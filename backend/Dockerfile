@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY backend/package.json backend/package.json
+RUN pnpm install --frozen-lockfile --filter tutorconnect-backend...
+
+COPY backend ./backend
+
+WORKDIR /app/backend
+ENV NODE_ENV=production
+ENV PORT=5000
+
+EXPOSE 5000
+
+CMD ["pnpm", "start"]

@@ -1,0 +1,8 @@
+{
+  "name": "tutorconnect-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "pnpm --filter tutorconnect-frontend build"
+  }
+}
