@@ -1,0 +1,11 @@
+.git
+.gitignore
+.pnpm-store
+node_modules
+**/node_modules
+frontend/.next
+frontend/out
+.env
+.env.*
+!.env.example
+!frontend/.env.local.example
