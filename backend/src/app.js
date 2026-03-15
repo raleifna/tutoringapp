@@ -50,6 +50,10 @@ app.get('/api/v1/demo', (_req, res) => {
   });
 });
 
+// tutors apis
+const tutorsAPIs = require('./routes/tutors');
+app.use('/api/v1/tutors', tutorsAPIs);
+
 app.use((_req, res) => {
   res.status(404).json({
     success: false,
