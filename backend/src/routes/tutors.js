@@ -17,7 +17,32 @@ const router = express.Router();
 
 // Get all tutors
 router.get('/', (_req, res) => {
-  res.json([]);
+  let tutors = [];
+  // make fake tutors
+  for (let i = 0; i < 1000; i++) {
+    tutors.push({
+      id: i,
+      name: `Tutor ${i}`,
+      email: `tutor${i}@example.com`,
+      phone: `1234567890${i}`,
+      subjects: [],
+      availability: [],
+    });
+  }
+  
+  // result is page 1 current
+  res.json({
+    success: true,
+    data: {
+      tutors,
+      pagination: {
+        page: 1,
+        limit: 100,
+        total: tutors.length,
+        totalPages: Math.ceil(tutors.length / 100),
+      },
+    },
+  });
 });
 
 // Get a tutor by id
