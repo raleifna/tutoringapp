@@ -1,3 +1,16 @@
+/**
+ * Routes for tutors
+ * 
+ * @route GET /api/v1/tutors
+ * @route GET /api/v1/tutors/:id
+ * @route GET /api/v1/tutors/:id/availability
+ * @route GET /api/v1/tutors/me/profile
+ * @route PUT /api/v1/tutors/me/application
+ * @route PUT /api/v1/tutors/me/profile
+ * @route PUT /api/v1/tutors/me/availability
+ * @route POST /api/v1/tutors/me/subjects
+ * @route DELETE /api/v1/tutors/me/subjects/:subjectId
+ */
 const express = require('express');
 
 const router = express.Router();
