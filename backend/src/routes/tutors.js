@@ -47,7 +47,19 @@ router.get('/', (_req, res) => {
 
 // Get a tutor by id
 router.get('/:id', (_req, res) => {
-  res.json([]);
+  // fake tutor
+  let tutor = {
+    id: Number(_req.params.id),
+    name: `Tutor ${_req.params.id}`,
+    email: `tutor${_req.params.id}@example.com`,
+    phone: `1234567890${_req.params.id}`,
+    subjects: [],
+    availability: [],
+  };
+  res.json({
+    success: true,
+    data: tutor,
+  });
 });
 
 // Get a tutor's availability by id
