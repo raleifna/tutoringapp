@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
@@ -50,11 +51,8 @@ app.get('/api/v1/demo', (_req, res) => {
   });
 });
 
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found.',
-  });
-});
+app.use(notFound);
+app.use(errorHandler);
+
 
 module.exports = app;
