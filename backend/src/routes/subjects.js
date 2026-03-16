@@ -36,6 +36,21 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/categories', async (req, res) => {
-  res.json({ success: true, data: {} });
+  let categories = await prisma.subject.findMany({
+    distinct: ['category'],
+    select: { category: true },
+    orderBy: { category: 'asc' },
+  });
+
+  let list = [];
+  for (let i = 0; i < categories.length; i++) {
+    let currentCategory = categories[i].category;
+    list.push(currentCategory);
+  }
+
+  res.json({
+    success: true, 
+    data: list
+  });
 });
 module.exports = router;
