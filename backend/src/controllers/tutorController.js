@@ -1,32 +1,75 @@
 ﻿import { errorHandler } from "../middleware/errorHandler";
 
 exports.searchTutors = async (req, res) => {
-  let page = req.query.page || 1;
-  let limit = req.query.limit || 12;
-  let subject = req.query.subject || '';
-  let tutors = prisma.tutorProfile.findMany({
-      where: {
-        status: 'ACTIVE',
-        subjects: {
-          some: {
-            subject: { name: { contains: subject, mode: 'insensitive' } }
-          }
+  const {
+    subject,
+    category,
+    location,
+    minRate,
+    maxRate,
+    minRating,
+    sessionType,
+    language,
+    experience,
+    sort = 'rating',
+    page = 1,
+    limit = 12,
+  } = req.query;
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const take = parseInt(limit);
+
+  const where = {
+    status: 'ACTIVE',
+    ...(minRate || maxRate
+      ? {
+          hourlyRate: {
+            ...(minRate && { gte: parseFloat(minRate) }),
+            ...(maxRate && { lte: parseFloat(maxRate) }),
+          },
         }
+      : {}),
+    ...(minRating && { rating: { gte: parseFloat(minRating) } }),
+    ...(sessionType && { sessionTypes: { has: sessionType } }),
+    ...(language && { languages: { has: language } }),
+    ...(experience && { yearsExperience: { gte: parseInt(experience) } }),
+    ...(location && {
+      location: { contains: location, mode: 'insensitive' },
+    }),
+    ...(subject && {
+      subjects: {
+        some: {
+          subject: { name: { contains: subject, mode: 'insensitive' } },
+        },
       },
+    }),
+    ...(category && {
+      subjects: {
+        some: {
+          subject: { category: { contains: category, mode: 'insensitive' } },
+        },
+      },
+    }),
+  };
+
+  const orderBy = {
+    rating: { rating: 'desc' },
+    rate_asc: { hourlyRate: 'asc' },
+    rate_desc: { hourlyRate: 'desc' },
+    experience: { yearsExperience: 'desc' },
+    sessions: { totalSessions: 'desc' },
+  }[sort] || { rating: 'desc' };
+
+  const [tutors, total] = await Promise.all([
+    prisma.tutorProfile.findMany({
+      where,
       select: tutorProfileSelect,
-      skip: (parseInt(page) - 1) * parseInt(limit),
-      take: parseInt(limit),
-    });
-  let total = prisma.tutorProfile.count({ 
-      where: {
-        status: 'ACTIVE',
-        subjects: {
-          some: {
-            subject: { name: { contains: subject, mode: 'insensitive' } }
-          }
-        }
-      },
-    });
+      orderBy,
+      skip,
+      take,
+    }),
+    prisma.tutorProfile.count({ where }),
+  ]);
 
   res.json({
     success: true,
@@ -34,9 +77,9 @@ exports.searchTutors = async (req, res) => {
       tutors,
       pagination: {
         page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(total),
-        totalPages: Math.ceil(parseInt(total) / parseInt(limit)),
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
       },
     },
   });
