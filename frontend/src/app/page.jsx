@@ -1,11 +1,20 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AcademicCapIcon,
 } from '@heroicons/react/24/outline';
+import { useAuthStore } from '../lib/store';
 
 export default function HomePage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const dashboardHref = user?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#e0f2fe,transparent_35%),linear-gradient(180deg,#f8fbff_0%,#ffffff_45%,#f3f6fb_100%)]">
       <header className="border-b border-white/60 bg-white/75 backdrop-blur-xl">
@@ -21,12 +30,20 @@ export default function HomePage() {
           </Link>
 
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm font-medium text-slate-600">
-              Log in
-            </Link>
-            <Link href="/register" className="btn-primary btn-sm rounded-full px-5">
-              Sign up
-            </Link>
+            {user ? (
+              <Link href={dashboardHref} className="btn-primary btn-sm rounded-full px-5">
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-medium text-slate-600">
+                  Log in
+                </Link>
+                <Link href="/register" className="btn-primary btn-sm rounded-full px-5">
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -34,11 +51,8 @@ export default function HomePage() {
         <section className="hero-card">
           <span className="eyebrow">TutorConnect</span>
           <h1>Project Workspace</h1>
-
-          <div className="link-grid">
-            <a href="/api/v1/health">Gateway health</a>
-            <a href="http://localhost:5050/health">Backend direct</a>
-            <a href="http://localhost:3000">Frontend direct</a>
+          <div className="mt-6 text-sm text-slate-500">
+            Current search value: {searchQuery || 'empty'}
           </div>
         </section>
 

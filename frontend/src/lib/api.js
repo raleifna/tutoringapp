@@ -103,4 +103,28 @@ export const authApi = {
         return api.post('/auth/resend-verification', data);
     },
 };
+
+// tutor APIs
+export const tutorApi = {
+    search: (params) => {
+        return api.get('/tutors', { params });
+    },
+    getById: (id) => {
+        return api.get(`/tutors/${id}`);
+    },
+    getAvailability: (id) => {
+        return api.get(`/tutors/${id}/availability`);
+    },
+
+};
+
+// subject APIs
+export const subjectApi = {
+    getAll: (params) => {
+        return api.get('/subjects', { params });
+    },
+    getCategories: () => {
+        return api.get('/subjects/categories');
+    },
+};
   
