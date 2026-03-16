@@ -69,7 +69,21 @@ exports.updateProfile = async (req, res) => {}
 
 exports.updateAvailability = async (req, res) => {}
 
-exports.getTutorAvailability = async (req, res) => {}
+exports.getTutorAvailability = async (req, res) => {
+  let userId = req.params.id;
+  const profile = await prisma.tutorProfile.findFirst({
+    where: { userId: userId },
+    include: { availability: true },
+  });
+
+  if (!profile) {
+    return res.status(400).json({
+            success: false,
+            message: 'Tutor not found',
+        });
+  }
+  res.json({ success: true, data: profile.availability });
+}
 
 exports.addSubject = async (req, res) => {}
 
