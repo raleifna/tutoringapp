@@ -71,3 +71,14 @@ model RefreshToken {
   @@index([token])
   @@map("refresh_tokens")
 }
+
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String   @unique // subject name
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+  tutors TutorSubject[]
+  @@map("subjects")
+}
