@@ -1,4 +1,4 @@
-﻿
+﻿import { errorHandler } from "../middleware/errorHandler";
 
 exports.searchTutors = async (req, res) => {
   let page = req.query.page || 1;
@@ -42,7 +42,24 @@ exports.searchTutors = async (req, res) => {
   });
 };
 
-exports.getTutorProfile = async (req, res) => {}
+exports.getTutorProfile = async (req, res) => {
+  let userId = req.params.id;
+  let tutor = await prisma.tutorProfile.findFirst({
+    where: {
+      userId: userId,
+      status: 'ACTIVE',
+    }
+  });
+
+  if (!tutor) {
+    return res.status(400).json({
+            success: false,
+            message: 'Tutor not found',
+        });
+  }
+
+  res.json({ success: true, data: tutor });
+}
 
 exports.getMyProfile = async (req, res) => {}
 
