@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AcademicCapIcon,
@@ -23,13 +23,19 @@ export default function HomePage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSearch = () => {
     const subject = searchQuery.trim();
     router.push(subject ? `/search?subject=${encodeURIComponent(subject)}` : '/search');
   };
 
-  const dashboardHref = user?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
+  const currentUser = mounted ? user : null;
+  const dashboardHref = currentUser?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#e0f2fe,transparent_35%),linear-gradient(180deg,#f8fbff_0%,#ffffff_45%,#f3f6fb_100%)]">
@@ -46,7 +52,7 @@ export default function HomePage() {
           </Link>
 
           <div className="flex items-center gap-3">
-            {user ? (
+            {currentUser ? (
               <Link href={dashboardHref} className="btn-primary btn-sm rounded-full px-5">
                 Dashboard
               </Link>
@@ -148,7 +154,7 @@ export default function HomePage() {
             </div>
           ))}
 
-          {!user && (
+          {!currentUser && (
             <div className="rounded-[28px] border border-sky-200 bg-sky-50 p-6">
               <p className="text-sm leading-6 text-sky-900">
                 Guests can browse tutors immediately. Create a learner or tutor account when you

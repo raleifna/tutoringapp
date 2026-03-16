@@ -106,7 +106,7 @@ function SearchPageContent() {
   return (
     <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
       <div className="mb-5">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
           <span>←</span> Back
         </Link>
       </div>
