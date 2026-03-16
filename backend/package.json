@@ -5,8 +5,10 @@
   "packageManager": "pnpm@10.15.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate",
+    "start": "pnpm run db:push && node server.js",
+    "dev": "pnpm run db:push && node --watch server.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
