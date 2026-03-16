@@ -1,8 +1,40 @@
 const express = require('express');
+const prisma = require('../prisma');
 const router = express.Router();
+
 router.get('/', async (req, res) => {
-  res.json({ success: true, data: {} });
+  let category = req.query.category;
+  let whereCondition = {};
+  if (category) {
+    whereCondition.category = category;
+  }
+
+  // read subjects
+  let subjects = await prisma.subject.findMany({
+    where: whereCondition,
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+  });
+
+  // group subjects
+  let grouped = {};
+  for (let i = 0; i < subjects.length; i++) {
+    let currentSubject = subjects[i];
+    let currentCategory = currentSubject.category;
+    if (!grouped[currentCategory]) {
+      grouped[currentCategory] = [];
+    }
+    grouped[currentCategory].push(currentSubject);
+  }
+
+  res.json({
+    success: true,
+    data: {
+      subjects: subjects,
+      grouped: grouped
+    }
+  });
 });
+
 router.get('/categories', async (req, res) => {
   res.json({ success: true, data: {} });
 });
