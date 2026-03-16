@@ -51,8 +51,15 @@ app.get('/api/v1/demo', (_req, res) => {
   });
 });
 
-app.use(notFound);
-app.use(errorHandler);
+// tutors apis
+const tutorsAPIs = require('./routes/tutors');
+app.use('/api/v1/tutors', tutorsAPIs);
 
+app.use((_req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found.',
+  });
+});
 
 module.exports = app;
