@@ -16,7 +16,7 @@ export default function HomePage() {
             </div>
             <div>
               <div className="text-lg font-semibold">TutorConnect Lite</div>
-              <div className="text-xs text-slate-500">Search, book, learn</div>
+              <div className="text-xs text-slate-500">A lightweight tutoring platform</div>
             </div>
           </Link>
 
