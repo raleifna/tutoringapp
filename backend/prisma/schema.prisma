@@ -123,3 +123,17 @@ model TutorProfile {
 
   @@map("tutor_profiles")
 }
+
+
+model TutorSubject {
+  id           String @id @default(uuid())
+  tutorId      String
+  subjectId    String
+  // beginner / intermediate / advanced / all
+  level        String
+  description  String?
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  @@unique([tutorId, subjectId]) // avoid duplicates
+  @@map("tutor_subjects")
+}
