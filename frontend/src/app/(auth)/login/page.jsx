@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { authApi } from '../../../lib/api';
+import { authApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
 import toast from 'react-hot-toast';
 

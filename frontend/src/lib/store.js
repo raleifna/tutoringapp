@@ -1,6 +1,6 @@
 // src/lib/store.js - Zustand Global State Store
 import { create } from 'zustand';
-import { authApi } from './api';
+import { authApi } from './api-entry';
 
 const STORAGE_KEYS = {
   USER: 'user',

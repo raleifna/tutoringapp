@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { authApi } from '../../../lib/api';
+import { authApi } from '../../../lib/api-entry';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;

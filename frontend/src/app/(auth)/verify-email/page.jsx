@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AcademicCapIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { authApi } from '../../../lib/api';
+import { authApi } from '../../../lib/api-entry';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
