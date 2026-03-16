@@ -22,36 +22,27 @@ enum ProfileStatus {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  password      String
-  role          Role          @default(LEARNER)
-  status        ProfileStatus @default(ACTIVE)
-  firstName     String
-  lastName      String
-  avatar        String?
-  phone         String?
-  dateOfBirth   DateTime?
-  bio           String?
-  preferredLang String        @default("en")
-  timezone      String        @default("UTC")
-  isEmailVerified          Boolean   @default(false)
-  emailVerificationToken   String?   @unique
+  id                       String        @id @default(uuid())
+  email                    String        @unique
+  password                 String
+  role                     Role          @default(LEARNER)
+  status                   ProfileStatus @default(ACTIVE)
+  firstName                String
+  lastName                 String
+  avatar                   String?
+  phone                    String?
+  dateOfBirth              DateTime?
+  bio                      String?
+  preferredLang            String        @default("en")
+  timezone                 String        @default("UTC")
+  isEmailVerified          Boolean       @default(false)
+  emailVerificationToken   String?       @unique
   emailVerificationExpiry  DateTime?
-  preferredMeetingTool     MeetingTool?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  lastLoginAt   DateTime?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  lastLoginAt              DateTime?
 
-  // Relations
-  learnerProfile  LearnerProfile?
-  tutorProfile    TutorProfile?
-  bookingsAsLearner Booking[]      @relation("LearnerBookings")
-  subscription    Subscription?
-  payments        Payment[]
-  refreshTokens   RefreshToken[]
-  adminActions    AdminAction[]    @relation("AdminActioner")
-  adminTargeted   AdminAction[]    @relation("AdminTarget")
+  refreshTokens            RefreshToken[]
 
   @@index([email])
   @@index([role])
