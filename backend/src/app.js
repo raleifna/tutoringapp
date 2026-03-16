@@ -53,4 +53,7 @@ app.use('/api/v1/users', userRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
+app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/users', userRoutes);
+
 module.exports = app;
