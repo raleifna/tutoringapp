@@ -6,6 +6,8 @@ const morgan = require('morgan');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const tutorRoutes = require('./routes/tutors');
+const subjectRoutes = require('./routes/subjects');
 
 const app = express();
 
@@ -55,5 +57,7 @@ app.use(errorHandler);
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/tutors', tutorRoutes);
+app.use('/api/v1/subjects', subjectRoutes);
 
 module.exports = app;
