@@ -1,6 +1,6 @@
 // server.js - Entry Point
 require('dotenv').config();
-require('express-async-errors');
+
 
 const app = require('./src/app');
 const { prisma } = require('./src/config/database');
@@ -38,3 +38,5 @@ process.on('SIGTERM', async () => {
   }
   process.exit(0);
 });
+
+start();
