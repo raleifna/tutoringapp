@@ -75,3 +75,7 @@ services:
       - frontend
       - backend
 
+volumes:
+  postgres_data:
+  backend_uploads:
+
