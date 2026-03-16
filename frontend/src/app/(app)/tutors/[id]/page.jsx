@@ -3,10 +3,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
+  CalendarDaysIcon,
   CheckBadgeIcon,
   AcademicCapIcon,
   BriefcaseIcon,
@@ -15,6 +20,18 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { tutorApi } from '../../../../lib/api-entry';
+import { bookingApi } from '../../../../lib/api';
+import { useAuthStore } from '../../../../lib/store';
+
+const bookingSchema = z.object({
+  subjectId: z.string().min(1, 'Please select a subject'),
+  sessionType: z.enum(['ONLINE', 'IN_PERSON', 'HYBRID']),
+  scheduledAt: z.string().min(1, 'Please select a date and time'),
+  duration: z.coerce.number().min(30).max(360),
+  notes: z.string().optional(),
+});
+
+const DURATIONS = [30, 60, 90, 120, 150, 180];
 
 const WEEKDAY_LABELS = [
   'Sunday',
@@ -52,7 +69,10 @@ const formatRate = (amount, currency = 'AUD') => {
 
 export default function TutorDetailPage() {
   const { id } = useParams();
+  const router = useRouter();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('about');
+  const [showBookingForm, setShowBookingForm] = useState(false);
 
   // Stage 2 priority #1
   const {
@@ -79,6 +99,71 @@ export default function TutorDetailPage() {
 
   const tutor = tutorData?.data?.data;
   const availability = availabilityData?.data?.data || [];
+  const isSelf = !!user && (user.id === tutor?.userId || user.id === tutor?.user?.id);
+  const isLearner = user?.role === 'LEARNER';
+  const isGuest = !user;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm({
+    resolver: zodResolver(bookingSchema),
+    defaultValues: {
+      subjectId: '',
+      sessionType: 'ONLINE',
+      scheduledAt: '',
+      duration: 60,
+      notes: '',
+    },
+  });
+
+  const bookMutation = useMutation({
+    mutationFn: (data) => {
+      const selectedSubject = tutor?.subjects?.find((item) => {
+        const subjectId = String(item?.subjectId || item?.subject?.id || item?.id || '');
+        return subjectId === String(data.subjectId);
+      });
+
+      const selectedSubjectName = selectedSubject?.subject?.name || selectedSubject?.name;
+      if (!selectedSubjectName) {
+        throw new Error('Please select a valid subject');
+      }
+
+      return bookingApi.create({
+        tutorId: id,
+        subjectId: data.subjectId,
+        subject: selectedSubjectName,
+        sessionType: data.sessionType,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        duration: Number(data.duration),
+        notes: data.notes,
+      });
+    },
+    onSuccess: (res) => {
+      toast.success('Booking request sent!');
+      reset();
+      setShowBookingForm(false);
+      const bookingId = res?.data?.data?.id;
+      if (bookingId) {
+        router.push(`/bookings/${bookingId}`);
+      }
+    },
+    onError: (err) => {
+      const message =
+        err?.response?.data?.errors?.[0]?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Booking failed';
+      toast.error(message);
+    },
+  });
+
+  const requireSignUp = () => {
+    toast('Create an account to book a session.');
+    router.push(`/register?next=/tutors/${id}`);
+  };
 
   if (isLoading) {
     return (
@@ -182,9 +267,18 @@ export default function TutorDetailPage() {
               </div>
             )}
 
-            <p className="text-xs text-gray-400 mt-3">
-              Booking form will be added in later stage.
-            </p>
+            {!isSelf && (isLearner || isGuest) && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => (isGuest ? requireSignUp() : setShowBookingForm(true))}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  {isGuest ? 'Sign Up to Book' : 'Book a Session'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -329,6 +423,98 @@ export default function TutorDetailPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {showBookingForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-5">Book a Session with {getTutorName(tutor)}</h2>
+
+            <form onSubmit={handleSubmit((data) => bookMutation.mutate(data))} className="space-y-4">
+              <div>
+                <label className="label">
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <select {...register('subjectId')} className="input">
+                  <option value="">Select subject...</option>
+                  {tutor.subjects?.map((item) => {
+                    const subjectId = String(item?.subjectId || item?.subject?.id || item?.id || '');
+                    const subjectName = item?.subject?.name || item?.name || 'Subject';
+                    return (
+                      <option key={subjectId} value={subjectId}>
+                        {subjectName}
+                      </option>
+                    );
+                  })}
+                </select>
+                {errors.subjectId && <p className="error-text">{errors.subjectId.message}</p>}
+              </div>
+
+              <div>
+                <label className="label">
+                  Session Type <span className="text-red-500">*</span>
+                </label>
+                <select {...register('sessionType')} className="input">
+                  {(Array.isArray(tutor.sessionTypes) && tutor.sessionTypes.length > 0
+                    ? tutor.sessionTypes
+                    : ['ONLINE', 'IN_PERSON', 'HYBRID']
+                  ).map((item) => (
+                    <option key={item} value={item}>
+                      {String(item).replace('_', '-')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">
+                  Date & Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  {...register('scheduledAt')}
+                  className="input"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+                {errors.scheduledAt && <p className="error-text">{errors.scheduledAt.message}</p>}
+              </div>
+
+              <div>
+                <label className="label">Duration (minutes)</label>
+                <select {...register('duration')} className="input">
+                  {DURATIONS.map((duration) => (
+                    <option key={duration} value={duration}>
+                      {duration} minutes
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Notes (optional)</label>
+                <textarea
+                  {...register('notes')}
+                  rows={2}
+                  className="input resize-none"
+                  placeholder="Topics you'd like to cover..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={bookMutation.isPending} className="btn-primary flex-1">
+                  {bookMutation.isPending ? 'Sending...' : 'Send Request'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBookingForm(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
