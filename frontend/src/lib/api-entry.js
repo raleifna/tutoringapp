@@ -2,6 +2,8 @@
 import { authApi as realAuthApi } from './api';
 import { authApi as mockAuthApi } from '../mocks/auth.mock';
 
-export const API_MODE = process.env.NEXT_PUBLIC_API_MODE === 'mock' ? 'mock' : 'backend';
+const normalizeMode = (value) => (value === 'mock' ? 'mock' : 'backend');
+const STAGE1_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE1_API_MODE);
 
-export const authApi = API_MODE === 'mock' ? mockAuthApi : realAuthApi;
+// Stage 1 pages/store currently use auth APIs.
+export const authApi = STAGE1_API_MODE === 'mock' ? mockAuthApi : realAuthApi;

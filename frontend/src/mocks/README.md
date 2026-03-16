@@ -5,9 +5,11 @@ Important: Next.js reads `.env.local` for local environment variables.
 
 ## Switch Between Backend and Mock
 
-The project uses one global switch:
+The project currently uses one stage switch:
 
-`NEXT_PUBLIC_API_MODE`
+- `NEXT_PUBLIC_STAGE1_API_MODE`
+
+It supports:
 
 - `backend`: use real backend APIs (`src/lib/api.js`)
 - `mock`: use mock APIs (`src/mocks/auth.mock.js`)
@@ -16,13 +18,7 @@ Set it in your env file (recommended):
 
 ```bash
 # frontend/.env.local
-NEXT_PUBLIC_API_MODE=mock
-```
-
-or
-
-```bash
-NEXT_PUBLIC_API_MODE=backend
+NEXT_PUBLIC_STAGE1_API_MODE=mock
 ```
 
 After changing the value, restart the frontend dev server.
@@ -31,7 +27,7 @@ After changing the value, restart the frontend dev server.
 
 Currently mocked:
 
-- `authApi` (register/login/logout/getMe/verifyEmail/resendVerification/changePassword)
+- Stage 1 `authApi` (register/login/logout/getMe/verifyEmail/resendVerification/changePassword)
 
 The switch logic is in:
 
@@ -46,9 +42,11 @@ The switch logic is in:
 
 ## 如何切换 后端 / Mock
 
-项目使用一个全局开关：
+项目目前使用一个 stage 开关：
 
-`NEXT_PUBLIC_API_MODE`
+- `NEXT_PUBLIC_STAGE1_API_MODE`
+
+它支持：
 
 - `backend`：使用真实后端接口（`src/lib/api.js`）
 - `mock`：使用 mock 接口（`src/mocks/auth.mock.js`）
@@ -57,13 +55,7 @@ The switch logic is in:
 
 ```bash
 # frontend/.env.local
-NEXT_PUBLIC_API_MODE=mock
-```
-
-或者：
-
-```bash
-NEXT_PUBLIC_API_MODE=backend
+NEXT_PUBLIC_STAGE1_API_MODE=mock
 ```
 
 修改后请重启前端开发服务器。
@@ -72,7 +64,7 @@ NEXT_PUBLIC_API_MODE=backend
 
 目前已实现：
 
-- `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
+- Stage 1 的 `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
 
 开关逻辑位置：
 
