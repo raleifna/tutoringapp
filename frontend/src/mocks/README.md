@@ -12,7 +12,7 @@ The project currently uses one stage switch:
 It supports:
 
 - `backend`: use real backend APIs (`src/lib/api.js`)
-- `mock`: use mock APIs (`src/mocks/auth.mock.js`)
+- `mock`: use mock APIs (`src/mocks/auth.mock.js`, `src/mocks/stage2.mock.js`)
 
 Set it in your env file (recommended):
 
@@ -27,7 +27,9 @@ After changing the value, restart the frontend dev server.
 
 Currently mocked:
 
-- Stage 1 `authApi` (register/login/logout/getMe/verifyEmail/resendVerification/changePassword)
+- `authApi` (register/login/logout/getMe/verifyEmail/resendVerification/changePassword)
+- `subjectApi` (getCategories/getAll)
+- `tutorApi` (search/getById/getAvailability)
 
 The switch logic is in:
 
@@ -49,7 +51,7 @@ The switch logic is in:
 它支持：
 
 - `backend`：使用真实后端接口（`src/lib/api.js`）
-- `mock`：使用 mock 接口（`src/mocks/auth.mock.js`）
+- `mock`：使用 mock 接口（`src/mocks/auth.mock.js`、`src/mocks/stage2.mock.js`）
 
 建议在环境变量文件中设置：
 
@@ -64,7 +66,9 @@ NEXT_PUBLIC_STAGE1_API_MODE=mock
 
 目前已实现：
 
-- Stage 1 的 `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
+- `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
+- `subjectApi`（getCategories/getAll）
+- `tutorApi`（search/getById/getAvailability）
 
 开关逻辑位置：
 

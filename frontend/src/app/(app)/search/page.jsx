@@ -11,7 +11,7 @@ import {
   MapPinIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { subjectApi, tutorApi } from '../../../lib/api';
+import { subjectApi, tutorApi } from '../../../lib/api-entry';
 
 const SESSION_TYPES = [
   { value: '', label: 'Any type' },

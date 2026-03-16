@@ -14,7 +14,7 @@ import {
   MapPinIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { tutorApi } from '../../../../lib/api';
+import { tutorApi } from '../../../../lib/api-entry';
 
 const WEEKDAY_LABELS = [
   'Sunday',
