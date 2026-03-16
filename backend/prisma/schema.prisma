@@ -6,3 +6,59 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  LEARNER
+  TUTOR
+  ADMIN
+  SYSTEM_ADMIN
+}
+
+enum ProfileStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+model User {
+  id                      String         @id @default(uuid())
+  email                   String         @unique
+  password                String
+  role                    Role           @default(LEARNER)
+  status                  ProfileStatus  @default(ACTIVE)
+  firstName               String
+  lastName                String
+  avatar                  String?
+  phone                   String?
+  dateOfBirth             DateTime?
+  bio                     String?
+  preferredLang           String         @default("en")
+  timezone                String         @default("UTC")
+  isEmailVerified         Boolean        @default(false)
+  emailVerificationToken  String?        @unique
+  emailVerificationExpiry DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  lastLoginAt             DateTime?
+
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

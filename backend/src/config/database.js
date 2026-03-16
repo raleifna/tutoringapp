@@ -1,7 +1,7 @@
-function connectDatabase() {
-    return Promise.resolve();
-}
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 module.exports = {
-    connectDatabase,
+    prisma,
 };
