@@ -5,13 +5,28 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AcademicCapIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../lib/store';
+
+const quickSubjects = [
+  'Mathematics',
+  'Programming',
+  'English',
+  'Physics',
+  'Data Science',
+  'IELTS Prep',
+];
 
 export default function HomePage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = () => {
+    const subject = searchQuery.trim();
+    router.push(subject ? `/search?subject=${encodeURIComponent(subject)}` : '/search');
+  };
 
   const dashboardHref = user?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
 
@@ -24,7 +39,7 @@ export default function HomePage() {
               <AcademicCapIcon className="h-6 w-6" />
             </div>
             <div>
-              <div className="text-lg font-semibold">TutorConnect Lite</div>
+              <div className="text-lg font-semibold">TutorConnect</div>
               <div className="text-xs text-slate-500">A lightweight tutoring platform</div>
             </div>
           </Link>
@@ -50,9 +65,44 @@ export default function HomePage() {
       <main className="page-shell">
         <section className="hero-card">
           <span className="eyebrow">TutorConnect</span>
-          <h1>Project Workspace</h1>
-          <div className="mt-6 text-sm text-slate-500">
-            Current search value: {searchQuery || 'empty'}
+          <h1>Find Your Tutor</h1>
+          <p>Search by subject to explore tutors and continue the learning journey.</p>
+
+          <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/50">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-1 items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSearch();
+                  }}
+                  placeholder="Search by subject, for example Mathematics or Python"
+                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                className="btn-primary justify-center rounded-2xl px-6 py-3"
+              >
+                Search tutors
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {quickSubjects.map((subject) => (
+              <Link
+                key={subject}
+                href={`/search?subject=${encodeURIComponent(subject)}`}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+              >
+                {subject}
+              </Link>
+            ))}
           </div>
         </section>
 
