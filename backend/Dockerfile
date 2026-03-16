@@ -9,8 +9,10 @@ COPY backend/prisma backend/prisma
 RUN pnpm install --frozen-lockfile --filter tutorconnect-backend...
 
 COPY backend ./backend
-    
+
 WORKDIR /app/backend
+RUN pnpm exec prisma generate
+
 ENV NODE_ENV=production
 ENV PORT=5000
 

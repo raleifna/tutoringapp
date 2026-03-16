@@ -1,15 +1,21 @@
 const express = require('express');
+const {
+    register,
+    login,
+    refreshToken,
+    logout,
+    getMe,
+} = require('../controllers/authController');
+const { authenticate } = require('../middleware/auth');
 
-router.post(
-  '/register',
-  upload.array('verificationFiles', 5),
-  registerRules,
-  validate,
-  authController.register
-);
-router.post('/login', loginRules, validate, authController.login);
-router.post('/logout', authenticate, authController.logout);
-router.get('/me', authenticate, authController.getMe);
-router.get('/verify-email', authController.verifyEmail); // ?token=xxx
-router.post('/resend-verification', authController.resendVerification); // { email }
-    
+const router = express.Router();
+
+router.post('/register', register);
+router.post('/login', login);
+router.post('/refresh-token', refreshToken);
+router.post('/logout', logout);
+
+// current user info should require login
+router.get('/me', authenticate, getMe);
+
+module.exports = router;
