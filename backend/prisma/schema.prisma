@@ -137,3 +137,15 @@ model TutorSubject {
   @@unique([tutorId, subjectId]) // avoid duplicates
   @@map("tutor_subjects")
 }
+
+model TutorAvailability {
+  id        String   @id @default(uuid())
+  tutorId   String
+  // day index
+  dayOfWeek Int      // 0=Sunday ... 6=Saturday
+  startTime String   // HH:MM
+  endTime   String   // HH:MM
+  timezone  String   @default("UTC") // might change later
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  @@map("tutor_availability")
+}
