@@ -1,4 +1,46 @@
-﻿exports.searchTutors = async (req, res) => {}
+﻿
+
+exports.searchTutors = async (req, res) => {
+  let page = req.query.page || 1;
+  let limit = req.query.limit || 12;
+  let subject = req.query.subject || '';
+  let tutors = prisma.tutorProfile.findMany({
+      where: {
+        status: 'ACTIVE',
+        subjects: {
+          some: {
+            subject: { name: { contains: subject, mode: 'insensitive' } }
+          }
+        }
+      },
+      select: tutorProfileSelect,
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: parseInt(limit),
+    });
+  let total = prisma.tutorProfile.count({ 
+      where: {
+        status: 'ACTIVE',
+        subjects: {
+          some: {
+            subject: { name: { contains: subject, mode: 'insensitive' } }
+          }
+        }
+      },
+    });
+
+  res.json({
+    success: true,
+    data: {
+      tutors,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: parseInt(total),
+        totalPages: Math.ceil(parseInt(total) / parseInt(limit)),
+      },
+    },
+  });
+};
 
 exports.getTutorProfile = async (req, res) => {}
 
