@@ -1,8 +1,9 @@
 import Providers from '../components/providers/Provider';
 import './globals.css';
-
 import { Inter } from 'next/font/google';
+
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+
 export const metadata = {
   title: {
     default: 'TutorConnect - Find Your Perfect Tutor',
