@@ -3,6 +3,12 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 
+const { notFound, errorHandler } = require('./middleware/errorHandler');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const tutorRoutes = require('./routes/tutors');
+const subjectRoutes = require('./routes/subjects');
+
 const app = express();
 
 const normalizeOrigin = (value = '') => value.trim().replace(/\/+$/, '');
@@ -42,23 +48,16 @@ app.get('/api/v1/health', (_req, res) => {
   res.json(createHealthPayload());
 });
 
-app.get('/api/v1/demo', (_req, res) => {
-  res.json({
-    success: true,
-    message: 'TutorConnect backend is running.',
-    endpoints: ['/health', '/api/v1/health'],
-  });
-});
+// stage 1: only auth and users routes are enabled
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 
-// tutors apis
-const tutorsAPIs = require('./routes/tutors');
-app.use('/api/v1/tutors', tutorsAPIs);
+app.use(notFound);
+app.use(errorHandler);
 
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found.',
-  });
-});
+app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/tutors', tutorRoutes);
+app.use('/api/v1/subjects', subjectRoutes);
 
 module.exports = app;
