@@ -9,3 +9,68 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  LEARNER
+  TUTOR
+  ADMIN
+  SYSTEM_ADMIN
+}
+
+enum ProfileStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+model User {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  role          Role          @default(LEARNER)
+  status        ProfileStatus @default(ACTIVE)
+  firstName     String
+  lastName      String
+  avatar        String?
+  phone         String?
+  dateOfBirth   DateTime?
+  bio           String?
+  preferredLang String        @default("en")
+  timezone      String        @default("UTC")
+  isEmailVerified          Boolean   @default(false)
+  emailVerificationToken   String?   @unique
+  emailVerificationExpiry  DateTime?
+  preferredMeetingTool     MeetingTool?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  learnerProfile  LearnerProfile?
+  tutorProfile    TutorProfile?
+  bookingsAsLearner Booking[]      @relation("LearnerBookings")
+  subscription    Subscription?
+  payments        Payment[]
+  refreshTokens   RefreshToken[]
+  adminActions    AdminAction[]    @relation("AdminActioner")
+  adminTargeted   AdminAction[]    @relation("AdminTarget")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("refresh_tokens")
+}
