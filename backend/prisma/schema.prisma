@@ -1,6 +1,3 @@
-// Prisma Schema for TutorConnect App
-// Database: PostgreSQL
-
 generator client {
   provider = "prisma-client-js"
 }
