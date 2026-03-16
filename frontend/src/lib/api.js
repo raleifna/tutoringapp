@@ -118,6 +118,37 @@ export const tutorApi = {
 
 };
 
+// booking APIs
+export const bookingApi = {
+    create: (data) => {
+        return api.post('/bookings', data);
+    },
+    getMyBookings: (params) => {
+        return api.get('/bookings/my-bookings', { params });
+    },
+    getTutorBookings: (params) => {
+        return api.get('/bookings/tutor/requests', { params });
+    },
+    getById: (id) => {
+        return api.get(`/bookings/${id}`);
+    },
+    cancel: (id, reason) => {
+        return api.post(`/bookings/${id}/cancel`, { reason });
+    },
+    accept: (id, data) => {
+        return api.patch(`/bookings/${id}/accept`, data);
+    },
+    decline: (id, reason) => {
+        return api.patch(`/bookings/${id}/decline`, { reason });
+    },
+    reschedule: (id, data) => {
+        return api.patch(`/bookings/${id}/reschedule`, data);
+    },
+    complete: (id) => {
+        return api.patch(`/bookings/${id}/complete`);
+    },
+};
+
 // subject APIs
 export const subjectApi = {
     getAll: (params) => {
