@@ -5,6 +5,7 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json backend/package.json
+COPY backend/prisma backend/prisma
 RUN pnpm install --frozen-lockfile --filter tutorconnect-backend...
 
 COPY backend ./backend
