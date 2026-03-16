@@ -74,8 +74,4 @@ services:
     depends_on:
       - frontend
       - backend
-  
-volumes:
-  postgres_data:
-  backend_uploads:
 

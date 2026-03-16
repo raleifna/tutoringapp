@@ -1,8 +1,11 @@
+// src/app/layout.jsx - Root Layout
 import Providers from '../components/providers/Provider';
 import './globals.css';
-
 import { Inter } from 'next/font/google';
+import { Toaster } from 'react-hot-toast';
+
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+
 export const metadata = {
   title: {
     default: 'TutorConnect - Find Your Perfect Tutor',
@@ -31,6 +34,16 @@ export default function RootLayout({ children }) {
       <body>
         <Providers>
           {children}
+
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: { borderRadius: '10px', background: '#fff', color: '#111827' },
+              success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+              error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+            }}
+          />
         </Providers>
       </body>
     </html>
