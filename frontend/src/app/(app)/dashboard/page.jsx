@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import {
   MagnifyingGlassIcon,
   CalendarDaysIcon,
@@ -12,7 +13,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
-import { bookingApi } from '../../../lib/api';
+import { bookingApi } from '../../../lib/api-entry';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -44,6 +45,13 @@ const getStatusClass = (status) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ['myBookings', 'dashboard'],
     queryFn: () => bookingApi.getMyBookings({ limit: 5 }),
@@ -93,7 +101,7 @@ export default function DashboardPage() {
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
         <h1 className="text-xl font-bold">
-          {user?.firstName} {user?.lastName}
+          {displayName}
         </h1>
         <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
         <button onClick={handleLogout} className="btn-secondary mt-4">

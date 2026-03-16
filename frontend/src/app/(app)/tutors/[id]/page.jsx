@@ -19,8 +19,7 @@ import {
   MapPinIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { tutorApi } from '../../../../lib/api-entry';
-import { bookingApi } from '../../../../lib/api';
+import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 
 const bookingSchema = z.object({
@@ -160,9 +159,9 @@ export default function TutorDetailPage() {
     },
   });
 
-  const requireSignUp = () => {
-    toast('Create an account to book a session.');
-    router.push(`/register?next=/tutors/${id}`);
+  const requireLogin = () => {
+    toast('Please log in to book a session.');
+    router.push(`/login?next=/tutors/${id}`);
   };
 
   if (isLoading) {
@@ -271,11 +270,11 @@ export default function TutorDetailPage() {
               <div className="mt-4">
                 <button
                   type="button"
-                  onClick={() => (isGuest ? requireSignUp() : setShowBookingForm(true))}
+                  onClick={() => (isGuest ? requireLogin() : setShowBookingForm(true))}
                   className="btn-primary inline-flex items-center gap-2"
                 >
                   <CalendarDaysIcon className="w-4 h-4" />
-                  {isGuest ? 'Sign Up to Book' : 'Book a Session'}
+                  {isGuest ? 'Log In to Book' : 'Book a Session'}
                 </button>
               </div>
             )}

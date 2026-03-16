@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../lib/api';
+import { bookingApi } from '../../../lib/api-entry';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
