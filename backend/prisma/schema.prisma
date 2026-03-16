@@ -62,3 +62,81 @@ model RefreshToken {
   @@index([token])
   @@map("refresh_tokens")
 }
+
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String   @unique // subject name
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+  tutors TutorSubject[]
+  @@map("subjects")
+}
+
+model TutorProfile {
+  id                String        @id @default(uuid())
+  userId            String        @unique
+  // profile status
+  status            ProfileStatus @default(PENDING)
+
+  headline          String?
+  hourlyRate        Decimal       @db.Decimal(10, 2) @default(0)
+  currency          String        @default("AUD") // default for now
+  yearsExperience   Int           @default(0)
+  // tutor education history
+  education         Json[]        // [{institution, degree, field, year}]
+  certifications    Json[]        // certificates etc
+  languages         String[]      @default(["English"]) // can add more later
+  sessionTypes      SessionType[] @default([ONLINE])
+  location          String?
+
+  // map related
+  latitude          Decimal?      @db.Decimal(10, 8)
+  longitude         Decimal?      @db.Decimal(11, 8)
+
+  rating            Decimal       @db.Decimal(3, 2) @default(0)
+  totalReviews      Int           @default(0)
+  totalSessions     Int           @default(0)
+  isVerified        Boolean       @default(false)
+  verifiedAt        DateTime?
+  responseTime      Int?          // minutes
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // allowed session durations
+  sessionDurations  Int[]           @default([60]) // e.g 30 / 60 / 90
+  preferredMeetingTool MeetingTool?
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects     TutorSubject[]
+  availability TutorAvailability[]
+  bookings     Booking[]         @relation("TutorBookings")
+
+  @@map("tutor_profiles")
+}
+
+
+model TutorSubject {
+  id           String @id @default(uuid())
+  tutorId      String
+  subjectId    String
+  // beginner / intermediate / advanced / all
+  level        String
+  description  String?
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  @@unique([tutorId, subjectId]) // avoid duplicates
+  @@map("tutor_subjects")
+}
+
+model TutorAvailability {
+  id        String   @id @default(uuid())
+  tutorId   String
+  // day index
+  dayOfWeek Int      // 0=Sunday ... 6=Saturday
+  startTime String   // HH:MM
+  endTime   String   // HH:MM
+  timezone  String   @default("UTC") // might change later
+  tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  @@map("tutor_availability")
+}
