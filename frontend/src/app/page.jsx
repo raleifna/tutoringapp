@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AcademicCapIcon,
+  CalendarDaysIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../lib/store';
@@ -40,7 +41,7 @@ export default function HomePage() {
             </div>
             <div>
               <div className="text-lg font-semibold">TutorConnect</div>
-              <div className="text-xs text-slate-500">A lightweight tutoring platform</div>
+              <div className="text-xs text-slate-500">Search, book, learn</div>
             </div>
           </Link>
 
@@ -62,13 +63,20 @@ export default function HomePage() {
           </div>
         </div>
       </header>
-      <main className="page-shell">
+      <main className="mx-auto grid min-h-[calc(100vh-73px)] max-w-5xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
         <section className="hero-card">
-          <span className="eyebrow">TutorConnect</span>
-          <h1>Find Your Tutor</h1>
-          <p>Search by subject to explore tutors and continue the learning journey.</p>
+          <div className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+            MVP First Demo
+          </div>
+          <h1 className="mt-6 max-w-2xl text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
+            Keep the core flow: find a tutor, book a lesson, manage the session.
+          </h1>
+          <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
+            For the MVP first demo, this version focuses on the core flow: login, tutor search, tutor detail, and booking features.
 
-          <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/50">
+          </p>
+
+          <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/60">
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="flex flex-1 items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
                 <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
@@ -106,14 +114,59 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="stack-card">
-          <h2>Current Stack</h2>
-          <ul>
-            <li>Next.js frontend on port 3000</li>
-            <li>Express backend on port 5000, mapped to host 5050</li>
-            <li>Nginx gateway on port 8080</li>
-            <li>Docker Compose local deployment config</li>
-          </ul>
+        <section className="space-y-4">
+          {[
+            {
+              title: '1. Search tutors',
+              body: 'Filter by subject, price, rating and session type, then open the tutor profile.',
+              icon: MagnifyingGlassIcon,
+            },
+            {
+              title: '2. Book a lesson',
+              body: 'Pick a subject, choose a time and submit a booking request from the tutor page.',
+              icon: CalendarDaysIcon,
+            },
+            {
+              title: '3. Manage the booking',
+              body: 'Learners track progress in My Bookings, tutors accept, decline or complete requests.',
+              icon: AcademicCapIcon,
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                  <item.icon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{item.title}</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {!user && (
+            <div className="rounded-[28px] border border-sky-200 bg-sky-50 p-6">
+              <p className="text-sm leading-6 text-sky-900">
+                Guests can browse tutors immediately. Create a learner or tutor account when you
+                want to book or manage sessions.
+              </p>
+              <div className="mt-4 flex gap-3">
+                <Link href="/register" className="btn-primary btn-sm rounded-full px-5">
+                  Create account
+                </Link>
+                <Link
+                  href="/register?role=TUTOR"
+                  className="btn-secondary btn-sm rounded-full px-5"
+                >
+                  Become a tutor
+                </Link>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>
