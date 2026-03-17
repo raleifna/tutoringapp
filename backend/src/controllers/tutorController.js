@@ -351,6 +351,48 @@ async function updateAvailability(req, res) {
   });
 };
 
+async function addSubject(req, res) {
+  let userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
+  let subjectId = req.body.subjectId;
+  let level = req.body.level;
+  let description = req.body.description;
+  let profile = await prisma.tutorProfile.findUnique({
+    where: { userId: userId },
+  });
+  if (!profile || profile.status !== 'ACTIVE') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not profile or no permission.',
+    });
+  }
+  let subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!subject) {
+    return res.status(404).json({
+      success: false,
+      message: 'No Subject',
+    });
+  }
+
+  // update or create
+  let tutorSubject = await prisma.tutorSubject.upsert({
+    where: { tutorId_subjectId: { tutorId: profile.id, subjectId: subjectId } },
+    update: { level: level, description: description },
+    create: { tutorId: profile.id, subjectId: subjectId, level: level, description: description },
+    include: { subject: true },
+  });
+
+  res.json({ 
+    success: true, 
+    data: tutorSubject
+  });
+};
+
 module.exports = {
   searchTutors,
   getTutorProfile,
@@ -358,4 +400,5 @@ module.exports = {
   getMyProfile,
   updateProfile,
   updateAvailability,
+  addSubject,
 };
