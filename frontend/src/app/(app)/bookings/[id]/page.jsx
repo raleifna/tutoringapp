@@ -1,4 +1,4 @@
-// src/app/(app)/bookings/[id]/page.jsx - Booking detail page (learner stage)
+// src/app/(app)/bookings/[id]/page.jsx -  Booking Detail Page
 'use client';
 
 import { useState } from 'react';
