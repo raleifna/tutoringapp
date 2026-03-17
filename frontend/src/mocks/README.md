@@ -5,21 +5,28 @@ Important: Next.js reads `.env.local` for local environment variables.
 
 ## Switch Between Backend and Mock
 
-The project currently uses one stage switch:
+The project currently uses three stage switches:
 
-- `NEXT_PUBLIC_STAGE1_API_MODE`
+- `NEXT_PUBLIC_STAGE1_API_MODE` (auth)
+- `NEXT_PUBLIC_STAGE2_API_MODE` (subject + tutor)
+- `NEXT_PUBLIC_STAGE3_API_MODE` (booking)
 
-It supports:
+Each switch supports:
 
 - `backend`: use real backend APIs (`src/lib/api.js`)
-- `mock`: use mock APIs (`src/mocks/auth.mock.js`, `src/mocks/stage2.mock.js`)
+- `mock`: use mock APIs (`src/mocks/stage1.mock.js`, `src/mocks/stage2.mock.js`, `src/mocks/stage3.mock.js`)
 
-Set it in your env file (recommended):
+Set them in your env file (recommended):
 
 ```bash
 # frontend/.env.local
 NEXT_PUBLIC_STAGE1_API_MODE=mock
+NEXT_PUBLIC_STAGE2_API_MODE=mock
+NEXT_PUBLIC_STAGE3_API_MODE=mock
 ```
+
+Compatibility note:
+- If `STAGE2/3` are not set, they will fallback to `STAGE1`.
 
 After changing the value, restart the frontend dev server.
 
@@ -30,6 +37,7 @@ Currently mocked:
 - `authApi` (register/login/logout/getMe/verifyEmail/resendVerification/changePassword)
 - `subjectApi` (getCategories/getAll)
 - `tutorApi` (search/getById/getAvailability)
+- `bookingApi` (create/getMyBookings/getById/cancel)
 
 The switch logic is in:
 
@@ -44,21 +52,28 @@ The switch logic is in:
 
 ## 如何切换 后端 / Mock
 
-项目目前使用一个 stage 开关：
+项目目前使用三个 stage 开关：
 
-- `NEXT_PUBLIC_STAGE1_API_MODE`
+- `NEXT_PUBLIC_STAGE1_API_MODE`（auth）
+- `NEXT_PUBLIC_STAGE2_API_MODE`（subject + tutor）
+- `NEXT_PUBLIC_STAGE3_API_MODE`（booking）
 
-它支持：
+每个开关支持：
 
 - `backend`：使用真实后端接口（`src/lib/api.js`）
-- `mock`：使用 mock 接口（`src/mocks/auth.mock.js`、`src/mocks/stage2.mock.js`）
+- `mock`：使用 mock 接口（`src/mocks/stage1.mock.js`、`src/mocks/stage2.mock.js`、`src/mocks/stage3.mock.js`）
 
 建议在环境变量文件中设置：
 
 ```bash
 # frontend/.env.local
 NEXT_PUBLIC_STAGE1_API_MODE=mock
+NEXT_PUBLIC_STAGE2_API_MODE=mock
+NEXT_PUBLIC_STAGE3_API_MODE=mock
 ```
+
+兼容说明：
+- 如果不设置 `STAGE2/3`，会默认跟随 `STAGE1`。
 
 修改后请重启前端开发服务器。
 
@@ -69,6 +84,7 @@ NEXT_PUBLIC_STAGE1_API_MODE=mock
 - `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
 - `subjectApi`（getCategories/getAll）
 - `tutorApi`（search/getById/getAvailability）
+- `bookingApi`（create/getMyBookings/getById/cancel）
 
 开关逻辑位置：
 
