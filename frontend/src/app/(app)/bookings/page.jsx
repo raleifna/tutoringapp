@@ -1,11 +1,12 @@
 // src/app/(app)/bookings/page.jsx - bookings list page
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../lib/api';
+import { bookingApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
 
 const STATUS_TABS = [
@@ -15,6 +16,13 @@ const STATUS_TABS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
+
+const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
+
+const getInitialStatus = (value) => {
+  const next = String(value || '').toUpperCase();
+  return STATUS_VALUES.has(next) ? next : '';
+};
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -68,10 +76,27 @@ const getBookingStatusClass = (status) => {
 };
 
 export default function BookingsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get('status');
   const { user } = useAuthStore();
-  const [activeStatus, setActiveStatus] = useState('');
+  const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
   const [page, setPage] = useState(1);
   const isTutor = user?.role === 'TUTOR';
+  const fallbackBackHref = isTutor ? '/tutor/dashboard' : '/dashboard';
+
+  useEffect(() => {
+    setActiveStatus(getInitialStatus(statusParam));
+    setPage(1);
+  }, [statusParam]);
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(fallbackBackHref);
+  };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['bookings', activeStatus, page, isTutor],
@@ -90,6 +115,16 @@ export default function BookingsPage() {
   return (
     <div className="space-y-5">
       <div>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
+        >
+          <span>←</span> Back
+        </button>
+      </div>
+
+      <div className="pl-4">
         <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
         <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
       </div>

@@ -2,7 +2,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
@@ -11,7 +13,7 @@ import {
   CheckCircleIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../../lib/api';
+import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 
 const cn = (...classes) => {
@@ -58,7 +60,15 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
 };
 
 export default function TutorDashboardPage() {
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
 
   const { data: requestsData, isLoading: requestsLoading } = useQuery({
     queryKey: ['tutor-requests', 'PENDING'],
@@ -75,6 +85,12 @@ export default function TutorDashboardPage() {
     queryFn: () => bookingApi.getTutorBookings({ limit: 100 }),
   });
 
+  const { data: myProfileData } = useQuery({
+    queryKey: ['tutor-public-profile-id'],
+    queryFn: () => tutorApi.getMyProfile(),
+    enabled: user?.role === 'TUTOR',
+  });
+
   const requests = requestsData?.data?.data?.bookings || [];
   const upcomingBookings = upcomingData?.data?.data?.bookings || [];
   const allBookings = allBookingsData?.data?.data?.bookings || [];
@@ -84,6 +100,11 @@ export default function TutorDashboardPage() {
     (sum, booking) => sum + Number(booking.totalAmount || 0),
     0
   );
+  const tutorPublicId = myProfileData?.data?.data?.id || user?.tutorProfileId || null;
+  const viewAsLearnerHref = tutorPublicId ? `/tutors/${tutorPublicId}` : '/tutor/profile';
+  const viewAsLearnerNavHref = viewAsLearnerHref.startsWith('/tutors/')
+    ? `${viewAsLearnerHref}?from=tutor-dashboard`
+    : viewAsLearnerHref;
 
   const stats = [
     {
@@ -91,21 +112,21 @@ export default function TutorDashboardPage() {
       value: requestsData?.data?.data?.pagination?.total || 0,
       icon: ClockIcon,
       color: 'text-yellow-600 bg-yellow-50',
-      href: '/tutor/requests',
+      href: '/tutor/requests?status=PENDING',
     },
     {
       label: 'Upcoming Sessions',
       value: upcomingData?.data?.data?.pagination?.total || 0,
       icon: CalendarDaysIcon,
       color: 'text-blue-600 bg-blue-50',
-      href: '/bookings',
+      href: '/tutor/requests?status=ACCEPTED',
     },
     {
       label: 'Completed Sessions',
       value: completedBookings.length,
       icon: CheckCircleIcon,
       color: 'text-green-600 bg-green-50',
-      href: '/bookings',
+      href: '/tutor/requests?status=COMPLETED',
     },
     {
       label: 'Total Earnings',
@@ -115,6 +136,11 @@ export default function TutorDashboardPage() {
       href: null,
     },
   ];
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   if (!user?.tutorProfile && !user?.tutorProfileId) {
     return (
@@ -132,18 +158,22 @@ export default function TutorDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Tutor Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+    <div className="space-y-5">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
+        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+        <h1 className="text-xl font-bold">{displayName}</h1>
+        <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {stats.map((stat) => (
           <div
             key={stat.label}
             className={cn(
-              'card p-4 sm:p-5',
+              'card p-4',
               stat.href && 'cursor-pointer hover:shadow-md transition-shadow'
             )}
           >
@@ -278,7 +308,7 @@ export default function TutorDashboardPage() {
           {
             label: 'View as Learner',
             desc: 'See your public profile',
-            href: `/tutors/${user?.tutorProfileId || user?.id}`,
+            href: viewAsLearnerNavHref,
             color: 'bg-purple-600',
           },
         ].map((item) => (
@@ -306,20 +336,20 @@ export default function TutorDashboardPage() {
 
 function StatCardContent({ stat }) {
   return (
-    <div className="flex h-full min-w-0 flex-col gap-3">
+    <div className="flex h-full min-w-0 flex-col gap-2.5">
       <div
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg flex-shrink-0 sm:h-11 sm:w-11',
+          'flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0',
           stat.color
         )}
       >
         <stat.icon className="w-5 h-5" />
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-2xl font-bold leading-none text-gray-900 sm:text-[2rem]">
+      <div className="flex-1">
+        <p className="text-2xl font-bold text-gray-900">
           {stat.value}
         </p>
-        <p className="mt-1 text-xs leading-4 text-gray-500 whitespace-normal text-wrap">
+        <p className="mt-0.5 text-xs text-gray-500 whitespace-nowrap">
           {stat.label}
         </p>
       </div>

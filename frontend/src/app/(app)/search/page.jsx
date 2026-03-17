@@ -3,6 +3,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,6 +13,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { subjectApi, tutorApi } from '../../../lib/api-entry';
+import { useAuthStore } from '../../../lib/store';
 
 const SESSION_TYPES = [
   { value: '', label: 'Any type' },
@@ -36,7 +38,9 @@ export default function SearchPage() {
 }
 
 function SearchPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
 
   const [filters, setFilters] = useState({
     subject: searchParams.get('subject') || '',
@@ -103,12 +107,26 @@ function SearchPageContent() {
     setFilters((prev) => ({ ...prev, page: nextPage }));
   };
 
+  const fallbackBackHref = user?.role === 'TUTOR' ? '/tutor/dashboard' : user ? '/dashboard' : '/';
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(fallbackBackHref);
+  };
+
   return (
     <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
       <div className="mb-5">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
+        >
           <span>←</span> Back
-        </Link>
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">

@@ -2,10 +2,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { ClockIcon, LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { tutorApi, subjectApi } from '../../../../lib/api';
+import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -370,22 +371,29 @@ export default function TutorProfilePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-5">
+      <div className="flex items-center justify-between">
+        <Link href="/tutor/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+          <span>←</span> Back
+        </Link>
+        <span className="text-xs text-gray-400">Tutor Area</span>
+      </div>
+
       <div>
-        <h1 className="page-title">Tutor Profile</h1>
+          <h1 className="page-title">Tutor Profile</h1>
         <p className="text-gray-600 mt-1">
           Status:{' '}
-          <span
-            className={cn(
-              'font-medium',
-              profile?.status === 'ACTIVE' && 'text-green-600',
-              profile?.status === 'PENDING' && 'text-yellow-600',
-              profile?.status === 'SUSPENDED' && 'text-red-600'
-            )}
-          >
-            {profile?.status || '-'}
-          </span>
-        </p>
+            <span
+              className={cn(
+                'font-medium',
+                profile?.status === 'ACTIVE' && 'text-green-600',
+                profile?.status === 'PENDING' && 'text-yellow-600',
+                profile?.status === 'SUSPENDED' && 'text-red-600'
+              )}
+            >
+              {profile?.status || '-'}
+            </span>
+          </p>
       </div>
 
       {!isApproved && (

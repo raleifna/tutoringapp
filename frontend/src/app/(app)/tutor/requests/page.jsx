@@ -1,8 +1,9 @@
 // src/app/(app)/tutor/requests/page.jsx - Tutor Booking Requests Management
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -11,7 +12,7 @@ import {
   CalendarDaysIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../../lib/api';
+import { bookingApi } from '../../../../lib/api-entry';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -20,6 +21,13 @@ const STATUS_TABS = [
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: '', label: 'All' },
 ];
+
+const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
+
+const getInitialStatus = (value) => {
+  const next = String(value || '').toUpperCase();
+  return STATUS_VALUES.has(next) ? next : 'PENDING';
+};
 
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
@@ -66,9 +74,19 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
 };
 
 export default function TutorRequestsPage() {
-  const [activeStatus, setActiveStatus] = useState('PENDING');
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get('status');
+  const [activeStatus, setActiveStatus] = useState(() =>
+    getInitialStatus(statusParam)
+  );
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const next = getInitialStatus(statusParam);
+    setActiveStatus(next);
+    setPage(1);
+  }, [statusParam]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tutor-requests', activeStatus, page],
@@ -112,13 +130,19 @@ export default function TutorRequestsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="page-title">Booking Requests</h1>
+        <Link href="/tutor/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+          <span>←</span> Back
+        </Link>
+      </div>
+
+      <div className="pl-4">
+        <h1 className="text-2xl font-bold text-gray-900">Booking Requests</h1>
         <p className="text-gray-600 mt-1">Manage session requests from learners</p>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-200">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -128,7 +152,7 @@ export default function TutorRequestsPage() {
               setPage(1);
             }}
             className={cn(
-              'px-4 py-2.5 -mb-px text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+              'flex-1 px-2 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors',
               activeStatus === tab.value
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -154,7 +178,7 @@ export default function TutorRequestsPage() {
           ))}
         </div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="text-center py-16 bg-white border border-gray-200 rounded-xl">
           <CalendarDaysIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h3 className="font-medium text-gray-900 mb-2">
             No {activeStatus.toLowerCase() || ''} requests

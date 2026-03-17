@@ -17,7 +17,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../../lib/api';
+import { bookingApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 
 const rescheduleSchema = z.object({

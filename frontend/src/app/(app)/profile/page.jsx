@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { CameraIcon, KeyIcon, UserCircleIcon } from '@heroicons/react/24/outline';
-import { authApi, userApi } from '../../../lib/api';
+import { authApi, userApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
