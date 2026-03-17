@@ -357,4 +357,5 @@ module.exports = {
   getTutorAvailability,
   getMyProfile,
   updateProfile,
+  updateAvailability,
 };
