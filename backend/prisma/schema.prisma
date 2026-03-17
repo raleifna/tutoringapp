@@ -148,6 +148,7 @@ model TutorProfile {
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects     TutorSubject[]
   availability TutorAvailability[]
+  bookings     Booking[]         @relation("TutorBookings")
 
   @@index([status])
   @@index([rating])
