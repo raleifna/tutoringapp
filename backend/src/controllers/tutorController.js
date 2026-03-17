@@ -392,6 +392,40 @@ async function addSubject(req, res) {
     data: tutorSubject
   });
 };
+async function removeSubject(req, res) {
+  let userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
+  let subjectId = req.params.subjectId;
+  let profile = await prisma.tutorProfile.findUnique({
+    where: { userId: userId },
+  });
+  if (!profile || profile.status !== 'ACTIVE') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not profile or no permission.',
+    });
+  }
+  if (!subjectId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Subject ID is required.',
+    });
+  }
+  await prisma.tutorSubject.deleteMany({
+    where: { tutorId: profile.id, subjectId: subjectId },
+  });
+
+  res.json({ 
+    success: true, 
+    message: 'Subject removed'
+  });
+};
+
 
 module.exports = {
   searchTutors,
@@ -401,4 +435,5 @@ module.exports = {
   updateProfile,
   updateAvailability,
   addSubject,
+  removeSubject,
 };
