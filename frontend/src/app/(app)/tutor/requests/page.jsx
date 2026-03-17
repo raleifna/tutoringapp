@@ -3,8 +3,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
+  CheckCircleIcon,
+  XCircleIcon,
   CalendarDaysIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
@@ -16,57 +19,6 @@ const STATUS_TABS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: '', label: 'All' },
-];
-
-const MOCK_BOOKINGS = [
-  {
-    id: '101',
-    status: 'PENDING',
-    subject: 'Mathematics',
-    scheduledAt: '2026-03-20T10:00:00.000Z',
-    duration: 60,
-    totalAmount: 55,
-    currency: 'AUD',
-    sessionType: 'ONLINE',
-    notes: 'Need help with calculus revision before the quiz.',
-    learner: {
-      firstName: 'Emily',
-      lastName: 'Wang',
-      avatar: '',
-    },
-  },
-  {
-    id: '102',
-    status: 'ACCEPTED',
-    subject: 'Programming',
-    scheduledAt: '2026-03-22T14:30:00.000Z',
-    duration: 90,
-    totalAmount: 82.5,
-    currency: 'AUD',
-    sessionType: 'IN_PERSON',
-    notes: '',
-    learner: {
-      firstName: 'Daniel',
-      lastName: 'Lee',
-      avatar: '',
-    },
-  },
-  {
-    id: '103',
-    status: 'COMPLETED',
-    subject: 'Physics',
-    scheduledAt: '2026-03-10T09:00:00.000Z',
-    duration: 120,
-    totalAmount: 110,
-    currency: 'AUD',
-    sessionType: 'ONLINE',
-    notes: 'Worked through mechanics past papers.',
-    learner: {
-      firstName: 'Sophie',
-      lastName: 'Brown',
-      avatar: '',
-    },
-  },
 ];
 
 const cn = (...classes) => {
@@ -116,24 +68,48 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
 export default function TutorRequestsPage() {
   const [activeStatus, setActiveStatus] = useState('PENDING');
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['tutor-requests', activeStatus, page],
     queryFn: () => bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 }),
   });
 
-  const mockBookings = activeStatus
-    ? MOCK_BOOKINGS.filter((booking) => booking.status === activeStatus)
-    : MOCK_BOOKINGS;
-  const bookings = data?.data?.data?.bookings || (isError ? mockBookings : []);
-  const pagination =
-    data?.data?.data?.pagination ||
-    (isError
-      ? {
-          page: 1,
-          totalPages: 1,
-        }
-      : null);
+  const bookings = data?.data?.data?.bookings || [];
+  const pagination = data?.data?.data?.pagination;
+
+  const acceptMutation = useMutation({
+    mutationFn: (id) => bookingApi.accept(id),
+    onSuccess: () => {
+      toast.success('Booking accepted!');
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to accept');
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: (id) => bookingApi.decline(id),
+    onSuccess: () => {
+      toast.success('Booking declined');
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to decline');
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: (id) => bookingApi.complete(id),
+    onSuccess: () => {
+      toast.success('Session marked as complete');
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed');
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -162,14 +138,6 @@ export default function TutorRequestsPage() {
           </button>
         ))}
       </div>
-
-      {isError && (
-        <div className="card p-4 border-yellow-200 bg-yellow-50">
-          <p className="text-sm text-yellow-800">
-            Preview mode: request data is using local mock content for frontend testing.
-          </p>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -249,6 +217,36 @@ export default function TutorRequestsPage() {
                 </div>
 
                 <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                  {booking.status === 'PENDING' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => acceptMutation.mutate(booking.id)}
+                        disabled={acceptMutation.isPending}
+                        className="btn-primary btn-sm gap-1.5 flex-1"
+                      >
+                        <CheckCircleIcon className="w-4 h-4" /> Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => declineMutation.mutate(booking.id)}
+                        disabled={declineMutation.isPending}
+                        className="btn-danger btn-sm gap-1.5 flex-1"
+                      >
+                        <XCircleIcon className="w-4 h-4" /> Decline
+                      </button>
+                    </>
+                  )}
+                  {booking.status === 'ACCEPTED' && (
+                    <button
+                      type="button"
+                      onClick={() => completeMutation.mutate(booking.id)}
+                      disabled={completeMutation.isPending}
+                      className="btn-primary btn-sm gap-1.5"
+                    >
+                      <CheckCircleIcon className="w-4 h-4" /> Mark Complete
+                    </button>
+                  )}
                   <Link
                     href={`/bookings/${booking.id}?from=tutor-requests`}
                     className="btn-secondary btn-sm ml-auto"
