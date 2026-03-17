@@ -57,6 +57,7 @@ function SearchPageContent() {
     queryKey: ['subject-categories'],
     queryFn: () => subjectApi.getCategories(),
   });
+  const categoriesLoading = !categoriesData;
 
   // Stage 2 priority #2: tutor search
   const {
@@ -196,6 +197,14 @@ function SearchPageContent() {
           </div>
         </div>
 
+        {categoriesLoading && (
+          <div className="flex gap-2 flex-wrap">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <span key={index} className="h-7 w-20 rounded-full bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        )}
+
         {categories.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             <button
@@ -239,19 +248,31 @@ function SearchPageContent() {
 
         {isError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-sm text-red-700 mb-2">
+            <p className="text-sm font-medium text-red-700 mb-1">
+              Search failed
+            </p>
+            <p className="text-sm text-red-700 mb-3">
               {error?.response?.data?.message || 'Failed to load tutors.'}
             </p>
-            <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
-              Retry
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
+                Retry
+              </button>
+              <button type="button" onClick={clearFilters} className="btn-secondary btn-sm">
+                Clear filters
+              </button>
+            </div>
           </div>
         )}
 
         {!isLoading && !isError && tutors.length === 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <AcademicCapIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
             <p className="text-gray-700 font-medium">No tutors found.</p>
-            <p className="text-gray-500 text-sm mt-1">Try changing subject, location, or session type.</p>
+            <p className="text-gray-500 text-sm mt-1 mb-4">Try changing subject, location, or session type.</p>
+            <button type="button" onClick={clearFilters} className="btn-primary btn-sm rounded-full">
+              Clear filters
+            </button>
           </div>
         )}
 
