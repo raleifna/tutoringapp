@@ -299,9 +299,57 @@ async function updateProfile(req, res) {
   });
 };
 
+async function updateAvailability(req, res) {
+  let userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
+  let profile = await prisma.tutorProfile.findUnique({
+    where: { userId: userId },
+  });
+  if (!profile || profile.status !== 'ACTIVE') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not profile or no permission.',
+    });
+  }
+  await prisma.tutorAvailability.deleteMany({ where: { tutorId: profile.id } }); // delete old availability
 
+  // no new availability
+  if (!req.body || (Array.isArray(req.body) && req.body.length === 0)) {
+    return res.status(200).json({
+      success: true,
+      data: []
+    });
+  }
+  let availability = Array.isArray(req.body) ? req.body : req.body.availability;
+  if (!availability || !Array.isArray(availability)) {
+    return res.status(200).json({
+      success: true,
+      data: []
+    });
+  }
 
+  // update
+  await prisma.tutorAvailability.createMany({
+      data: availability.map((a) => ({
+        tutorId: profile.id,
+        dayOfWeek:a.dayOfWeek,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        timezone: a.timezone || 'UTC',
+      })),
+    });
 
+  let newAva = await prisma.tutorAvailability.findMany({ where: { tutorId: profile.id } });
+  res.json({ 
+    success: true, 
+    data: newAva
+  });
+};
 
 module.exports = {
   searchTutors,
