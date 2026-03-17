@@ -191,6 +191,28 @@ async function getTutorAvailability(req, res) {
 }
 
 
+const getLatestReviewAction = (userId) =>
+  prisma.adminAction.findFirst({
+    where: {
+      targetUserId: userId,
+      action: { in: ['TUTOR_PROFILE_RETURNED', 'TUTOR_REJECTED', 'TUTOR_APPROVED'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      action: true,
+      description: true,
+      createdAt: true,
+      admin: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+
 async function getMyProfile(req, res) {
   let userId = req.user.id;
   if (!userId) {
@@ -202,7 +224,6 @@ async function getMyProfile(req, res) {
 
   let profile = await prisma.tutorProfile.findUnique({
       where: { userId: userId },
-      select: tutorProfileSelect,
     });
   let latestReviewAction = await getLatestReviewAction(userId);
 
@@ -218,8 +239,65 @@ async function getMyProfile(req, res) {
   });
 };
 
+async function updateProfile(req, res) {
+  let userId = req.user?.id;
+  let {
+    headline,
+    hourlyRate,
+    currency,
+    yearsExperience,
+    education,
+    certifications,
+    languages,
+    sessionTypes,
+    location,
+    bio
+  } = req.body;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
 
+  let profile = await prisma.tutorProfile.findUnique({
+    where: { userId: userId },
+  });
+  if (!profile || profile.status !== 'ACTIVE') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not profile or no permission.',
+    });
+  }
 
+  // Update user bio
+  if (bio) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { bio },
+    });
+  }
+
+  const newProfile = await prisma.tutorProfile.update({
+    where: { userId: userId },
+    data: {
+      ...(headline !== undefined && { headline }),
+      ...(hourlyRate !== undefined && { hourlyRate: parseFloat(hourlyRate) }),
+      ...(currency && { currency }),
+      ...(yearsExperience !== undefined && { yearsExperience: parseInt(yearsExperience) }),
+      ...(education && { education }),
+      ...(certifications && { certifications }),
+      ...(languages && { languages }),
+      ...(sessionTypes && { sessionTypes }),
+      ...(location !== undefined && { location }),
+    },
+  });
+
+  res.json({ 
+    success: true, message: 'Profile updated', 
+    data: newProfile
+  });
+};
 
 
 
@@ -230,4 +308,5 @@ module.exports = {
   getTutorProfile,
   getTutorAvailability,
   getMyProfile,
+  updateProfile,
 };
