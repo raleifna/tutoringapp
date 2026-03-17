@@ -59,5 +59,7 @@ app.use(errorHandler);
 // app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/tutors', tutorRoutes);
 // app.use('/api/v1/subjects', subjectRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
+
 
 module.exports = app;

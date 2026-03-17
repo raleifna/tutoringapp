@@ -21,6 +21,30 @@ enum ProfileStatus {
   DEACTIVATED
 }
 
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  COMPLETED
+  RESCHEDULED
+}
+
+enum RecurringType {
+  ONE_OFF
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+}
+
+enum MeetingTool {
+  GOOGLE_MEET
+  ZOOM
+  MICROSOFT_TEAMS
+  SKYPE
+  OTHER
+}
+
 enum MeetingTool {
   GOOGLE_MEET
   ZOOM
@@ -158,4 +182,55 @@ model TutorAvailability {
 
   @@index([tutorId])
   @@map("tutor_availability")
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  learnerId       String
+  tutorId         String
+  subject         String
+  status          BookingStatus @default(PENDING)
+  sessionType     SessionType   @default(ONLINE)
+  scheduledAt     DateTime
+  duration        Int           // in minutes
+  hourlyRate      Decimal       @db.Decimal(10, 2)
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  currency        String        @default("AUD")
+  notes           String?
+  meetingLink     String?
+  meetingTool     MeetingTool?  // preferred meeting tool for this session
+  address         String?
+  cancellationReason String?
+  declineReason   String?
+  rescheduleNote  String?       // reason/note when proposing a new time
+  proposedTime    DateTime?     // new time proposed by tutor when rescheduling
+  // Recurring booking
+  recurringType   RecurringType @default(ONE_OFF)
+  recurringGroupId String?       // links sessions in the same recurring series
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+
+  learner      User           @relation("LearnerBookings", fields: [learnerId], references: [id])
+  tutorProfile TutorProfile   @relation("TutorBookings", fields: [tutorId], references: [id])
+  payment      Payment?
+  statusHistory BookingStatusHistory[]
+
+  @@index([learnerId])
+  @@index([tutorId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("bookings")
+}
+
+model BookingStatusHistory {
+  id        String        @id @default(uuid())
+  bookingId String
+  status    BookingStatus
+  reason    String?
+  createdAt DateTime      @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_status_history")
 }
