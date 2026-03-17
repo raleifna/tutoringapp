@@ -6,8 +6,9 @@ const morgan = require('morgan');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const subjectRoutes = require('./routes/subjects');
+const bookingRoutes = require('./routes/bookings');
 // const tutorRoutes = require('./routes/tutors');
-// const subjectRoutes = require('./routes/subjects');
 
 const app = express();
 
@@ -48,18 +49,13 @@ app.get('/api/v1/health', (_req, res) => {
   res.json(createHealthPayload());
 });
 
-// stage 1: only auth and users routes are enabled
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/subjects', subjectRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
+// app.use('/api/v1/tutors', tutorRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
-
-// app.use('/api/v1/auth', authLimiter, authRoutes);
-// app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/tutors', tutorRoutes);
-// app.use('/api/v1/subjects', subjectRoutes);
-app.use('/api/v1/bookings', bookingRoutes);
-
 
 module.exports = app;

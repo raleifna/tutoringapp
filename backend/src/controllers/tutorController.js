@@ -1,6 +1,6 @@
-﻿import { errorHandler } from "../middleware/errorHandler";
+﻿const { prisma } = require('../config/database');
 
-exports.searchTutors = async (req, res) => {
+async function searchTutors(req, res) {
   const {
     subject,
     category,
@@ -16,57 +16,94 @@ exports.searchTutors = async (req, res) => {
     limit = 12,
   } = req.query;
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-  const take = parseInt(limit);
+  const pageNumber = parseInt(page, 10) || 1;
+  const limitNumber = parseInt(limit, 10) || 12;
+  const skip = (pageNumber - 1) * limitNumber;
 
   const where = {
     status: 'ACTIVE',
     ...(minRate || maxRate
       ? {
-          hourlyRate: {
-            ...(minRate && { gte: parseFloat(minRate) }),
-            ...(maxRate && { lte: parseFloat(maxRate) }),
-          },
-        }
+        hourlyRate: {
+          ...(minRate ? { gte: parseFloat(minRate) } : {}),
+          ...(maxRate ? { lte: parseFloat(maxRate) } : {}),
+        },
+      }
       : {}),
-    ...(minRating && { rating: { gte: parseFloat(minRating) } }),
-    ...(sessionType && { sessionTypes: { has: sessionType } }),
-    ...(language && { languages: { has: language } }),
-    ...(experience && { yearsExperience: { gte: parseInt(experience) } }),
-    ...(location && {
-      location: { contains: location, mode: 'insensitive' },
-    }),
-    ...(subject && {
-      subjects: {
-        some: {
-          subject: { name: { contains: subject, mode: 'insensitive' } },
+    ...(minRating ? { rating: { gte: parseFloat(minRating) } } : {}),
+    ...(sessionType ? { sessionTypes: { has: sessionType } } : {}),
+    ...(language ? { languages: { has: language } } : {}),
+    ...(experience ? { yearsExperience: { gte: parseInt(experience, 10) } } : {}),
+    ...(location
+      ? {
+        location: {
+          contains: location,
+          mode: 'insensitive',
         },
-      },
-    }),
-    ...(category && {
-      subjects: {
-        some: {
-          subject: { category: { contains: category, mode: 'insensitive' } },
+      }
+      : {}),
+    ...(subject
+      ? {
+        subjects: {
+          some: {
+            subject: {
+              name: {
+                contains: subject,
+                mode: 'insensitive',
+              },
+            },
+          },
         },
-      },
-    }),
+      }
+      : {}),
+    ...(category
+      ? {
+        subjects: {
+          some: {
+            subject: {
+              category: {
+                contains: category,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      }
+      : {}),
   };
 
-  const orderBy = {
+  const orderByMap = {
     rating: { rating: 'desc' },
     rate_asc: { hourlyRate: 'asc' },
     rate_desc: { hourlyRate: 'desc' },
     experience: { yearsExperience: 'desc' },
     sessions: { totalSessions: 'desc' },
-  }[sort] || { rating: 'desc' };
+  };
+
+  const orderBy = orderByMap[sort] || { rating: 'desc' };
 
   const [tutors, total] = await Promise.all([
     prisma.tutorProfile.findMany({
       where,
-      select: tutorProfileSelect,
       orderBy,
       skip,
-      take,
+      take: limitNumber,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            bio: true,
+          },
+        },
+        subjects: {
+          include: {
+            subject: true,
+          },
+        },
+      },
     }),
     prisma.tutorProfile.count({ where }),
   ]);
@@ -76,158 +113,85 @@ exports.searchTutors = async (req, res) => {
     data: {
       tutors,
       pagination: {
-        page: parseInt(page),
-        limit: take,
+        page: pageNumber,
+        limit: limitNumber,
         total,
-        totalPages: Math.ceil(total / take),
+        totalPages: Math.ceil(total / limitNumber),
       },
     },
   });
-};
+}
 
-exports.getTutorProfile = async (req, res) => {
-  let userId = req.params.id;
-  let tutor = await prisma.tutorProfile.findFirst({
+async function getTutorProfile(req, res) {
+  const tutorId = req.params.id;
+
+  const tutor = await prisma.tutorProfile.findFirst({
     where: {
-      userId: userId,
+      OR: [{ id: tutorId }, { userId: tutorId }],
       status: 'ACTIVE',
-    }
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          avatar: true,
+          bio: true,
+          preferredLang: true,
+          timezone: true,
+        },
+      },
+      subjects: {
+        include: {
+          subject: true,
+        },
+      },
+      availability: true,
+    },
   });
 
   if (!tutor) {
-    return res.status(400).json({
-            success: false,
-            message: 'Tutor not found',
-        });
-  }
-
-  res.json({ success: true, data: tutor });
-}
-
-exports.getMyProfile = async (req, res) => {}
-
-exports.updateApplication = async (req, res) => {
-  const profile = await prisma.tutorProfile.findUnique({
-    where: { userId: req.user.id },
-    select: {
-      ...tutorProfileSelect,
-      certifications: true,
-    },
-  });
-
-  if (!profile) throw new AppError('Tutor profile not found', 404);
-  if (profile.status === 'ACTIVE') {
-    throw new AppError(
-      'Approved tutors should update their public profile instead of re-submitting verification materials',
-      400
-    );
-  }
-
-  const { tutorEducationSummary, tutorExperienceYears, tutorSupportingNotes } = req.body;
-
-  if (!tutorEducationSummary || !tutorEducationSummary.trim()) {
-    throw new AppError('Education summary is required', 400);
-  }
-
-  const uploadedFiles = toUploadedFileItems(req.files || []);
-  const nextFileItems =
-    uploadedFiles.length > 0 ? uploadedFiles : getApplicationFileItems(profile.certifications);
-
-  if (nextFileItems.length === 0) {
-    throw new AppError('Upload at least one verification file before resubmitting', 400);
-  }
-
-  const updated = await prisma.tutorProfile.update({
-    where: { userId: req.user.id },
-    data: {
-      yearsExperience:
-        tutorExperienceYears === undefined || tutorExperienceYears === ''
-          ? profile.yearsExperience
-          : parseInt(tutorExperienceYears, 10) || 0,
-      education: toReviewItems(tutorEducationSummary),
-      certifications: [
-        ...nextFileItems,
-        ...toReviewItems(tutorSupportingNotes).map((item) => ({ ...item, kind: 'note' })),
-      ],
-      status: 'PENDING',
-      isVerified: false,
-      verifiedAt: null,
-    },
-    select: tutorProfileSelect,
-  });
-
-  const latestReviewAction = await getLatestReviewAction(req.user.id);
-
-  res.json({
-    success: true,
-    message: 'Verification materials resubmitted for admin review',
-    data: { ...updated, latestReviewAction },
-  });
-};
-
-exports.updateProfile = async (req, res) => {
-  const profile = await prisma.tutorProfile.findUnique({
-    where: { userId: req.user.id },
-  });
-  ensureTutorProfileEditable(profile);
-
-  const {
-    headline,
-    hourlyRate,
-    currency,
-    yearsExperience,
-    education,
-    certifications,
-    languages,
-    sessionTypes,
-    location,
-  } = req.body;
-
-  // Update user bio too if provided
-  if (req.body.bio) {
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: { bio: req.body.bio },
+    return res.status(404).json({
+      success: false,
+      message: 'Tutor not found.',
     });
   }
 
-  const updated = await prisma.tutorProfile.update({
-    where: { userId: req.user.id },
-    data: {
-      ...(headline !== undefined && { headline }),
-      ...(hourlyRate !== undefined && { hourlyRate: parseFloat(hourlyRate) }),
-      ...(currency && { currency }),
-      ...(yearsExperience !== undefined && { yearsExperience: parseInt(yearsExperience) }),
-      ...(education && { education }),
-      ...(certifications && { certifications }),
-      ...(languages && { languages }),
-      ...(sessionTypes && { sessionTypes }),
-      ...(location !== undefined && { location }),
-    },
-    select: tutorProfileSelect,
+  res.json({
+    success: true,
+    data: tutor,
   });
-
-  res.json({ success: true, message: 'Profile updated', data: updated });
-};
-
-exports.updateAvailability = async (req, res) => {}
-
-exports.getTutorAvailability = async (req, res) => {
-  let userId = req.params.id;
-  const profile = await prisma.tutorProfile.findFirst({
-    where: { userId: userId },
-    include: { availability: true },
-  });
-
-  if (!profile) {
-    return res.status(400).json({
-            success: false,
-            message: 'Tutor not found',
-        });
-  }
-  res.json({ success: true, data: profile.availability });
 }
 
-exports.addSubject = async (req, res) => {}
+async function getTutorAvailability(req, res) {
+  const tutorId = req.params.id;
 
-exports.removeSubject = async (req, res) => {}
+  const tutor = await prisma.tutorProfile.findFirst({
+    where: {
+      OR: [{ id: tutorId }, { userId: tutorId }],
+      status: 'ACTIVE',
+    },
+    include: {
+      availability: true,
+    },
+  });
+
+  if (!tutor) {
+    return res.status(404).json({
+      success: false,
+      message: 'Tutor not found.',
+    });
+  }
+
+  res.json({
+    success: true,
+    data: tutor.availability,
+  });
+}
+
+module.exports = {
+  searchTutors,
+  getTutorProfile,
+  getTutorAvailability,
+};

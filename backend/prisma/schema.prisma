@@ -45,20 +45,11 @@ enum MeetingTool {
   OTHER
 }
 
-enum MeetingTool {
-  GOOGLE_MEET
-  ZOOM
-  MICROSOFT_TEAMS
-  SKYPE
-  OTHER
-}
-
 enum SessionType {
   ONLINE
   IN_PERSON
   HYBRID
 }
-
 
 model User {
   id                       String        @id @default(uuid())
@@ -77,12 +68,15 @@ model User {
   isEmailVerified          Boolean       @default(false)
   emailVerificationToken   String?       @unique
   emailVerificationExpiry  DateTime?
+  preferredMeetingTool     MeetingTool?
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
   lastLoginAt              DateTime?
 
-  refreshTokens            RefreshToken[]
-  tutorProfile             TutorProfile?
+  learnerProfile     LearnerProfile?
+  tutorProfile       TutorProfile?
+  bookingsAsLearner  Booking[]      @relation("LearnerBookings")
+  refreshTokens      RefreshToken[]
 
   @@index([email])
   @@index([role])
@@ -90,19 +84,62 @@ model User {
   @@map("users")
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+model LearnerProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  gradeLevel         String?
+  learningGoals      String?
+  subjects           String[]
+  preferredStyle     String?
+  isMinor            Boolean  @default(false)
+  parentName         String?
+  parentEmail        String?
+  parentPhone        String?
+  parentRelationship String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([token])
-  @@map("refresh_tokens")
+  @@map("learner_profiles")
 }
 
+model TutorProfile {
+  id                   String        @id @default(uuid())
+  userId               String        @unique
+  status               ProfileStatus @default(PENDING)
+  headline             String?
+  hourlyRate           Decimal       @db.Decimal(10, 2) @default(0)
+  currency             String        @default("AUD")
+  yearsExperience      Int           @default(0)
+  education            Json[]
+  certifications       Json[]
+  languages            String[]      @default(["English"])
+  sessionTypes         SessionType[] @default([ONLINE])
+  location             String?
+  latitude             Decimal?      @db.Decimal(10, 8)
+  longitude            Decimal?      @db.Decimal(11, 8)
+  rating               Decimal       @db.Decimal(3, 2) @default(0)
+  totalReviews         Int           @default(0)
+  totalSessions        Int           @default(0)
+  isVerified           Boolean       @default(false)
+  verifiedAt           DateTime?
+  responseTime         Int?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  sessionDurations     Int[]         @default([60])
+  preferredMeetingTool MeetingTool?
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects     TutorSubject[]
+  availability TutorAvailability[]
+  bookings     Booking[]          @relation("TutorBookings")
+
+  @@index([status])
+  @@index([rating])
+  @@index([hourlyRate])
+  @@map("tutor_profiles")
+}
 
 model Subject {
   id          String   @id @default(uuid())
@@ -117,52 +154,12 @@ model Subject {
   @@map("subjects")
 }
 
-model TutorProfile {
-  id                String        @id @default(uuid())
-  userId            String        @unique
-  status            ProfileStatus @default(PENDING)
-  headline          String?
-  hourlyRate        Decimal       @db.Decimal(10, 2) @default(0)
-  currency          String        @default("AUD")
-  yearsExperience   Int           @default(0)
-  education         Json[]        // [{institution, degree, field, year}]
-  certifications    Json[]        // [{name, issuer, year, url}]
-  languages         String[]      @default(["English"])
-  sessionTypes      SessionType[] @default([ONLINE])
-  location          String?
-  latitude          Decimal?      @db.Decimal(10, 8)
-  longitude         Decimal?      @db.Decimal(11, 8)
-  rating            Decimal       @db.Decimal(3, 2) @default(0)
-  totalReviews      Int           @default(0)
-  totalSessions     Int           @default(0)
-  isVerified        Boolean       @default(false)
-  verifiedAt        DateTime?
-  responseTime      Int?          // avg response time in minutes
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-
-  // Session duration options (in minutes)
-  sessionDurations  Int[]           @default([60]) // e.g. [30, 60, 90]
-  preferredMeetingTool MeetingTool?
-
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjects     TutorSubject[]
-  availability TutorAvailability[]
-  bookings     Booking[]         @relation("TutorBookings")
-
-  @@index([status])
-  @@index([rating])
-  @@index([hourlyRate])
-  @@map("tutor_profiles")
-}
-
-
 model TutorSubject {
-  id           String @id @default(uuid())
-  tutorId      String
-  subjectId    String
-  level        String // beginner, intermediate, advanced, all
-  description  String?
+  id          String @id @default(uuid())
+  tutorId     String
+  subjectId   String
+  level       String
+  description String?
 
   tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
   subject Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -174,9 +171,9 @@ model TutorSubject {
 model TutorAvailability {
   id        String   @id @default(uuid())
   tutorId   String
-  dayOfWeek Int      // 0=Sunday, 1=Monday, ..., 6=Saturday
-  startTime String   // HH:MM format
-  endTime   String   // HH:MM format
+  dayOfWeek Int
+  startTime String
+  endTime   String
   timezone  String   @default("UTC")
 
   tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
@@ -186,35 +183,33 @@ model TutorAvailability {
 }
 
 model Booking {
-  id              String        @id @default(uuid())
-  learnerId       String
-  tutorId         String
-  subject         String
-  status          BookingStatus @default(PENDING)
-  sessionType     SessionType   @default(ONLINE)
-  scheduledAt     DateTime
-  duration        Int           // in minutes
-  hourlyRate      Decimal       @db.Decimal(10, 2)
-  totalAmount     Decimal       @db.Decimal(10, 2)
-  currency        String        @default("AUD")
-  notes           String?
-  meetingLink     String?
-  meetingTool     MeetingTool?  // preferred meeting tool for this session
-  address         String?
+  id                 String        @id @default(uuid())
+  learnerId          String
+  tutorId            String
+  subject            String
+  status             BookingStatus @default(PENDING)
+  sessionType        SessionType   @default(ONLINE)
+  scheduledAt        DateTime
+  duration           Int
+  hourlyRate         Decimal       @db.Decimal(10, 2)
+  totalAmount        Decimal       @db.Decimal(10, 2)
+  currency           String        @default("AUD")
+  notes              String?
+  meetingLink        String?
+  meetingTool        MeetingTool?
+  address            String?
   cancellationReason String?
-  declineReason   String?
-  rescheduleNote  String?       // reason/note when proposing a new time
-  proposedTime    DateTime?     // new time proposed by tutor when rescheduling
-  // Recurring booking
-  recurringType   RecurringType @default(ONE_OFF)
-  recurringGroupId String?       // links sessions in the same recurring series
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  completedAt     DateTime?
+  declineReason      String?
+  rescheduleNote     String?
+  proposedTime       DateTime?
+  recurringType      RecurringType @default(ONE_OFF)
+  recurringGroupId   String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  completedAt        DateTime?
 
-  learner      User           @relation("LearnerBookings", fields: [learnerId], references: [id])
-  tutorProfile TutorProfile   @relation("TutorBookings", fields: [tutorId], references: [id])
-  payment      Payment?
+  learner       User                   @relation("LearnerBookings", fields: [learnerId], references: [id])
+  tutorProfile  TutorProfile           @relation("TutorBookings", fields: [tutorId], references: [id])
   statusHistory BookingStatusHistory[]
 
   @@index([learnerId])
@@ -234,4 +229,17 @@ model BookingStatusHistory {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("booking_status_history")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("refresh_tokens")
 }
