@@ -4,8 +4,12 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { tutorApi, subjectApi } from '../../../../lib/api';
+
+const MAX_VERIFICATION_FILES = 5;
+const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
 
 const DAY_OPTIONS = [
   { value: '1', label: 'Monday' },
@@ -28,43 +32,32 @@ const LEVELS = [
 
 const CURRENCIES = ['AUD', 'USD', 'GBP', 'EUR'];
 
-const MOCK_PROFILE = {
-  headline: 'Mathematics and Programming Tutor',
-  status: 'ACTIVE',
-  bio: 'I enjoy helping students build confidence through clear explanations and practice.',
-  hourlyRate: 55,
-  currency: 'AUD',
-  location: 'Sydney, NSW',
-  sessionTypes: ['ONLINE', 'IN_PERSON'],
-  yearsExperience: 3,
-  education: 'BSc Computer Science, UNSW, 2023',
-  languages: ['English', 'Mandarin'],
-  subjects: [
-    {
-      id: 1,
-      subjectId: 1,
-      level: 'advanced',
-      subject: { id: 1, name: 'Mathematics', category: 'STEM' },
-    },
-    {
-      id: 2,
-      subjectId: 2,
-      level: 'intermediate',
-      subject: { id: 2, name: 'Programming', category: 'Technology' },
-    },
-  ],
-  availability: [
-    { dayOfWeek: 1, startTime: '09:00', endTime: '12:00' },
-    { dayOfWeek: 3, startTime: '14:00', endTime: '18:00' },
-  ],
+const formatEducationItem = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return [item.degree, item.field, item.institution, item.year, item.text]
+    .filter(Boolean)
+    .join(', ');
 };
 
-const MOCK_SUBJECTS = [
-  { id: 1, name: 'Mathematics', category: 'STEM' },
-  { id: 2, name: 'Programming', category: 'Technology' },
-  { id: 3, name: 'Physics', category: 'STEM' },
-  { id: 4, name: 'English', category: 'Language' },
-];
+const formatCertificationItem = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return [item.name, item.issuer, item.year, item.url, item.text].filter(Boolean).join(' | ');
+};
+
+const getApplicationFiles = (items) => {
+  return Array.isArray(items) ? items.filter((item) => item && typeof item === 'object' && item.url) : [];
+};
+
+const getApplicationNotes = (items) => {
+  return Array.isArray(items)
+    ? items
+        .filter((item) => item && typeof item === 'object' && item.text && !item.url)
+        .map((item) => item.text)
+        .join('\n')
+    : '';
+};
 
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
@@ -88,11 +81,17 @@ export default function TutorProfilePage() {
   const [mySubjects, setMySubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
+  const [applicationSummary, setApplicationSummary] = useState('');
+  const [applicationNotes, setApplicationNotes] = useState('');
+  const [applicationExperienceYears, setApplicationExperienceYears] = useState('0');
+  const [applicationFiles, setApplicationFiles] = useState([]);
+  const [applicationFileError, setApplicationFileError] = useState('');
 
   const {
     data: profileData,
     isLoading: profileLoading,
     isError: profileError,
+    error: profileQueryError,
   } = useQuery({
     queryKey: ['my-tutor-profile'],
     queryFn: () => tutorApi.getMyProfile(),
@@ -102,14 +101,17 @@ export default function TutorProfilePage() {
     data: subjectsData,
     isLoading: subjectsLoading,
     isError: subjectsError,
+    error: subjectsQueryError,
   } = useQuery({
     queryKey: ['all-subjects'],
     queryFn: () => subjectApi.getAll(),
   });
 
-  const profile = profileData?.data?.data || MOCK_PROFILE;
-  const allSubjects = subjectsData?.data?.data?.subjects || MOCK_SUBJECTS;
-  const isPreviewMode = profileError || subjectsError;
+  const profile = profileData?.data?.data;
+  const allSubjects = subjectsData?.data?.data?.subjects || [];
+  const isApproved = profile?.status === 'ACTIVE';
+  const latestReviewAction = profile?.latestReviewAction;
+  const existingApplicationFiles = getApplicationFiles(profile?.certifications);
 
   useEffect(() => {
     if (!profile) return;
@@ -137,6 +139,15 @@ export default function TutorProfilePage() {
     );
 
     setMySubjects(profile.subjects || []);
+    setApplicationSummary(
+      Array.isArray(profile.education)
+        ? profile.education.map(formatEducationItem).filter(Boolean).join('\n')
+        : profile.education || ''
+    );
+    setApplicationNotes(getApplicationNotes(profile.certifications));
+    setApplicationExperienceYears(String(profile.yearsExperience || 0));
+    setApplicationFiles([]);
+    setApplicationFileError('');
   }, [profile]);
 
   const updateProfileMutation = useMutation({
@@ -185,6 +196,19 @@ export default function TutorProfilePage() {
     },
   });
 
+  const applicationMutation = useMutation({
+    mutationFn: (formData) => tutorApi.updateApplication(formData),
+    onSuccess: () => {
+      toast.success('Verification materials resubmitted');
+      queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
+      setApplicationFiles([]);
+      setApplicationFileError('');
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to resubmit verification materials');
+    },
+  });
+
   const handleProfileChange = (key, value) => {
     setProfileForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -228,11 +252,6 @@ export default function TutorProfilePage() {
         : [],
     };
 
-    if (isPreviewMode) {
-      toast.success('Profile updated (preview mode)');
-      return;
-    }
-
     updateProfileMutation.mutate(payload);
   };
 
@@ -254,11 +273,6 @@ export default function TutorProfilePage() {
   };
 
   const handleSaveAvailability = () => {
-    if (isPreviewMode) {
-      toast.success('Availability updated (preview mode)');
-      return;
-    }
-
     updateAvailabilityMutation.mutate(availability);
   };
 
@@ -277,33 +291,58 @@ export default function TutorProfilePage() {
       return;
     }
 
-    if (isPreviewMode) {
-      setMySubjects((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          subjectId: subject.id,
-          level: selectedLevel,
-          subject,
-        },
-      ]);
-      setSelectedSubjectId('');
-      setSelectedLevel('all');
-      toast.success('Subject added (preview mode)');
-      return;
-    }
-
     addSubjectMutation.mutate({ subjectId: selectedSubjectId, level: selectedLevel });
   };
 
   const handleRemoveSubject = (subjectId) => {
-    if (isPreviewMode) {
-      setMySubjects((prev) => prev.filter((item) => item.subjectId !== subjectId));
-      toast.success('Subject removed (preview mode)');
+    removeSubjectMutation.mutate(subjectId);
+  };
+
+  const handleApplicationFilesChange = (event) => {
+    const files = Array.from(event.target.files || []);
+
+    if (files.length > MAX_VERIFICATION_FILES) {
+      setApplicationFiles([]);
+      setApplicationFileError(`Upload up to ${MAX_VERIFICATION_FILES} verification files`);
       return;
     }
 
-    removeSubjectMutation.mutate(subjectId);
+    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
+      setApplicationFiles([]);
+      setApplicationFileError('Each verification file must be 5MB or smaller');
+      return;
+    }
+
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
+      setApplicationFiles([]);
+      setApplicationFileError('Total upload size must stay within 25MB');
+      return;
+    }
+
+    setApplicationFiles(files);
+    setApplicationFileError('');
+  };
+
+  const handleApplicationResubmit = () => {
+    if (!applicationSummary.trim()) {
+      toast.error('Education summary is required');
+      return;
+    }
+
+    if (applicationFiles.length === 0 && existingApplicationFiles.length === 0) {
+      setApplicationFileError('Upload at least one verification file');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('tutorEducationSummary', applicationSummary);
+    formData.append('tutorExperienceYears', applicationExperienceYears || '0');
+    if (applicationNotes.trim()) {
+      formData.append('tutorSupportingNotes', applicationNotes);
+    }
+    applicationFiles.forEach((file) => formData.append('verificationFiles', file));
+    applicationMutation.mutate(formData);
   };
 
   if (profileLoading || subjectsLoading) {
@@ -311,6 +350,21 @@ export default function TutorProfilePage() {
       <div className="max-w-3xl mx-auto space-y-4 animate-pulse">
         <div className="h-10 bg-gray-200 rounded w-1/3" />
         <div className="card p-6 h-48" />
+      </div>
+    );
+  }
+
+  if (profileError || subjectsError || !profile) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="card p-6">
+          <h1 className="page-title">Tutor Profile</h1>
+          <p className="text-sm text-gray-600 mt-3">
+            {profileQueryError?.response?.data?.message ||
+              subjectsQueryError?.response?.data?.message ||
+              'Tutor profile data is unavailable for this account.'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -334,34 +388,189 @@ export default function TutorProfilePage() {
         </p>
       </div>
 
-      {isPreviewMode && (
-        <div className="card p-4 border-yellow-200 bg-yellow-50">
-          <p className="text-sm text-yellow-800">
-            Preview mode: tutor profile data is currently using local mock content for frontend
-            testing.
-          </p>
+      {!isApproved && (
+        <div className="space-y-4">
+          <div className="card p-5 border-yellow-200 bg-yellow-50/70">
+            <div className="flex items-start gap-3">
+              <LockClosedIcon className="w-5 h-5 text-yellow-700 mt-0.5" />
+              <div>
+                <h2 className="font-semibold text-gray-900">Tutor profile locked until approval</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Your verification submission is still being reviewed. Public tutor profile fields
+                  stay locked until approval.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {latestReviewAction?.description && (
+            <div className="card p-5 border-blue-200 bg-blue-50/70">
+              <h3 className="font-semibold text-gray-900">Latest admin feedback</h3>
+              <p className="text-sm text-gray-600 mt-2">{latestReviewAction.description}</p>
+            </div>
+          )}
+
+          <div className="card p-5 space-y-5">
+            <div>
+              <h3 className="font-semibold text-gray-900">Submitted education summary</h3>
+              {Array.isArray(profile.education) && profile.education.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {profile.education.map((item, index) => {
+                    const text = formatEducationItem(item);
+                    return text ? (
+                      <p
+                        key={index}
+                        className="text-sm text-gray-600 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
+                      >
+                        {text}
+                      </p>
+                    ) : null;
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">No education summary submitted.</p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-gray-900">Submitted verification files</h3>
+              {existingApplicationFiles.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {existingApplicationFiles.map((item, index) => {
+                    const text =
+                      item.originalName || item.fileName || formatCertificationItem(item);
+                    return text ? (
+                      <a
+                        key={`${text}-${index}`}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-sm text-primary-700 rounded-xl border border-blue-100 bg-white px-3 py-2 hover:bg-blue-50"
+                      >
+                        {text}
+                      </a>
+                    ) : null;
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">No verification files submitted.</p>
+              )}
+            </div>
+
+            {getApplicationNotes(profile.certifications) && (
+              <div>
+                <h3 className="font-semibold text-gray-900">Supporting notes</h3>
+                <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">
+                  {getApplicationNotes(profile.certifications)}
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <ClockIcon className="w-4 h-4" />
+              Review status updates will appear here after verification.
+            </div>
+          </div>
+
+          <div className="card p-5 space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">Update verification materials</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                You can update only your verification submission here while approval is pending.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Education / Qualifications Summary</label>
+              <textarea
+                value={applicationSummary}
+                onChange={(event) => setApplicationSummary(event.target.value)}
+                rows={3}
+                className="input resize-none"
+                placeholder="Summarise your qualifications and teaching background"
+              />
+            </div>
+
+            <div>
+              <label className="label">Years of Experience</label>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                value={applicationExperienceYears}
+                onChange={(event) => setApplicationExperienceYears(event.target.value)}
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="label">Additional Notes</label>
+              <textarea
+                value={applicationNotes}
+                onChange={(event) => setApplicationNotes(event.target.value)}
+                rows={3}
+                className="input resize-none"
+                placeholder="Optional notes for the reviewer"
+              />
+            </div>
+
+            <div>
+              <label className="label">Upload New Verification Files</label>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.txt,image/*"
+                className="input py-3"
+                onChange={handleApplicationFilesChange}
+              />
+              {applicationFileError && <p className="error-text">{applicationFileError}</p>}
+              {applicationFiles.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {applicationFiles.map((file) => (
+                    <span
+                      key={`${file.name}-${file.size}`}
+                      className="badge bg-blue-50 text-blue-700 text-xs"
+                    >
+                      {file.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleApplicationResubmit}
+              disabled={applicationMutation.isPending}
+              className="btn-primary"
+            >
+              {applicationMutation.isPending ? 'Submitting...' : 'Resubmit Verification Materials'}
+            </button>
+          </div>
         </div>
       )}
 
-      <div className="border-b border-gray-200 flex gap-1">
-        {['profile', 'subjects', 'availability'].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              'px-4 py-2.5 -mb-px text-sm font-medium capitalize border-b-2 transition-colors',
-              activeTab === tab
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      {isApproved && (
+        <>
+          <div className="border-b border-gray-200 flex gap-1">
+            {['profile', 'subjects', 'availability'].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'px-4 py-2.5 -mb-px text-sm font-medium capitalize border-b-2 transition-colors',
+                  activeTab === tab
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
 
-      {activeTab === 'profile' && (
+          {activeTab === 'profile' && (
         <div className="card p-6 space-y-4">
           <div>
             <label className="label">Headline</label>
@@ -486,9 +695,9 @@ export default function TutorProfilePage() {
             {updateProfileMutation.isPending ? 'Saving...' : 'Update Profile'}
           </button>
         </div>
-      )}
+          )}
 
-      {activeTab === 'subjects' && (
+          {activeTab === 'subjects' && (
         <div className="space-y-4">
           <div className="card p-5">
             <h3 className="font-semibold text-gray-900 mb-3">My Subjects</h3>
@@ -563,9 +772,9 @@ export default function TutorProfilePage() {
             </div>
           </div>
         </div>
-      )}
+          )}
 
-      {activeTab === 'availability' && (
+          {activeTab === 'availability' && (
         <div className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-gray-900">Weekly Availability</h3>
@@ -627,6 +836,8 @@ export default function TutorProfilePage() {
             {updateAvailabilityMutation.isPending ? 'Saving...' : 'Save Availability'}
           </button>
         </div>
+          )}
+        </>
       )}
     </div>
   );
