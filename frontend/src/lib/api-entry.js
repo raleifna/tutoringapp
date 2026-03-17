@@ -1,5 +1,6 @@
 // src/lib/api-entry.js - switch between backend API and mock API
 import {
+  adminApi as realAdminApi,
   authApi as realAuthApi,
   bookingApi as realBookingApi,
   subjectApi as realSubjectApi,
@@ -85,3 +86,6 @@ export const bookingApi = {
 
 // Stage 4: user profile
 export const userApi = STAGE4_API_MODE === 'mock' ? mockUserApi : realUserApi;
+
+// Stage 5: admin (mock will be added later)
+export const adminApi = realAdminApi;
