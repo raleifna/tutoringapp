@@ -426,6 +426,34 @@ async function removeSubject(req, res) {
   });
 };
 
+async function updateApplication(req, res) {
+  let userId = req.user?.id;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
+  let profile = await prisma.tutorProfile.findUnique({
+    where: { userId: userId },
+  });
+  if (!profile || profile.status !== 'APPLICATION') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not application or no permission.',
+    });
+  }
+
+  // TODO: update
+
+  let latestReviewAction = await getLatestReviewAction(userId);
+  res.json({ 
+    success: true, 
+    message: 'DOING: Application updated',
+    data: { ...profile, latestReviewAction } 
+  });
+}
+
 
 module.exports = {
   searchTutors,
@@ -436,4 +464,5 @@ module.exports = {
   updateAvailability,
   addSubject,
   removeSubject,
+  updateApplication,
 };
