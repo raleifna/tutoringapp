@@ -115,7 +115,28 @@ export const tutorApi = {
     getAvailability: (id) => {
         return api.get(`/tutors/${id}/availability`);
     },
-
+    getMyProfile: () => {
+        return api.get('/tutors/me/profile');
+    },
+    updateApplication: (formData) => {
+        return api.put('/tutors/me/application', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+        });
+    },
+    updateProfile: (data) => {
+        return api.put('/tutors/me/profile', data);
+    },
+    updateAvailability: (availability) => {
+        return api.put('/tutors/me/availability', { availability });
+    },
+    addSubject: (subjectId, data) => {
+        return api.post('/tutors/me/subjects', { subjectId, ...data });
+    },
+    removeSubject: (subjectId) => {
+        return api.delete(`/tutors/me/subjects/${subjectId}`);
+    },
 };
 
 // booking APIs
@@ -156,6 +177,20 @@ export const subjectApi = {
     },
     getCategories: () => {
         return api.get('/subjects/categories');
+    },
+};
+
+// user APIs
+export const userApi = {
+    updateProfile: (data) => {
+        return api.put('/users/me', data);
+    },
+    uploadAvatar: (formData) => {
+        return api.post('/users/me/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+        });
     },
 };
   
