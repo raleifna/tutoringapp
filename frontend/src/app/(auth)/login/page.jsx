@@ -43,7 +43,15 @@ export default function LoginPage() {
                 refreshToken: data.refreshToken,
             });
             toast.success('Welcome back!');
-            router.push('/dashboard');
+
+            const userRole = data?.user?.role;
+            if (userRole === 'TUTOR') {
+                router.push('/tutor/dashboard');
+            } else if (userRole === 'ADMIN') {
+                router.push('/admin/dashboard');
+            } else {
+                router.push('/dashboard');
+            }
         } catch (error) {
             toast.error(error?.response?.data?.message || 'Login failed');
         } finally {
