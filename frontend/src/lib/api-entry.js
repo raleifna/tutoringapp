@@ -18,6 +18,7 @@ import {
   tutorApi as mockStage4TutorApi,
   userApi as mockUserApi,
 } from '../mocks/stage4.mock';
+import { adminApi as mockAdminApi } from '../mocks/stage5.mock';
 
 const normalizeMode = (value, fallback = 'backend') => {
   if (value === 'mock') return 'mock';
@@ -29,6 +30,7 @@ const STAGE1_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE1_API_MODE);
 const STAGE2_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE2_API_MODE, STAGE1_API_MODE);
 const STAGE3_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE3_API_MODE, STAGE1_API_MODE);
 const STAGE4_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE4_API_MODE, STAGE1_API_MODE);
+const STAGE5_API_MODE = normalizeMode(process.env.NEXT_PUBLIC_STAGE5_API_MODE, STAGE1_API_MODE);
 
 // Stage 1: auth
 export const authApi = STAGE1_API_MODE === 'mock' ? mockAuthApi : realAuthApi;
@@ -87,5 +89,5 @@ export const bookingApi = {
 // Stage 4: user profile
 export const userApi = STAGE4_API_MODE === 'mock' ? mockUserApi : realUserApi;
 
-// Stage 5: admin (mock will be added later)
-export const adminApi = realAdminApi;
+// Stage 5: admin
+export const adminApi = STAGE5_API_MODE === 'mock' ? mockAdminApi : realAdminApi;

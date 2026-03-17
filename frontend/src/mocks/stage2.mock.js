@@ -2,6 +2,7 @@
 
 const wait = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
 const STAGE4_TUTOR_PROFILES_KEY = 'mock_stage4_tutor_profiles_v1';
+const STAGE5_SUBJECTS_KEY = 'mock_stage5_subjects_v1';
 
 const ok = (data = null, message = 'OK') => ({
   data: {
@@ -27,6 +28,18 @@ const readJson = (key, fallback) => {
   } catch {
     return fallback;
   }
+};
+
+const getStage5Subjects = () => {
+  const extras = readJson(STAGE5_SUBJECTS_KEY, []);
+  if (!Array.isArray(extras)) return [];
+  return extras
+    .map((item) => ({
+      id: item?.id ? String(item.id) : '',
+      name: item?.name ? String(item.name) : '',
+      category: item?.category ? String(item.category) : '',
+    }))
+    .filter((item) => item.id && item.name);
 };
 
 const MOCK_TUTORS = [
@@ -245,6 +258,12 @@ const getAllSubjects = () => {
         map.set(id, { id, name, category });
       }
     });
+  });
+
+  getStage5Subjects().forEach((item) => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
   });
 
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
