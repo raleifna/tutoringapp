@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { CameraIcon, KeyIcon, UserCircleIcon } from '@heroicons/react/24/outline';
-import { userApi } from '../../../lib/api';
+import { authApi, userApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
@@ -17,6 +17,17 @@ const profileSchema = z.object({
   phone: z.string().optional(),
   bio: z.string().max(500).optional(),
 });
+
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Required'),
+    newPassword: z.string().min(8, 'At least 8 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -43,6 +54,15 @@ export default function ProfilePage() {
     },
   });
 
+  const {
+    register: registerPwd,
+    handleSubmit: handlePwdSubmit,
+    formState: { errors: pwdErrors },
+    reset: resetPwd,
+  } = useForm({
+    resolver: zodResolver(passwordSchema),
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data) => userApi.updateProfile(data),
     onSuccess: async () => {
@@ -66,6 +86,17 @@ export default function ProfilePage() {
     },
     onError: () => {
       toast.error('Avatar upload failed');
+    },
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: (data) => authApi.changePassword(data),
+    onSuccess: () => {
+      toast.success('Password changed successfully');
+      resetPwd();
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Password change failed');
     },
   });
 
@@ -209,10 +240,58 @@ export default function ProfilePage() {
 
       {activeTab === 'security' && (
         <div className="card p-6">
-          <h3 className="font-semibold text-gray-900 mb-2">Security</h3>
-          <p className="text-sm text-gray-500">
-            Change password will be added in the later part of Stage 4.
-          </p>
+          <h3 className="font-semibold text-gray-900 mb-4">Change Password</h3>
+          <form
+            onSubmit={handlePwdSubmit((data) => passwordMutation.mutate(data))}
+            className="space-y-4"
+          >
+            <div>
+              <label className="label">Current Password</label>
+              <input
+                {...registerPwd('currentPassword')}
+                type="password"
+                className="input"
+                autoComplete="current-password"
+              />
+              {pwdErrors.currentPassword && (
+                <p className="error-text">{pwdErrors.currentPassword.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="label">New Password</label>
+              <input
+                {...registerPwd('newPassword')}
+                type="password"
+                className="input"
+                autoComplete="new-password"
+              />
+              {pwdErrors.newPassword && (
+                <p className="error-text">{pwdErrors.newPassword.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="label">Confirm New Password</label>
+              <input
+                {...registerPwd('confirmPassword')}
+                type="password"
+                className="input"
+                autoComplete="new-password"
+              />
+              {pwdErrors.confirmPassword && (
+                <p className="error-text">{pwdErrors.confirmPassword.message}</p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={passwordMutation.isPending}
+              className="btn-primary"
+            >
+              {passwordMutation.isPending ? 'Changing...' : 'Change Password'}
+            </button>
+          </form>
         </div>
       )}
     </div>
