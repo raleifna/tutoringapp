@@ -190,8 +190,44 @@ async function getTutorAvailability(req, res) {
   });
 }
 
+
+async function getMyProfile(req, res) {
+  let userId = req.user.id;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User ID is required.',
+    });
+  }
+
+  let profile = await prisma.tutorProfile.findUnique({
+      where: { userId: userId },
+      select: tutorProfileSelect,
+    });
+  let latestReviewAction = await getLatestReviewAction(userId);
+
+  if (!profile) {
+    return res.status(404).json({
+      success: false,
+      message: 'Profile not found.',
+    });
+  }
+  res.json({ 
+    success: true, 
+    data: { ...profile, latestReviewAction } 
+  });
+};
+
+
+
+
+
+
+
+
 module.exports = {
   searchTutors,
   getTutorProfile,
   getTutorAvailability,
+  getMyProfile,
 };
