@@ -2,16 +2,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   UsersIcon,
-  AcademicCapIcon,
   CalendarDaysIcon,
   CurrencyDollarIcon,
   ClockIcon,
-  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
 
 const formatCurrency = (amount) => {
   const value = Number(amount || 0);
@@ -45,6 +45,9 @@ const getBookingStatusStyle = (status) => {
 };
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
+  const { logout } = useAuthStore();
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => adminApi.getDashboard(),
@@ -64,13 +67,6 @@ export default function AdminDashboardPage() {
       href: '/admin/users',
     },
     {
-      label: 'Total Tutors',
-      value: overview.totalTutors ?? 0,
-      icon: AcademicCapIcon,
-      iconColor: 'bg-green-100 text-green-600',
-      href: '/admin/tutors',
-    },
-    {
       label: 'Total Bookings',
       value: overview.totalBookings ?? 0,
       icon: CalendarDaysIcon,
@@ -82,23 +78,21 @@ export default function AdminDashboardPage() {
       value: formatCurrency(overview.totalRevenue || 0),
       icon: CurrencyDollarIcon,
       iconColor: 'bg-orange-100 text-orange-600',
-      href: '/admin/analytics',
+      href: '/admin/analytics?period=30',
     },
     {
       label: 'Pending Tutors',
       value: overview.pendingTutors ?? 0,
       icon: ClockIcon,
       iconColor: 'bg-amber-100 text-amber-600',
-      href: '/admin/tutors',
+      href: '/admin/tutors?status=PENDING',
     },
   ];
 
-  const quickActions = [
-    { label: 'User Management', href: '/admin/users', icon: UsersIcon },
-    { label: 'Tutor Review', href: '/admin/tutors', icon: AcademicCapIcon },
-    { label: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
-    { label: 'Operations', href: '/admin/operations', icon: CalendarDaysIcon },
-  ];
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   return (
     <div className="space-y-5">
@@ -106,6 +100,9 @@ export default function AdminDashboardPage() {
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
         <h1 className="text-xl font-bold">Admin Dashboard</h1>
         <p className="text-primary-200 text-sm mt-1">Platform overview and key metrics</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
       {isError ? (
@@ -117,8 +114,8 @@ export default function AdminDashboardPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            {(isLoading ? Array.from({ length: 6 }) : statCards).map((item, index) => {
+          <div className="grid grid-cols-2 gap-3">
+            {(isLoading ? Array.from({ length: statCards.length }) : statCards).map((item, index) => {
               if (isLoading) {
                 return <div key={index} className="card h-28 animate-pulse" />;
               }
@@ -185,17 +182,6 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            {quickActions.map((item) => (
-              <Link key={item.label} href={item.href} className="card p-4 hover:shadow-md transition-shadow">
-                <div className="w-9 h-9 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center mb-2.5">
-                  <item.icon className="w-5 h-5" />
-                </div>
-                <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-              </Link>
-            ))}
           </div>
         </>
       )}

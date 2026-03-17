@@ -1,9 +1,12 @@
 // src/app/(app)/admin/analytics/page.jsx - Admin Analytics
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
 
 const PERIODS = [7, 30, 90];
 
@@ -57,7 +60,16 @@ function MetricList({ items, formatter, emptyLabel, tone = 'bg-primary-600' }) {
 }
 
 export default function AdminAnalyticsPage() {
+  const router = useRouter();
+  const { logout } = useAuthStore();
+  const searchParams = useSearchParams();
   const [period, setPeriod] = useState(30);
+
+  useEffect(() => {
+    const fromUrl = Number(searchParams.get('period') || '');
+    if (!PERIODS.includes(fromUrl)) return;
+    setPeriod(fromUrl);
+  }, [searchParams]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-analytics', period],
@@ -71,12 +83,24 @@ export default function AdminAnalyticsPage() {
   const topSubjects = analytics?.topSubjects || [];
   const revenueData = analytics?.revenueTimeline || [];
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
   return (
     <div className="space-y-5">
+      <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <span>←</span> Back
+      </Link>
+
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
         <h1 className="text-xl font-bold">Analytics</h1>
         <p className="text-primary-200 text-sm mt-1">Platform performance overview</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">

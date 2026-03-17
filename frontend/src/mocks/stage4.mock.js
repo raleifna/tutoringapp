@@ -56,9 +56,85 @@ const parseLimit = (value, fallback = 10) => {
   return Math.floor(num);
 };
 
+const verificationFilePlaceholderUrl = (fileName = 'verification-file.pdf') =>
+  `data:text/plain;charset=utf-8,${encodeURIComponent(`Mock verification file: ${fileName}`)}`;
+
+const fallbackVerificationFile = (fileName = 'uploaded-verification-file.pdf') => ({
+  originalName: fileName,
+  fileName,
+  url: verificationFilePlaceholderUrl(fileName),
+});
+
+const toVerificationFileMeta = (item, index = 0) => {
+  if (!item) return null;
+
+  if (typeof item === 'string') {
+    const fileName = item.trim();
+    return fileName ? fallbackVerificationFile(fileName) : null;
+  }
+
+  if (typeof item !== 'object') return null;
+
+  const hasFileFields = Boolean(item.url || item.originalName || item.fileName || item.name);
+  if (!hasFileFields) return null;
+
+  const rawName = item.originalName || item.fileName || item.name || `verification-file-${index + 1}.pdf`;
+  const fileName = String(rawName || `verification-file-${index + 1}.pdf`);
+  const url = String(item.url || '').trim() || verificationFilePlaceholderUrl(fileName);
+
+  return {
+    ...item,
+    originalName: String(item.originalName || fileName),
+    fileName: String(item.fileName || fileName),
+    url,
+  };
+};
+
+const normalizeVerificationFiles = (items, hasVerificationFiles = false) => {
+  const source = Array.isArray(items) ? items : [];
+  const files = source
+    .map((item, index) => toVerificationFileMeta(item, index))
+    .filter(Boolean);
+
+  if (files.length === 0 && hasVerificationFiles) {
+    files.push(fallbackVerificationFile());
+  }
+
+  return files;
+};
+
 const toPublicUser = (user) => {
   const { password, ...rest } = user || {};
   return rest;
+};
+
+const blobToDataUrl = (blob) =>
+  new Promise((resolve) => {
+    if (
+      !blob ||
+      typeof Blob === 'undefined' ||
+      !(blob instanceof Blob) ||
+      typeof FileReader === 'undefined'
+    ) {
+      resolve(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+
+const toMockAvatarUrl = async (file, fallbackName) => {
+  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=0ea5e9&color=fff`;
+
+  if (file && typeof Blob !== 'undefined' && file instanceof Blob) {
+    const dataUrl = await blobToDataUrl(file);
+    if (dataUrl) return dataUrl;
+  }
+
+  return fallback;
 };
 
 const getUsers = () => readJson(USERS_KEY, []);
@@ -310,34 +386,58 @@ const ensureTutorUserMap = () => {
   return seeded;
 };
 
-const createEmptyTutorProfile = (user) => ({
-  id: `mock_tutor_${Date.now()}`,
-  userId: user.id,
-  user: {
-    id: user.id,
-    firstName: user.firstName || 'Tutor',
-    lastName: user.lastName || '',
-    email: user.email || '',
-    avatar: user.avatar || '',
-  },
-  // New tutor starts with editable empty profile in mock flow.
-  status: 'ACTIVE',
-  headline: '',
-  bio: '',
-  hourlyRate: 50,
-  currency: 'AUD',
-  location: '',
-  sessionTypes: ['ONLINE'],
-  yearsExperience: 0,
-  education: [],
-  languages: [],
-  availability: [],
-  subjects: [],
-  certifications: [],
-  latestReviewAction: null,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
+const createEmptyTutorProfile = (user) => {
+  const educationSummary = String(user?.tutorEducationSummary || '')
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const yearsExperience = Number(user?.tutorExperienceYears || 0);
+  const supportingNotes = String(user?.tutorSupportingNotes || '').trim();
+  const registrationFiles = normalizeVerificationFiles(
+    user?.verificationFiles,
+    Boolean(user?.hasVerificationFiles)
+  );
+  const hasSubmissionData = registrationFiles.length > 0 || educationSummary.length > 0;
+  const certifications = [...registrationFiles];
+
+  if (supportingNotes) {
+    certifications.push({ text: supportingNotes });
+  }
+
+  return {
+    id: `mock_tutor_${Date.now()}`,
+    userId: user.id,
+    user: {
+      id: user.id,
+      firstName: user.firstName || 'Tutor',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      avatar: user.avatar || '',
+    },
+    status: hasSubmissionData ? 'PENDING' : 'ACTIVE',
+    headline: '',
+    bio: '',
+    hourlyRate: 50,
+    currency: 'AUD',
+    location: '',
+    sessionTypes: ['ONLINE'],
+    yearsExperience: Number.isFinite(yearsExperience) ? yearsExperience : 0,
+    education: educationSummary,
+    languages: [],
+    availability: [],
+    subjects: [],
+    certifications,
+    latestReviewAction: hasSubmissionData
+      ? {
+          action: 'SUBMITTED',
+          description: 'Application submitted and pending admin review.',
+          createdAt: new Date().toISOString(),
+        }
+      : null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+};
 
 const ensureTutorProfileForUser = (user) => {
   if (!user) throw buildError('Unauthorized', 401);
@@ -382,6 +482,91 @@ const ensureTutorProfileForUser = (user) => {
     email: user.email || profile.user?.email || '',
     avatar: user.avatar || profile.user?.avatar || '',
   };
+
+  const isCustomTutor = String(user.id || '').startsWith('mock_user_');
+  if (isCustomTutor) {
+    const registrationFiles = normalizeVerificationFiles(
+      user?.verificationFiles,
+      Boolean(user?.hasVerificationFiles)
+    );
+    const supportNotes = String(user.tutorSupportingNotes || '').trim();
+    const summaryLines = String(user.tutorEducationSummary || '')
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const years = Number(user.tutorExperienceYears || 0);
+
+    if ((!Array.isArray(profile.education) || profile.education.length === 0) && summaryLines.length > 0) {
+      profile.education = summaryLines;
+    }
+    if ((!profile.yearsExperience || profile.yearsExperience === 0) && Number.isFinite(years) && years > 0) {
+      profile.yearsExperience = years;
+    }
+    const currentCertifications = Array.isArray(profile.certifications)
+      ? [...profile.certifications]
+      : [];
+    const currentFileItems = currentCertifications
+      .map((item, index) => toVerificationFileMeta(item, index))
+      .filter(Boolean);
+    const currentNotes = [];
+    const noteSet = new Set();
+    currentCertifications.forEach((item) => {
+      if (!item || typeof item !== 'object' || item.url || !item.text) return;
+      const text = String(item.text).trim();
+      if (!text) return;
+      const key = normalize(text);
+      if (noteSet.has(key)) return;
+      noteSet.add(key);
+      currentNotes.push({ text });
+    });
+
+    const mergedFiles = [...currentFileItems];
+    const fileKeySet = new Set(
+      mergedFiles.map((item) =>
+        normalize(String(item.url || item.originalName || item.fileName || item.name || ''))
+      )
+    );
+    registrationFiles.forEach((file, index) => {
+      const normalizedFile = toVerificationFileMeta(file, index);
+      if (!normalizedFile) return;
+      const fileKey = normalize(
+        String(
+          normalizedFile.url ||
+            normalizedFile.originalName ||
+            normalizedFile.fileName ||
+            normalizedFile.name ||
+            ''
+        )
+      );
+      if (!fileKey || fileKeySet.has(fileKey)) return;
+      fileKeySet.add(fileKey);
+      mergedFiles.push(normalizedFile);
+    });
+
+    if (supportNotes) {
+      const noteKey = normalize(supportNotes);
+      if (!noteSet.has(noteKey)) {
+        noteSet.add(noteKey);
+        currentNotes.push({ text: supportNotes });
+      }
+    }
+
+    if (mergedFiles.length > 0 || currentNotes.length > 0) {
+      profile.certifications = [...mergedFiles, ...currentNotes];
+    }
+    if (
+      profile.status === 'ACTIVE' &&
+      (registrationFiles.length > 0 || summaryLines.length > 0)
+    ) {
+      profile.status = 'PENDING';
+      profile.latestReviewAction = {
+        action: 'SUBMITTED',
+        description: 'Application submitted and pending admin review.',
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
   profile.updatedAt = new Date().toISOString();
 
   writeTutorProfiles(profiles);
@@ -401,9 +586,12 @@ const writeBookings = (bookings) => writeJson(BOOKINGS_KEY, bookings);
 
 const buildSeedBookings = () => {
   const now = Date.now();
+  const h = 60 * 60 * 1000;
+  const d = 24 * h;
+
   return [
     {
-      id: `mock_booking_seed_${now}_1`,
+      id: 'mock_booking_seed_1',
       learnerId: 'mock_seed_learner_1',
       learner: {
         id: 'mock_seed_learner_1',
@@ -416,18 +604,26 @@ const buildSeedBookings = () => {
       subjectId: 'subj_math',
       subject: 'Mathematics',
       sessionType: 'ONLINE',
-      scheduledAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      scheduledAt: new Date(now + d).toISOString(),
       duration: 60,
-      notes: 'Need help with calculus homework.',
+      notes: 'Please focus on calculus practice questions.',
       status: 'PENDING',
       currency: 'AUD',
       hourlyRate: 65,
       totalAmount: 65,
-      createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 4 * h).toISOString(),
+      updatedAt: new Date(now - 4 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_1_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 4 * h).toISOString(),
+          reason: '',
+        },
+      ],
     },
     {
-      id: `mock_booking_seed_${now}_2`,
+      id: 'mock_booking_seed_2',
       learnerId: 'mock_seed_learner_2',
       learner: {
         id: 'mock_seed_learner_2',
@@ -440,18 +636,32 @@ const buildSeedBookings = () => {
       subjectId: 'subj_physics',
       subject: 'Physics',
       sessionType: 'IN_PERSON',
-      scheduledAt: new Date(now + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      scheduledAt: new Date(now + 2 * d).toISOString(),
       duration: 90,
-      notes: 'Focus on mechanics and vectors.',
+      notes: 'Mechanics revision before quiz.',
       status: 'ACCEPTED',
       currency: 'AUD',
       hourlyRate: 65,
       totalAmount: 97.5,
-      createdAt: new Date(now - 10 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now - 9 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 10 * h).toISOString(),
+      updatedAt: new Date(now - 8 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_2_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 10 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_2_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 8 * h).toISOString(),
+          reason: '',
+        },
+      ],
     },
     {
-      id: `mock_booking_seed_${now}_3`,
+      id: 'mock_booking_seed_3',
       learnerId: 'mock_seed_learner_3',
       learner: {
         id: 'mock_seed_learner_3',
@@ -464,15 +674,228 @@ const buildSeedBookings = () => {
       subjectId: 'subj_programming',
       subject: 'Programming',
       sessionType: 'ONLINE',
-      scheduledAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      scheduledAt: new Date(now - 2 * d).toISOString(),
       duration: 60,
-      notes: 'Intro to JavaScript functions.',
+      notes: 'Finished fundamentals module.',
       status: 'COMPLETED',
       currency: 'AUD',
       hourlyRate: 72,
       totalAmount: 72,
-      createdAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 4 * d).toISOString(),
+      updatedAt: new Date(now - 2 * d).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_3_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 4 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_3_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 3 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_3_h3',
+          status: 'COMPLETED',
+          createdAt: new Date(now - 2 * d).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_4',
+      learnerId: 'mock_seed_learner_1',
+      learner: {
+        id: 'mock_seed_learner_1',
+        firstName: 'Ava',
+        lastName: 'Martin',
+        email: 'ava.learner@example.com',
+        avatar: '',
+      },
+      tutorId: 'mock_tutor_2',
+      subjectId: 'subj_data_science',
+      subject: 'Data Science',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now - d).toISOString(),
+      duration: 60,
+      notes: 'Cancelled due to schedule conflict.',
+      status: 'CANCELLED',
+      currency: 'AUD',
+      hourlyRate: 72,
+      totalAmount: 72,
+      createdAt: new Date(now - 2 * d).toISOString(),
+      updatedAt: new Date(now - 30 * h).toISOString(),
+      cancelReason: 'Unavailable this week',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_4_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 2 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_4_h2',
+          status: 'CANCELLED',
+          createdAt: new Date(now - 30 * h).toISOString(),
+          reason: 'Unavailable this week',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_5',
+      learnerId: 'mock_seed_learner_2',
+      learner: {
+        id: 'mock_seed_learner_2',
+        firstName: 'Ethan',
+        lastName: 'Ng',
+        email: 'ethan.learner@example.com',
+        avatar: '',
+      },
+      tutorId: 'mock_tutor_1',
+      subjectId: 'subj_math',
+      subject: 'Mathematics',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 3 * d).toISOString(),
+      duration: 60,
+      notes: 'Needs help with algebra before test.',
+      status: 'PENDING',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 65,
+      createdAt: new Date(now - 2 * h).toISOString(),
+      updatedAt: new Date(now - 2 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_5_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 2 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_6',
+      learnerId: 'mock_seed_learner_3',
+      learner: {
+        id: 'mock_seed_learner_3',
+        firstName: 'Mia',
+        lastName: 'Lopez',
+        email: 'mia.learner@example.com',
+        avatar: '',
+      },
+      tutorId: 'mock_tutor_1',
+      subjectId: 'subj_physics',
+      subject: 'Physics',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 4 * d).toISOString(),
+      duration: 60,
+      notes: 'Upcoming chapter review.',
+      status: 'ACCEPTED',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 65,
+      createdAt: new Date(now - 9 * h).toISOString(),
+      updatedAt: new Date(now - 7 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_6_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 9 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_6_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 7 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_7',
+      learnerId: 'mock_seed_learner_2',
+      learner: {
+        id: 'mock_seed_learner_2',
+        firstName: 'Ethan',
+        lastName: 'Ng',
+        email: 'ethan.learner@example.com',
+        avatar: '',
+      },
+      tutorId: 'mock_tutor_3',
+      subjectId: 'subj_english',
+      subject: 'English',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 2 * d).toISOString(),
+      duration: 60,
+      notes: 'Declined due to mismatch in level.',
+      status: 'DECLINED',
+      currency: 'AUD',
+      hourlyRate: 58,
+      totalAmount: 58,
+      createdAt: new Date(now - 12 * h).toISOString(),
+      updatedAt: new Date(now - 10 * h).toISOString(),
+      declineReason: 'Not available at requested level',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_7_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 12 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_7_h2',
+          status: 'DECLINED',
+          createdAt: new Date(now - 10 * h).toISOString(),
+          reason: 'Not available at requested level',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_8',
+      learnerId: 'mock_seed_learner_3',
+      learner: {
+        id: 'mock_seed_learner_3',
+        firstName: 'Mia',
+        lastName: 'Lopez',
+        email: 'mia.learner@example.com',
+        avatar: '',
+      },
+      tutorId: 'mock_tutor_2',
+      subjectId: 'subj_data_science',
+      subject: 'Data Science',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 5 * d).toISOString(),
+      duration: 90,
+      notes: 'Rescheduled once.',
+      status: 'RESCHEDULED',
+      currency: 'AUD',
+      hourlyRate: 72,
+      totalAmount: 108,
+      createdAt: new Date(now - 14 * h).toISOString(),
+      updatedAt: new Date(now - 6 * h).toISOString(),
+      rescheduleReason: 'Tutor requested time shift',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_8_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 14 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_8_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 11 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_8_h3',
+          status: 'RESCHEDULED',
+          createdAt: new Date(now - 6 * h).toISOString(),
+          reason: 'Tutor requested time shift',
+        },
+      ],
     },
   ];
 };
@@ -550,11 +973,37 @@ const mutateTutorBooking = async (id, updater) => {
 
   const booking = bookings[index];
   if (String(booking.tutorId) !== String(profile.id)) return fail('Forbidden', 403);
+  const previousStatus = booking.status;
+  const previousScheduledAt = booking.scheduledAt;
 
   try {
     updater(booking);
   } catch (error) {
     return Promise.reject(error);
+  }
+
+  if (!Array.isArray(booking.statusHistory)) {
+    booking.statusHistory = [];
+  }
+
+  if (booking.status !== previousStatus) {
+    booking.statusHistory.push({
+      id: `history_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      status: booking.status,
+      createdAt: new Date().toISOString(),
+      reason:
+        booking.declineReason ||
+        booking.cancelReason ||
+        booking.rescheduleReason ||
+        '',
+    });
+  } else if (booking.scheduledAt !== previousScheduledAt) {
+    booking.statusHistory.push({
+      id: `history_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      status: 'RESCHEDULED',
+      createdAt: new Date().toISOString(),
+      reason: booking.rescheduleReason || '',
+    });
   }
 
   booking.updatedAt = new Date().toISOString();
@@ -749,6 +1198,12 @@ export const tutorApi = {
     const profile = ensureTutorProfileForUser(sessionUser);
     const index = profiles.findIndex((item) => item.id === profile.id);
     if (index < 0) return fail('Tutor profile not found', 404);
+    if (String(profile.status || '').toUpperCase() === 'ACTIVE') {
+      return fail(
+        'Application resubmission is only available when your tutor verification is pending review or returned for updates',
+        403
+      );
+    }
 
     const parsed = parseApplicationPayload(payload);
     if (!String(parsed.tutorEducationSummary || '').trim()) {
@@ -949,12 +1404,15 @@ export const userApi = {
       typeof FormData !== 'undefined' && formData instanceof FormData ? formData.get('avatar') : null;
 
     const fallbackName = `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim() || 'User';
-    const avatar =
-      file && file.name
-        ? `https://mock.local/avatar/${Date.now()}_${encodeURIComponent(file.name)}`
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=0ea5e9&color=fff`;
+    let avatar = await toMockAvatarUrl(file, fallbackName);
 
-    const nextUser = updateUserRecord(sessionUser.id, { avatar });
+    let nextUser;
+    try {
+      nextUser = updateUserRecord(sessionUser.id, { avatar });
+    } catch {
+      avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=0ea5e9&color=fff`;
+      nextUser = updateUserRecord(sessionUser.id, { avatar });
+    }
     if (!nextUser) return fail('User not found', 404);
     updateStoredCurrentUser(nextUser);
 

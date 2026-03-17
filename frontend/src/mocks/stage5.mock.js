@@ -175,69 +175,230 @@ const SEED_TUTOR_PROFILES = [
   },
 ];
 
-const buildSeedBookings = () => [
-  {
-    id: 'mock_admin_booking_1',
-    learnerId: 'mock_seed_learner_1',
-    learner: { id: 'mock_seed_learner_1', firstName: 'Ava', lastName: 'Martin', email: 'ava.learner@example.com', avatar: '' },
-    tutorId: 'mock_tutor_1',
-    subjectId: 'subj_math',
-    subject: 'Mathematics',
-    sessionType: 'ONLINE',
-    scheduledAt: '2026-03-20T08:00:00.000Z',
-    duration: 60,
-    status: 'PENDING',
-    currency: 'AUD',
-    totalAmount: 65,
-    payment: { status: 'PENDING' },
-    statusHistory: [{ id: 'history_1', status: 'PENDING', createdAt: '2026-03-16T08:00:00.000Z', reason: '' }],
-    createdAt: '2026-03-16T08:00:00.000Z',
-    updatedAt: '2026-03-16T08:00:00.000Z',
-  },
-  {
-    id: 'mock_admin_booking_2',
-    learnerId: 'mock_seed_learner_2',
-    learner: { id: 'mock_seed_learner_2', firstName: 'Ethan', lastName: 'Ng', email: 'ethan.learner@example.com', avatar: '' },
-    tutorId: 'mock_tutor_1',
-    subjectId: 'subj_physics',
-    subject: 'Physics',
-    sessionType: 'IN_PERSON',
-    scheduledAt: '2026-03-18T10:00:00.000Z',
-    duration: 90,
-    status: 'ACCEPTED',
-    currency: 'AUD',
-    totalAmount: 97.5,
-    payment: { status: 'COMPLETED' },
-    statusHistory: [
-      { id: 'history_2', status: 'PENDING', createdAt: '2026-03-14T04:00:00.000Z', reason: '' },
-      { id: 'history_3', status: 'ACCEPTED', createdAt: '2026-03-14T07:00:00.000Z', reason: '' },
-    ],
-    createdAt: '2026-03-14T04:00:00.000Z',
-    updatedAt: '2026-03-14T07:00:00.000Z',
-  },
-  {
-    id: 'mock_admin_booking_3',
-    learnerId: 'mock_seed_learner_3',
-    learner: { id: 'mock_seed_learner_3', firstName: 'Mia', lastName: 'Lopez', email: 'mia.learner@example.com', avatar: '' },
-    tutorId: 'mock_tutor_2',
-    subjectId: 'subj_programming',
-    subject: 'Programming',
-    sessionType: 'ONLINE',
-    scheduledAt: '2026-03-12T09:00:00.000Z',
-    duration: 60,
-    status: 'COMPLETED',
-    currency: 'AUD',
-    totalAmount: 72,
-    payment: { status: 'COMPLETED' },
-    statusHistory: [
-      { id: 'history_4', status: 'PENDING', createdAt: '2026-03-10T01:00:00.000Z', reason: '' },
-      { id: 'history_5', status: 'ACCEPTED', createdAt: '2026-03-10T02:00:00.000Z', reason: '' },
-      { id: 'history_6', status: 'COMPLETED', createdAt: '2026-03-12T11:00:00.000Z', reason: '' },
-    ],
-    createdAt: '2026-03-10T01:00:00.000Z',
-    updatedAt: '2026-03-12T11:00:00.000Z',
-  },
-];
+const buildSeedBookings = () => {
+    const now = Date.now();
+    const h = 60 * 60 * 1000;
+    const d = 24 * h;
+
+    return [
+      {
+        id: 'mock_booking_seed_1',
+        learnerId: 'mock_seed_learner_1',
+        learner: {
+          id: 'mock_seed_learner_1',
+          firstName: 'Ava',
+          lastName: 'Martin',
+          email: 'ava.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_1',
+        subjectId: 'subj_math',
+        subject: 'Mathematics',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now + d).toISOString(),
+        duration: 60,
+        status: 'PENDING',
+        currency: 'AUD',
+        totalAmount: 65,
+        payment: { status: 'PENDING' },
+        statusHistory: [
+          { id: 'mock_booking_seed_1_h1', status: 'PENDING', createdAt: new Date(now - 4 * h).toISOString(), reason: '' },
+        ],
+        createdAt: new Date(now - 4 * h).toISOString(),
+        updatedAt: new Date(now - 4 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_2',
+        learnerId: 'mock_seed_learner_1',
+        learner: {
+          id: 'mock_seed_learner_1',
+          firstName: 'Ava',
+          lastName: 'Martin',
+          email: 'ava.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_1',
+        subjectId: 'subj_physics',
+        subject: 'Physics',
+        sessionType: 'IN_PERSON',
+        scheduledAt: new Date(now + 2 * d).toISOString(),
+        duration: 90,
+        status: 'ACCEPTED',
+        currency: 'AUD',
+        totalAmount: 97.5,
+        payment: { status: 'COMPLETED' },
+        statusHistory: [
+          { id: 'mock_booking_seed_2_h1', status: 'PENDING', createdAt: new Date(now - 10 * h).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_2_h2', status: 'ACCEPTED', createdAt: new Date(now - 8 * h).toISOString(), reason: '' },
+        ],
+        createdAt: new Date(now - 10 * h).toISOString(),
+        updatedAt: new Date(now - 8 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_3',
+        learnerId: 'mock_seed_learner_1',
+        learner: {
+          id: 'mock_seed_learner_1',
+          firstName: 'Ava',
+          lastName: 'Martin',
+          email: 'ava.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_2',
+        subjectId: 'subj_programming',
+        subject: 'Programming',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now - 2 * d).toISOString(),
+        duration: 60,
+        status: 'COMPLETED',
+        currency: 'AUD',
+        totalAmount: 72,
+        payment: { status: 'COMPLETED' },
+        statusHistory: [
+          { id: 'mock_booking_seed_3_h1', status: 'PENDING', createdAt: new Date(now - 4 * d).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_3_h2', status: 'ACCEPTED', createdAt: new Date(now - 3 * d).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_3_h3', status: 'COMPLETED', createdAt: new Date(now - 2 * d).toISOString(), reason: '' },
+        ],
+        createdAt: new Date(now - 4 * d).toISOString(),
+        updatedAt: new Date(now - 2 * d).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_4',
+        learnerId: 'mock_seed_learner_2',
+        learner: {
+          id: 'mock_seed_learner_2',
+          firstName: 'Ethan',
+          lastName: 'Ng',
+          email: 'ethan.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_3',
+        subjectId: 'subj_english',
+        subject: 'English',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now + 2 * d).toISOString(),
+        duration: 60,
+        status: 'DECLINED',
+        currency: 'AUD',
+        totalAmount: 58,
+        payment: { status: 'FAILED' },
+        statusHistory: [
+          { id: 'mock_booking_seed_4_h1', status: 'PENDING', createdAt: new Date(now - 12 * h).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_4_h2', status: 'DECLINED', createdAt: new Date(now - 10 * h).toISOString(), reason: 'Not available at requested level' },
+        ],
+        createdAt: new Date(now - 12 * h).toISOString(),
+        updatedAt: new Date(now - 10 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_5',
+        learnerId: 'mock_seed_learner_3',
+        learner: {
+          id: 'mock_seed_learner_3',
+          firstName: 'Mia',
+          lastName: 'Lopez',
+          email: 'mia.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_2',
+        subjectId: 'subj_data_science',
+        subject: 'Data Science',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now + 5 * d).toISOString(),
+        duration: 90,
+        status: 'RESCHEDULED',
+        currency: 'AUD',
+        totalAmount: 108,
+        payment: { status: 'PENDING' },
+        statusHistory: [
+          { id: 'mock_booking_seed_5_h1', status: 'PENDING', createdAt: new Date(now - 14 * h).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_5_h2', status: 'ACCEPTED', createdAt: new Date(now - 11 * h).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_5_h3', status: 'RESCHEDULED', createdAt: new Date(now - 6 * h).toISOString(), reason: 'Tutor requested time shift' },
+        ],
+        createdAt: new Date(now - 14 * h).toISOString(),
+        updatedAt: new Date(now - 6 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_6',
+        learnerId: 'mock_seed_learner_2',
+        learner: {
+          id: 'mock_seed_learner_2',
+          firstName: 'Ethan',
+          lastName: 'Ng',
+          email: 'ethan.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_1',
+        subjectId: 'subj_math',
+        subject: 'Mathematics',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now + 3 * d).toISOString(),
+        duration: 60,
+        status: 'PENDING',
+        currency: 'AUD',
+        totalAmount: 65,
+        payment: { status: 'PENDING' },
+        statusHistory: [
+          { id: 'mock_booking_seed_6_h1', status: 'PENDING', createdAt: new Date(now - 2 * h).toISOString(), reason: '' },
+        ],
+        createdAt: new Date(now - 2 * h).toISOString(),
+        updatedAt: new Date(now - 2 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_7',
+        learnerId: 'mock_seed_learner_3',
+        learner: {
+          id: 'mock_seed_learner_3',
+          firstName: 'Mia',
+          lastName: 'Lopez',
+          email: 'mia.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_1',
+        subjectId: 'subj_physics',
+        subject: 'Physics',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now + 4 * d).toISOString(),
+        duration: 60,
+        status: 'ACCEPTED',
+        currency: 'AUD',
+        totalAmount: 65,
+        payment: { status: 'COMPLETED' },
+        statusHistory: [
+          { id: 'mock_booking_seed_7_h1', status: 'PENDING', createdAt: new Date(now - 9 * h).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_7_h2', status: 'ACCEPTED', createdAt: new Date(now - 7 * h).toISOString(), reason: '' },
+        ],
+        createdAt: new Date(now - 9 * h).toISOString(),
+        updatedAt: new Date(now - 7 * h).toISOString(),
+      },
+      {
+        id: 'mock_booking_seed_8',
+        learnerId: 'mock_seed_learner_1',
+        learner: {
+          id: 'mock_seed_learner_1',
+          firstName: 'Ava',
+          lastName: 'Martin',
+          email: 'ava.learner@example.com',
+          avatar: '',
+        },
+        tutorId: 'mock_tutor_2',
+        subjectId: 'subj_data_science',
+        subject: 'Data Science',
+        sessionType: 'ONLINE',
+        scheduledAt: new Date(now - d).toISOString(),
+        duration: 60,
+        status: 'CANCELLED',
+        currency: 'AUD',
+        totalAmount: 72,
+        payment: { status: 'FAILED' },
+        statusHistory: [
+          { id: 'mock_booking_seed_8_h1', status: 'PENDING', createdAt: new Date(now - 2 * d).toISOString(), reason: '' },
+          { id: 'mock_booking_seed_8_h2', status: 'CANCELLED', createdAt: new Date(now - 30 * h).toISOString(), reason: 'Unavailable this week' },
+        ],
+        createdAt: new Date(now - 2 * d).toISOString(),
+        updatedAt: new Date(now - 30 * h).toISOString(),
+      },
+    ];
+};
 
 const ensureSubjects = () => {
   const current = readJson(SUBJECTS_KEY, null);
@@ -344,7 +505,19 @@ const getRegisteredUsers = () => {
 
 const getAllUsersForAdmin = () => {
   const registered = getRegisteredUsers();
-  return [...clone(DEFAULT_ADMIN_USERS), ...registered].sort((a, b) => {
+  const byKey = new Map();
+
+  [...clone(DEFAULT_ADMIN_USERS), ...registered].forEach((user) => {
+    const idKey = user?.id ? `id:${user.id}` : null;
+    const emailKey = user?.email ? `email:${normalize(user.email)}` : null;
+    const key = idKey || emailKey;
+    if (!key) return;
+
+    const previous = byKey.get(key);
+    byKey.set(key, previous ? { ...previous, ...user } : user);
+  });
+
+  return Array.from(byKey.values()).sort((a, b) => {
     const aTime = new Date(a.createdAt || 0).getTime();
     const bTime = new Date(b.createdAt || 0).getTime();
     return bTime - aTime;

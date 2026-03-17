@@ -1,7 +1,9 @@
 // src/app/(app)/admin/tutors/page.jsx - Admin Tutor Review
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -12,6 +14,7 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -75,6 +78,9 @@ const formatApplicationItem = (item) => {
 const isUploadedFile = (item) => item && typeof item === 'object' && item.url;
 
 export default function AdminTutorsPage() {
+  const router = useRouter();
+  const { logout } = useAuthStore();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [activeStatus, setActiveStatus] = useState('PENDING');
   const [pendingAction, setPendingAction] = useState({
@@ -82,6 +88,13 @@ export default function AdminTutorsPage() {
     type: null,
     message: '',
   });
+
+  useEffect(() => {
+    const statusFromUrl = (searchParams.get('status') || '').toUpperCase();
+    if (!STATUS_TABS.some((tab) => tab.value === statusFromUrl)) return;
+    setActiveStatus(statusFromUrl);
+    setPendingAction({ tutorId: null, type: null, message: '' });
+  }, [searchParams]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-tutors', activeStatus],
@@ -144,12 +157,24 @@ export default function AdminTutorsPage() {
     rejectMutation.mutate({ tutorId, reason: message || undefined });
   };
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
   return (
     <div className="space-y-5">
+      <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <span>←</span> Back
+      </Link>
+
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
         <h1 className="text-xl font-bold">Tutor Review</h1>
         <p className="text-primary-200 text-sm mt-1">Review tutor applications and moderation state</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">

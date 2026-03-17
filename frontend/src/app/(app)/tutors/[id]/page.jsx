@@ -74,9 +74,14 @@ export default function TutorDetailPage() {
   const [activeTab, setActiveTab] = useState('about');
   const [showBookingForm, setShowBookingForm] = useState(false);
   const from = searchParams.get('from');
+  const searchFrom = (searchParams.get('searchFrom') || '').toLowerCase();
   const isFromTutorDashboard = from === 'tutor-dashboard';
-  const backHref = isFromTutorDashboard ? '/tutor/dashboard' : '/search';
-  const backLabel = isFromTutorDashboard ? 'Back' : 'Back to search';
+  const backHref = isFromTutorDashboard
+    ? '/tutor/dashboard'
+    : searchFrom
+      ? `/search?from=${encodeURIComponent(searchFrom)}`
+      : '/search';
+  const backLabel = 'Back';
 
   // Stage 2 priority #1
   const {
@@ -207,7 +212,7 @@ export default function TutorDetailPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
         <p className="text-gray-600 mb-3">Tutor not found.</p>
         <Link href={backHref} className="btn-primary btn-sm">
-          {isFromTutorDashboard ? 'Back' : 'Back to Search'}
+          {backLabel}
         </Link>
       </div>
     );

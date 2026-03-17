@@ -1,7 +1,9 @@
 // src/app/(app)/admin/users/page.jsx - Admin User Management
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -11,6 +13,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
 
 const ROLES = ['', 'LEARNER', 'TUTOR', 'ADMIN', 'SYSTEM_ADMIN'];
 const STATUSES = ['', 'ACTIVE', 'SUSPENDED', 'DEACTIVATED'];
@@ -66,12 +69,31 @@ function DetailRow({ label, value }) {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
+  const { logout } = useAuthStore();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState(null);
+
+  useEffect(() => {
+    const nextSearch = searchParams.get('search') || '';
+    const roleFromUrl = searchParams.get('role') || '';
+    const statusFromUrl = searchParams.get('status') || '';
+    const pageFromUrl = Number(searchParams.get('page') || '1');
+
+    const nextRole = ROLES.includes(roleFromUrl) ? roleFromUrl : '';
+    const nextStatus = STATUSES.includes(statusFromUrl) ? statusFromUrl : '';
+    const nextPage = Number.isFinite(pageFromUrl) && pageFromUrl > 0 ? Math.floor(pageFromUrl) : 1;
+
+    setSearch(nextSearch);
+    setRole(nextRole);
+    setStatus(nextStatus);
+    setPage(nextPage);
+  }, [searchParams]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', search, role, status, page],
@@ -104,12 +126,24 @@ export default function AdminUsersPage() {
     },
   });
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
   return (
     <div className="space-y-5">
+      <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <span>←</span> Back
+      </Link>
+
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
         <h1 className="text-xl font-bold">User Management</h1>
         <p className="text-primary-200 text-sm mt-1">View users and manage account status</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">

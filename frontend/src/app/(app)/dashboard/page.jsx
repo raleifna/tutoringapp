@@ -11,6 +11,7 @@ import {
   ClockIcon,
   CheckCircleIcon,
   StarIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
@@ -46,6 +47,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const currentUserId = user?.id || '';
 
   useEffect(() => {
     setMounted(true);
@@ -53,8 +55,9 @@ export default function DashboardPage() {
 
   const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
   const { data: bookingsData, isLoading } = useQuery({
-    queryKey: ['myBookings', 'dashboard'],
+    queryKey: ['myBookings', 'dashboard', currentUserId],
     queryFn: () => bookingApi.getMyBookings({ limit: 5 }),
+    enabled: !!currentUserId,
   });
 
   const bookings = bookingsData?.data?.data?.bookings || [];
@@ -69,28 +72,28 @@ export default function DashboardPage() {
       value: totalBookings,
       icon: CalendarDaysIcon,
       color: 'bg-blue-100 text-blue-600',
-      href: '/bookings',
+      href: '/bookings?from=dashboard',
     },
     {
       label: 'Completed',
       value: completedCount,
       icon: CheckCircleIcon,
       color: 'bg-green-100 text-green-600',
-      href: '/bookings?status=COMPLETED',
+      href: '/bookings?from=dashboard&status=COMPLETED',
     },
     {
       label: 'Pending',
       value: pendingCount,
       icon: ClockIcon,
       color: 'bg-amber-100 text-amber-600',
-      href: '/bookings?status=PENDING',
+      href: '/bookings?from=dashboard&status=PENDING',
     },
     {
       label: 'Upcoming',
       value: upcomingCount,
       icon: StarIcon,
       color: 'bg-purple-100 text-purple-600',
-      href: '/bookings?status=ACCEPTED',
+      href: '/bookings?from=dashboard&status=ACCEPTED',
     },
   ];
 
@@ -111,6 +114,9 @@ export default function DashboardPage() {
         <button onClick={handleLogout} className="btn-secondary mt-4">
           Log out
         </button>
+        <Link href="/profile" className="btn-secondary mt-2 ml-2">
+          My Profile
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -130,7 +136,7 @@ export default function DashboardPage() {
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Recent Bookings</h2>
-          <Link href="/bookings" className="text-xs text-primary-600 font-medium">
+          <Link href="/bookings?from=dashboard" className="text-xs text-primary-600 font-medium">
             View all →
           </Link>
         </div>
@@ -143,7 +149,7 @@ export default function DashboardPage() {
               <CalendarDaysIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
               <p className="text-sm font-medium text-gray-700 mb-1">No bookings yet</p>
               <p className="text-xs text-gray-400 mb-4">Start by finding a tutor</p>
-              <Link href="/search" className="btn-primary btn-sm rounded-full">
+              <Link href="/search?from=dashboard" className="btn-primary btn-sm rounded-full">
                 Book a session
               </Link>
             </div>
@@ -151,7 +157,7 @@ export default function DashboardPage() {
             bookings.map((booking) => (
               <Link
                 key={booking.id}
-                href={`/bookings/${booking.id}`}
+                href={`/bookings/${booking.id}?from=dashboard`}
                 className="flex items-center gap-3 px-4 py-3 active:bg-gray-50 transition-colors"
               >
                 <img
@@ -187,9 +193,9 @@ export default function DashboardPage() {
           Continue to the tutor search page and explore available tutors.
         </p>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
-            href="/search"
+            href="/search?from=dashboard"
             className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
@@ -202,7 +208,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/bookings"
+            href="/bookings?from=dashboard"
             className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 text-green-600">
@@ -211,6 +217,19 @@ export default function DashboardPage() {
             <div>
               <div className="text-sm font-semibold text-gray-900">My Bookings</div>
               <div className="text-xs text-gray-500">View session details</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+              <UserCircleIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">My Profile</div>
+              <div className="text-xs text-gray-500">Update info & password</div>
             </div>
           </Link>
         </div>

@@ -31,7 +31,11 @@ export default function HomePage() {
 
   const handleSearch = () => {
     const subject = searchQuery.trim();
-    router.push(subject ? `/search?subject=${encodeURIComponent(subject)}` : '/search');
+    router.push(
+      subject
+        ? `/search?from=home&subject=${encodeURIComponent(subject)}`
+        : '/search?from=home'
+    );
   };
 
   const handleSearchSubmit = (event) => {
@@ -113,7 +117,7 @@ export default function HomePage() {
             {quickSubjects.map((subject) => (
               <Link
                 key={subject}
-                href={`/search?subject=${encodeURIComponent(subject)}`}
+                href={`/search?from=home&subject=${encodeURIComponent(subject)}`}
                 className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
               >
                 {subject}

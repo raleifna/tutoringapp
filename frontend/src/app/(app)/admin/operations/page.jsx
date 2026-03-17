@@ -1,6 +1,7 @@
 // src/app/(app)/admin/operations/page.jsx - Admin Operations
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
 
 const OPERATION_TABS = [
   { key: 'bookings', label: 'Bookings', icon: ClipboardDocumentListIcon },
@@ -85,10 +87,12 @@ function Pagination({ currentPage, totalPages, onPrevious, onNext }) {
 
 export default function AdminOperationsPage() {
   const router = useRouter();
+  const { logout } = useAuthStore();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const requestedTab = searchParams.get('tab');
+  const requestedStatus = searchParams.get('status');
   const activeTab = OPERATION_TABS.some((tab) => tab.key === requestedTab) ? requestedTab : 'bookings';
 
   const [expandedBookingId, setExpandedBookingId] = useState(null);
@@ -102,6 +106,14 @@ export default function AdminOperationsPage() {
     if (requestedTab) return;
     router.replace('/admin/operations?tab=bookings');
   }, [requestedTab, router]);
+
+  useEffect(() => {
+    if (activeTab !== 'bookings') return;
+    const statusFromUrl = String(requestedStatus || '').toUpperCase();
+    const nextStatus = BOOKING_STATUSES.includes(statusFromUrl) ? statusFromUrl : '';
+    setBookingStatus(nextStatus);
+    setBookingsPage(1);
+  }, [activeTab, requestedStatus]);
 
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['admin-bookings', bookingStatus, bookingsPage],
@@ -190,6 +202,11 @@ export default function AdminOperationsPage() {
     createSubjectMutation.mutate(payload);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
   const stats = [
     { label: 'Bookings', value: bookingsPagination?.total || 0, tone: 'bg-blue-50 text-blue-700' },
     { label: 'Subjects', value: subjects.length, tone: 'bg-sky-50 text-sky-700' },
@@ -198,10 +215,17 @@ export default function AdminOperationsPage() {
 
   return (
     <div className="space-y-5">
+      <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <span>←</span> Back
+      </Link>
+
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
         <h1 className="text-xl font-bold">Admin Operations</h1>
         <p className="text-primary-200 text-sm mt-1">Manage bookings, subject catalog and action logs</p>
+        <button onClick={handleLogout} className="btn-secondary mt-4">
+          Log out
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

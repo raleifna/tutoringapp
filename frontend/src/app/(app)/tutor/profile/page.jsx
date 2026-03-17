@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ClockIcon, LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 
 const MAX_VERIFICATION_FILES = 5;
@@ -113,6 +113,7 @@ export default function TutorProfilePage() {
   const isApproved = profile?.status === 'ACTIVE';
   const latestReviewAction = profile?.latestReviewAction;
   const existingApplicationFiles = getApplicationFiles(profile?.certifications);
+  const existingApplicationNotes = getApplicationNotes(profile?.certifications);
 
   useEffect(() => {
     if (!profile) return;
@@ -326,7 +327,12 @@ export default function TutorProfilePage() {
   };
 
   const handleApplicationResubmit = () => {
-    if (!applicationSummary.trim()) {
+    const fallbackSummary = Array.isArray(profile?.education)
+      ? profile.education.map(formatEducationItem).filter(Boolean).join('\n')
+      : profile?.education || '';
+    const summaryForSubmit = applicationSummary.trim() || String(fallbackSummary || '').trim();
+
+    if (!summaryForSubmit) {
       toast.error('Education summary is required');
       return;
     }
@@ -337,8 +343,11 @@ export default function TutorProfilePage() {
     }
 
     const formData = new FormData();
-    formData.append('tutorEducationSummary', applicationSummary);
-    formData.append('tutorExperienceYears', applicationExperienceYears || '0');
+    formData.append('tutorEducationSummary', summaryForSubmit);
+    formData.append(
+      'tutorExperienceYears',
+      String(applicationExperienceYears || profile?.yearsExperience || '0')
+    );
     if (applicationNotes.trim()) {
       formData.append('tutorSupportingNotes', applicationNotes);
     }
@@ -396,50 +405,9 @@ export default function TutorProfilePage() {
           </p>
       </div>
 
-      {!isApproved && (
-        <div className="space-y-4">
-          <div className="card p-5 border-yellow-200 bg-yellow-50/70">
-            <div className="flex items-start gap-3">
-              <LockClosedIcon className="w-5 h-5 text-yellow-700 mt-0.5" />
-              <div>
-                <h2 className="font-semibold text-gray-900">Tutor profile locked until approval</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Your verification submission is still being reviewed. Public tutor profile fields
-                  stay locked until approval.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {latestReviewAction?.description && (
-            <div className="card p-5 border-blue-200 bg-blue-50/70">
-              <h3 className="font-semibold text-gray-900">Latest admin feedback</h3>
-              <p className="text-sm text-gray-600 mt-2">{latestReviewAction.description}</p>
-            </div>
-          )}
-
+      <div className="space-y-4">
+        {(existingApplicationFiles.length > 0 || existingApplicationNotes) && (
           <div className="card p-5 space-y-5">
-            <div>
-              <h3 className="font-semibold text-gray-900">Submitted education summary</h3>
-              {Array.isArray(profile.education) && profile.education.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {profile.education.map((item, index) => {
-                    const text = formatEducationItem(item);
-                    return text ? (
-                      <p
-                        key={index}
-                        className="text-sm text-gray-600 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
-                      >
-                        {text}
-                      </p>
-                    ) : null;
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 mt-2">No education summary submitted.</p>
-              )}
-            </div>
-
             <div>
               <h3 className="font-semibold text-gray-900">Submitted verification files</h3>
               {existingApplicationFiles.length > 0 ? (
@@ -465,21 +433,19 @@ export default function TutorProfilePage() {
               )}
             </div>
 
-            {getApplicationNotes(profile.certifications) && (
+            {existingApplicationNotes && (
               <div>
                 <h3 className="font-semibold text-gray-900">Supporting notes</h3>
                 <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">
-                  {getApplicationNotes(profile.certifications)}
+                  {existingApplicationNotes}
                 </p>
               </div>
             )}
-
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <ClockIcon className="w-4 h-4" />
-              Review status updates will appear here after verification.
-            </div>
           </div>
+        )}
 
+        {!isApproved && (
+          <>
           <div className="card p-5 space-y-4">
             <div>
               <h3 className="font-semibold text-gray-900">Update verification materials</h3>
@@ -555,8 +521,30 @@ export default function TutorProfilePage() {
               {applicationMutation.isPending ? 'Submitting...' : 'Resubmit Verification Materials'}
             </button>
           </div>
-        </div>
-      )}
+
+          <div className="card p-5 border-yellow-200 bg-yellow-50/70">
+            <div className="flex items-start gap-3">
+              <LockClosedIcon className="w-5 h-5 text-yellow-700 mt-0.5" />
+              <div>
+                <h2 className="font-semibold text-gray-900">Tutor profile locked until approval</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Your verification submission is still being reviewed. Public tutor profile fields
+                  stay locked until approval.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {latestReviewAction?.description && (
+            <div className="card p-5 border-blue-200 bg-blue-50/70">
+              <h3 className="font-semibold text-gray-900">Latest admin feedback</h3>
+              <p className="text-sm text-gray-600 mt-2">{latestReviewAction.description}</p>
+            </div>
+          )}
+
+          </>
+        )}
+      </div>
 
       {isApproved && (
         <>
