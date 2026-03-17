@@ -112,13 +112,21 @@ function SearchPageContent() {
   const fallbackBackHrefMap = {
     home: '/',
     dashboard: '/dashboard',
+    'admin-dashboard': '/admin/dashboard',
     bookings: '/bookings',
     'tutor-dashboard': '/tutor/dashboard',
     'tutor-requests': '/tutor/requests',
   };
 
   const fallbackBackHref =
-    fallbackBackHrefMap[from] || (user?.role === 'TUTOR' ? '/tutor/dashboard' : user ? '/dashboard' : '/');
+    fallbackBackHrefMap[from] ||
+    (user?.role === 'TUTOR'
+      ? '/tutor/dashboard'
+      : user?.role === 'ADMIN' || user?.role === 'SYSTEM_ADMIN'
+        ? '/admin/dashboard'
+        : user
+          ? '/dashboard'
+          : '/');
 
   const handleBack = () => {
     router.push(fallbackBackHref);

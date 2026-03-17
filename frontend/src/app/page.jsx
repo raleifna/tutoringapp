@@ -44,7 +44,12 @@ export default function HomePage() {
   };
 
   const currentUser = mounted ? user : null;
-  const dashboardHref = currentUser?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
+  const dashboardHref =
+    currentUser?.role === 'TUTOR'
+      ? '/tutor/dashboard'
+      : currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN'
+        ? '/admin/dashboard'
+        : '/dashboard';
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#e0f2fe,transparent_35%),linear-gradient(180deg,#f8fbff_0%,#ffffff_45%,#f3f6fb_100%)]">
@@ -79,7 +84,7 @@ export default function HomePage() {
         </div>
       </header>
       <main className="mx-auto grid min-h-[calc(100vh-73px)] max-w-5xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-        <section className="hero-card">
+        <section className="rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-xl shadow-slate-200/50">
           <div className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
             MVP First Demo
           </div>

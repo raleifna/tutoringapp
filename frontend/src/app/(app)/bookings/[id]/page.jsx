@@ -274,7 +274,7 @@ export default function BookingDetailPage() {
 
         <hr className="border-gray-100" />
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Subject</p>
             <p className="font-medium text-gray-900">{booking.subject || '-'}</p>
