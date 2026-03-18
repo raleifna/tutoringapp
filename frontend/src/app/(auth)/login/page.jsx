@@ -35,7 +35,7 @@ export default function LoginPage() {
         setIsLoading(true);
         try {
             const response = await authApi.login(values);
-            const data = response.data.data;
+            const data = response.data;
 
             setAuth({
                 user: data.user,

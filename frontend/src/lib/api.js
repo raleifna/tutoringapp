@@ -32,8 +32,13 @@ api.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
-    
-        if (error.response?.status === 401 && !originalRequest._retry) {
+
+        // Skip refresh logic for auth endpoints — 401 there means invalid credentials,
+        // not an expired session. Let the caller's catch block handle it directly.
+        const requestUrl = originalRequest?.url || '';
+        const isAuthEndpoint = /\/auth\/(login|register|verify-email|refresh-token)/.test(requestUrl);
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
             originalRequest._retry = true;
     
             const refreshToken = localStorage.getItem('refreshToken');
@@ -47,8 +52,8 @@ api.interceptors.response.use(
                 const response = await axios.post(`${API_URL}/auth/refresh-token`, {
                     refreshToken
                 });
-                const accessToken = response.data.data.accessToken;
-                const newRefreshToken = response.data.data.refreshToken;
+                const accessToken = response.data.accessToken;
+                const newRefreshToken = response.data.refreshToken;
 
                 localStorage.setItem('accessToken', accessToken);
                 localStorage.setItem('refreshToken', newRefreshToken);

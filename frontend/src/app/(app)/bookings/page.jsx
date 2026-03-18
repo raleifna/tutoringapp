@@ -75,13 +75,13 @@ const getBookingStatusClass = (status) => {
   return 'bg-gray-100 text-gray-700 border border-gray-200';
 };
 
-export default function BookingsPage() {
-  return (
-    <Suspense fallback={<BookingsPageFallback />}>
-      <BookingsPageContent />
-    </Suspense>
-  );
-}
+// export default function BookingsPage() {
+//   return (
+//     <Suspense fallback={<BookingsPageFallback />}>
+//       <BookingsPageContent />
+//     </Suspense>
+//   );
+// }
 
 function BookingsPageContent() {
   const router = useRouter();
