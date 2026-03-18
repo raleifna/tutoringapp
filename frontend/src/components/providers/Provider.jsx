@@ -3,11 +3,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { useEffect, useState } from 'react';
-import { useAuthStore } from '../../lib/store';
+import { useState } from 'react';
 
 export default function Providers({ children }) {
-  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -20,10 +18,6 @@ export default function Providers({ children }) {
         },
       })
   );
-
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
 
   return (
     <QueryClientProvider client={queryClient}>

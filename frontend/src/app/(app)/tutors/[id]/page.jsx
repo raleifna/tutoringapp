@@ -1,0 +1,521 @@
+// src/app/(app)/tutors/[id]/page.jsx - Tutor detail page
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
+import {
+  ArrowLeftIcon,
+  CalendarDaysIcon,
+  CheckBadgeIcon,
+  AcademicCapIcon,
+  BriefcaseIcon,
+  GlobeAltIcon,
+  MapPinIcon,
+  StarIcon,
+} from '@heroicons/react/24/outline';
+import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { useAuthStore } from '../../../../lib/store';
+
+const bookingSchema = z.object({
+  subjectId: z.string().min(1, 'Please select a subject'),
+  sessionType: z.enum(['ONLINE', 'IN_PERSON', 'HYBRID']),
+  scheduledAt: z.string().min(1, 'Please select a date and time'),
+  duration: z.coerce.number().min(30).max(360),
+  notes: z.string().optional(),
+});
+
+const DURATIONS = [30, 60, 90, 120, 150, 180];
+
+const WEEKDAY_LABELS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+const getTutorName = (tutor) => {
+  const firstName = tutor?.user?.firstName || '';
+  const lastName = tutor?.user?.lastName || '';
+  return `${firstName} ${lastName}`.trim() || 'Tutor';
+};
+
+const getAvatarUrl = (tutor) => {
+  if (tutor?.user?.avatar) return tutor.user.avatar;
+  const name = getTutorName(tutor);
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
+};
+
+const formatRating = (rating) => {
+  const value = Number.parseFloat(rating || 0);
+  if (Number.isNaN(value)) return '0.0';
+  return value.toFixed(1);
+};
+
+const formatRate = (amount, currency = 'AUD') => {
+  const value = Number(amount || 0);
+  if (Number.isNaN(value)) return `$0 ${currency}`;
+  return `$${value} ${currency}`;
+};
+
+export default function TutorDetailPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState('about');
+  const [showBookingForm, setShowBookingForm] = useState(false);
+
+  // Stage 2 priority #1
+  const {
+    data: tutorData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['tutor', id],
+    queryFn: () => tutorApi.getById(id),
+    enabled: !!id,
+  });
+
+  // Stage 2 priority #2
+  const {
+    data: availabilityData,
+    isLoading: isAvailabilityLoading,
+  } = useQuery({
+    queryKey: ['tutor-availability', id],
+    queryFn: () => tutorApi.getAvailability(id),
+    enabled: !!id,
+  });
+
+  const tutor = tutorData?.data?.data;
+  const availability = availabilityData?.data?.data || [];
+  const isSelf = !!user && (user.id === tutor?.userId || user.id === tutor?.user?.id);
+  const isLearner = user?.role === 'LEARNER';
+  const isGuest = !user;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm({
+    resolver: zodResolver(bookingSchema),
+    defaultValues: {
+      subjectId: '',
+      sessionType: 'ONLINE',
+      scheduledAt: '',
+      duration: 60,
+      notes: '',
+    },
+  });
+
+  const bookMutation = useMutation({
+    mutationFn: (data) => {
+      const selectedSubject = tutor?.subjects?.find((item) => {
+        const subjectId = String(item?.subjectId || item?.subject?.id || item?.id || '');
+        return subjectId === String(data.subjectId);
+      });
+
+      const selectedSubjectName = selectedSubject?.subject?.name || selectedSubject?.name;
+      if (!selectedSubjectName) {
+        throw new Error('Please select a valid subject');
+      }
+
+      return bookingApi.create({
+        tutorId: id,
+        subjectId: data.subjectId,
+        subject: selectedSubjectName,
+        sessionType: data.sessionType,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        duration: Number(data.duration),
+        notes: data.notes,
+      });
+    },
+    onSuccess: (res) => {
+      toast.success('Booking request sent!');
+      reset();
+      setShowBookingForm(false);
+      const bookingId = res?.data?.data?.id;
+      if (bookingId) {
+        router.push(`/bookings/${bookingId}`);
+      }
+    },
+    onError: (err) => {
+      const message =
+        err?.response?.data?.errors?.[0]?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Booking failed';
+      toast.error(message);
+    },
+  });
+
+  const requireLogin = () => {
+    toast('Please log in to book a session.');
+    router.push(`/login?next=/tutors/${id}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 animate-pulse">
+          <div className="flex gap-4">
+            <div className="w-24 h-24 rounded-full bg-gray-200" />
+            <div className="flex-1 space-y-3">
+              <div className="h-6 bg-gray-200 rounded w-1/3" />
+              <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div className="h-4 bg-gray-200 rounded w-1/2" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 text-center">
+        <p className="text-red-600 mb-2">{error?.response?.data?.message || 'Failed to load tutor detail.'}</p>
+        <div className="flex items-center justify-center gap-3">
+          <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
+            Retry
+          </button>
+          <Link href="/search" className="text-sm text-primary-600 hover:underline">
+            Back to Search
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tutor) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 text-center">
+        <p className="text-gray-600 mb-3">Tutor not found.</p>
+        <Link href="/search" className="btn-primary btn-sm">
+          Browse Tutors
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+      <Link href="/search" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600">
+        <ArrowLeftIcon className="w-4 h-4" />
+        Back to search
+      </Link>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
+        <div className="flex flex-col sm:flex-row gap-5">
+          <img
+            src={getAvatarUrl(tutor)}
+            alt={getTutorName(tutor)}
+            className="w-24 h-24 rounded-full object-cover border border-gray-100"
+          />
+
+          <div className="flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-gray-900">{getTutorName(tutor)}</h1>
+                  {tutor.isVerified && <CheckBadgeIcon className="w-5 h-5 text-primary-600" />}
+                </div>
+                <p className="text-gray-600 text-sm mt-0.5">{tutor.headline || 'Expert Tutor'}</p>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-2">
+                  <span className="inline-flex items-center gap-1">
+                    <StarIcon className="w-4 h-4 text-yellow-500" />
+                    <span className="text-gray-800 font-medium">{formatRating(tutor.rating)}</span>
+                  </span>
+                  <span>{tutor.totalSessions || 0} sessions</span>
+                  {tutor.location && (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPinIcon className="w-4 h-4" />
+                      {tutor.location}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-xl font-bold text-gray-900">{formatRate(tutor.hourlyRate, tutor.currency)}</p>
+                <p className="text-xs text-gray-400">per hour</p>
+              </div>
+            </div>
+
+            {Array.isArray(tutor.sessionTypes) && tutor.sessionTypes.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {tutor.sessionTypes.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-700"
+                  >
+                    {String(item).replace('_', '-')}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {!isSelf && (isLearner || isGuest) && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => (isGuest ? requireLogin() : setShowBookingForm(true))}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  {isGuest ? 'Log In to Book' : 'Book a Session'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('about')}
+          className={`px-4 py-2.5 -mb-px text-sm font-medium border-b-2 ${
+            activeTab === 'about'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          About
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('availability')}
+          className={`px-4 py-2.5 -mb-px text-sm font-medium border-b-2 ${
+            activeTab === 'availability'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Availability
+        </button>
+      </div>
+
+      {activeTab === 'about' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 space-y-4">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <h2 className="font-semibold text-gray-900 mb-2">About</h2>
+              <p className="text-sm text-gray-700 leading-relaxed">{tutor.bio || 'No bio yet.'}</p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <h2 className="font-semibold text-gray-900 mb-2">Subjects</h2>
+              {Array.isArray(tutor.subjects) && tutor.subjects.length > 0 ? (
+                <div className="space-y-2">
+                  {tutor.subjects.map((item) => {
+                    const subjectName = item?.subject?.name || item?.name || 'Subject';
+                    const category = item?.subject?.category || item?.category || '';
+                    const level = item?.level || 'All Levels';
+                    const key = item?.id || `${subjectName}-${level}`;
+
+                    return (
+                      <div key={key} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{subjectName}</p>
+                          {category && <p className="text-xs text-gray-400">{category}</p>}
+                        </div>
+                        <span className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-full px-2 py-0.5">
+                          {level}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No subjects listed.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5">
+              <h2 className="font-semibold text-gray-900 mb-3">Details</h2>
+              <div className="space-y-3 text-sm">
+                {Number(tutor.yearsExperience) > 0 && (
+                  <div className="flex items-start gap-2">
+                    <BriefcaseIcon className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Experience</p>
+                      <p className="font-medium text-gray-700">{tutor.yearsExperience} years</p>
+                    </div>
+                  </div>
+                )}
+
+                {tutor.education && (
+                  <div className="flex items-start gap-2">
+                    <AcademicCapIcon className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Education</p>
+                      <p className="font-medium text-gray-700 text-xs leading-relaxed">
+                        {Array.isArray(tutor.education)
+                          ? tutor.education
+                              .map((item) => [item?.degree, item?.field, item?.institution].filter(Boolean).join(', '))
+                              .filter(Boolean)
+                              .join(' | ')
+                          : String(tutor.education)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(tutor.languages) && tutor.languages.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <GlobeAltIcon className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Languages</p>
+                      <p className="font-medium text-gray-700">{tutor.languages.join(', ')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'availability' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <h2 className="font-semibold text-gray-900 mb-3">Weekly Availability</h2>
+
+          {isAvailabilityLoading ? (
+            <p className="text-sm text-gray-500">Loading availability...</p>
+          ) : availability.length === 0 ? (
+            <p className="text-sm text-gray-500">No availability set.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b border-gray-200">
+                    <th className="pb-2">Day</th>
+                    <th className="pb-2">From</th>
+                    <th className="pb-2">To</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {availability.map((slot, index) => (
+                    <tr key={`${slot.dayOfWeek}-${slot.startTime}-${index}`} className="border-b border-gray-100 last:border-0">
+                      <td className="py-2.5 font-medium text-gray-800">
+                        {WEEKDAY_LABELS[Number(slot.dayOfWeek)] || slot.dayOfWeek}
+                      </td>
+                      <td className="py-2.5 text-gray-600">{slot.startTime}</td>
+                      <td className="py-2.5 text-gray-600">{slot.endTime}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showBookingForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-5">Book a Session with {getTutorName(tutor)}</h2>
+
+            <form onSubmit={handleSubmit((data) => bookMutation.mutate(data))} className="space-y-4">
+              <div>
+                <label className="label">
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <select {...register('subjectId')} className="input">
+                  <option value="">Select subject...</option>
+                  {tutor.subjects?.map((item) => {
+                    const subjectId = String(item?.subjectId || item?.subject?.id || item?.id || '');
+                    const subjectName = item?.subject?.name || item?.name || 'Subject';
+                    return (
+                      <option key={subjectId} value={subjectId}>
+                        {subjectName}
+                      </option>
+                    );
+                  })}
+                </select>
+                {errors.subjectId && <p className="error-text">{errors.subjectId.message}</p>}
+              </div>
+
+              <div>
+                <label className="label">
+                  Session Type <span className="text-red-500">*</span>
+                </label>
+                <select {...register('sessionType')} className="input">
+                  {(Array.isArray(tutor.sessionTypes) && tutor.sessionTypes.length > 0
+                    ? tutor.sessionTypes
+                    : ['ONLINE', 'IN_PERSON', 'HYBRID']
+                  ).map((item) => (
+                    <option key={item} value={item}>
+                      {String(item).replace('_', '-')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">
+                  Date & Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  {...register('scheduledAt')}
+                  className="input"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+                {errors.scheduledAt && <p className="error-text">{errors.scheduledAt.message}</p>}
+              </div>
+
+              <div>
+                <label className="label">Duration (minutes)</label>
+                <select {...register('duration')} className="input">
+                  {DURATIONS.map((duration) => (
+                    <option key={duration} value={duration}>
+                      {duration} minutes
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Notes (optional)</label>
+                <textarea
+                  {...register('notes')}
+                  rows={2}
+                  className="input resize-none"
+                  placeholder="Topics you'd like to cover..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={bookMutation.isPending} className="btn-primary flex-1">
+                  {bookMutation.isPending ? 'Sending...' : 'Send Request'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBookingForm(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

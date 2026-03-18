@@ -1,6 +1,7 @@
 const express = require('express');
-const prisma = require('../prisma');
+const { prisma } = require('../config/database');
 const router = express.Router();
+
 
 router.get('/', async (req, res) => {
   let category = req.query.category;

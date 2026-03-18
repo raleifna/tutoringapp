@@ -1,4 +1,4 @@
-// src/mocks/auth.mock.js - Mock auth API for frontend-only development
+// src/mocks/stage1.mock.js - Mock auth API for frontend-only development
 
 const USERS_KEY = 'mock_auth_users_v1';
 const VERIFY_TOKENS_KEY = 'mock_auth_verify_tokens_v1';

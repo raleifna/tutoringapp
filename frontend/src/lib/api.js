@@ -1,7 +1,7 @@
 // axios instance
 import axios from 'axios';
 
-const API_URL = '/api/v1';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').replace(/\/$/, '');
 
 const api = axios.create({
     baseURL: API_URL,
@@ -101,6 +101,61 @@ export const authApi = {
     },
     resendVerification: (data) => {
         return api.post('/auth/resend-verification', data);
+    },
+};
+
+// tutor APIs
+export const tutorApi = {
+    search: (params) => {
+        return api.get('/tutors', { params });
+    },
+    getById: (id) => {
+        return api.get(`/tutors/${id}`);
+    },
+    getAvailability: (id) => {
+        return api.get(`/tutors/${id}/availability`);
+    },
+
+};
+
+// booking APIs
+export const bookingApi = {
+    create: (data) => {
+        return api.post('/bookings', data);
+    },
+    getMyBookings: (params) => {
+        return api.get('/bookings/my-bookings', { params });
+    },
+    getTutorBookings: (params) => {
+        return api.get('/bookings/tutor/requests', { params });
+    },
+    getById: (id) => {
+        return api.get(`/bookings/${id}`);
+    },
+    cancel: (id, reason) => {
+        return api.post(`/bookings/${id}/cancel`, { reason });
+    },
+    accept: (id, data) => {
+        return api.patch(`/bookings/${id}/accept`, data);
+    },
+    decline: (id, reason) => {
+        return api.patch(`/bookings/${id}/decline`, { reason });
+    },
+    reschedule: (id, data) => {
+        return api.patch(`/bookings/${id}/reschedule`, data);
+    },
+    complete: (id) => {
+        return api.patch(`/bookings/${id}/complete`);
+    },
+};
+
+// subject APIs
+export const subjectApi = {
+    getAll: (params) => {
+        return api.get('/subjects', { params });
+    },
+    getCategories: () => {
+        return api.get('/subjects/categories');
     },
 };
   
