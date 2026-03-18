@@ -85,17 +85,15 @@ function Pagination({ currentPage, totalPages, onPrevious, onNext }) {
   );
 }
 
-function AdminOperationsPageFallback() {
+export default function AdminOperationsPage() {
   return (
-    <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="card p-5 h-40 animate-pulse" />
-      ))}
-    </div>
+    <Suspense fallback={<AdminOperationsFallback />}>
+      <AdminOperationsContent />
+    </Suspense>
   );
 }
 
-function AdminOperationsPageContent() {
+function AdminOperationsContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -628,10 +626,12 @@ function AdminOperationsPageContent() {
   );
 }
 
-export default function AdminOperationsPage() {
+function AdminOperationsFallback() {
   return (
-    <Suspense fallback={<AdminOperationsPageFallback />}>
-      <AdminOperationsPageContent />
-    </Suspense>
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-24 bg-gray-200 rounded-2xl animate-pulse" />
+      <div className="card p-6 animate-pulse h-96" />
+    </div>
   );
 }

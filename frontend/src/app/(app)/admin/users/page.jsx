@@ -68,17 +68,15 @@ function DetailRow({ label, value }) {
   );
 }
 
-function AdminUsersPageFallback() {
+export default function AdminUsersPage() {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="card h-16 animate-pulse" />
-      ))}
-    </div>
+    <Suspense fallback={<AdminUsersFallback />}>
+      <AdminUsersContent />
+    </Suspense>
   );
 }
 
-function AdminUsersPageContent() {
+function AdminUsersContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -419,10 +417,12 @@ function AdminUsersPageContent() {
   );
 }
 
-export default function AdminUsersPage() {
+function AdminUsersFallback() {
   return (
-    <Suspense fallback={<AdminUsersPageFallback />}>
-      <AdminUsersPageContent />
-    </Suspense>
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-24 bg-gray-200 rounded-2xl animate-pulse" />
+      <div className="card p-6 animate-pulse h-80" />
+    </div>
   );
 }

@@ -73,17 +73,15 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
-function TutorRequestsPageFallback() {
+export default function TutorRequestsPage() {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="card p-5 animate-pulse h-24" />
-      ))}
-    </div>
+    <Suspense fallback={<TutorRequestsFallback />}>
+      <TutorRequestsContent />
+    </Suspense>
   );
 }
 
-function TutorRequestsPageContent() {
+function TutorRequestsContent() {
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
   const [activeStatus, setActiveStatus] = useState(() =>
@@ -321,10 +319,16 @@ function TutorRequestsPageContent() {
   );
 }
 
-export default function TutorRequestsPage() {
+function TutorRequestsFallback() {
   return (
-    <Suspense fallback={<TutorRequestsPageFallback />}>
-      <TutorRequestsPageContent />
-    </Suspense>
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="card p-5 animate-pulse h-28" />
+        ))}
+      </div>
+    </div>
   );
 }

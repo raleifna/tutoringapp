@@ -77,17 +77,15 @@ const formatApplicationItem = (item) => {
 
 const isUploadedFile = (item) => item && typeof item === 'object' && item.url;
 
-function AdminTutorsPageFallback() {
+export default function AdminTutorsPage() {
   return (
-    <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="card p-6 animate-pulse h-48" />
-      ))}
-    </div>
+    <Suspense fallback={<AdminTutorsFallback />}>
+      <AdminTutorsContent />
+    </Suspense>
   );
 }
 
-function AdminTutorsPageContent() {
+function AdminTutorsContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -425,10 +423,16 @@ function AdminTutorsPageContent() {
   );
 }
 
-export default function AdminTutorsPage() {
+function AdminTutorsFallback() {
   return (
-    <Suspense fallback={<AdminTutorsPageFallback />}>
-      <AdminTutorsPageContent />
-    </Suspense>
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-24 bg-gray-200 rounded-2xl animate-pulse" />
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="card p-6 animate-pulse h-48" />
+        ))}
+      </div>
+    </div>
   );
 }

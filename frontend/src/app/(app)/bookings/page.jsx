@@ -75,13 +75,11 @@ const getBookingStatusClass = (status) => {
   return 'bg-gray-100 text-gray-700 border border-gray-200';
 };
 
-function BookingsPageFallback() {
+export default function BookingsPage() {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse h-24" />
-      ))}
-    </div>
+    <Suspense fallback={<BookingsPageFallback />}>
+      <BookingsPageContent />
+    </Suspense>
   );
 }
 
@@ -246,6 +244,20 @@ function BookingsPageContent() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function BookingsPageFallback() {
+  return (
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-8 w-40 bg-gray-200 rounded animate-pulse" />
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse h-24" />
+        ))}
+      </div>
     </div>
   );
 }
