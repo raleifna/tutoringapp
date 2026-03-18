@@ -2,13 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const tutorRoutes = require('./routes/tutors');
 const subjectRoutes = require('./routes/subjects');
 const bookingRoutes = require('./routes/bookings');
-// const tutorRoutes = require('./routes/tutors');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -34,6 +36,7 @@ app.use(
 );
 app.use(express.json());
 app.use(morgan('dev'));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 const createHealthPayload = () => ({
   success: true,
@@ -51,20 +54,12 @@ app.get('/api/v1/health', (_req, res) => {
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/tutors', tutorRoutes);
 app.use('/api/v1/subjects', subjectRoutes);
-app.use('/api/v1/bookings', bookingRoutes);
-// app.use('/api/v1/tutors', tutorRoutes);
-
-app.use(notFound);
-app.use(errorHandler);
-
-// app.use('/api/v1/auth', authLimiter, authRoutes);
-// app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/tutors', tutorRoutes);
-// app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
-
+app.use(notFound);
+app.use(errorHandler);
 
 module.exports = app;

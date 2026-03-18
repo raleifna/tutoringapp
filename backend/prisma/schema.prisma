@@ -249,6 +249,7 @@ model Booking {
 
   learner       User                   @relation("LearnerBookings", fields: [learnerId], references: [id])
   tutorProfile  TutorProfile           @relation("TutorBookings", fields: [tutorId], references: [id])
+  payment       Payment?
   statusHistory BookingStatusHistory[]
 
   @@index([learnerId])
