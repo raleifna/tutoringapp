@@ -58,4 +58,13 @@ app.use('/api/v1/bookings', bookingRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
+// app.use('/api/v1/auth', authLimiter, authRoutes);
+// app.use('/api/v1/users', userRoutes);
+// app.use('/api/v1/tutors', tutorRoutes);
+// app.use('/api/v1/subjects', subjectRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/admin', adminRoutes);
+
+
+
 module.exports = app;
