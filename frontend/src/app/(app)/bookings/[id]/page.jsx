@@ -169,10 +169,34 @@ export default function BookingDetailPage() {
     resolver: zodResolver(rescheduleSchema),
   });
 
+  if (!currentUserId) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-14">
+        <p className="text-gray-700 font-medium mb-1">Login required</p>
+        <p className="text-gray-500 text-sm mb-4">Please log in first to view booking details.</p>
+        <Link href="/login" className="btn-primary btn-sm">
+          Go to login
+        </Link>
+      </div>
+    );
+  }
+
+  if (!id) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-14">
+        <p className="text-gray-700 font-medium mb-1">Invalid booking link</p>
+        <p className="text-gray-500 text-sm mb-4">Booking ID is missing.</p>
+        <Link href={backHref} className="btn-primary btn-sm">
+          {backLabel}
+        </Link>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/4" />
+        <div className="h-6 bg-gray-200 rounded w-1/3" />
         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
           <div className="h-5 bg-gray-200 rounded w-1/3" />
           <div className="h-4 bg-gray-200 rounded" />
@@ -185,6 +209,8 @@ export default function BookingDetailPage() {
   if (isError) {
     return (
       <div className="max-w-2xl mx-auto text-center py-14">
+        <ExclamationTriangleIcon className="w-10 h-10 text-red-400 mx-auto mb-2" />
+        <p className="text-red-700 font-medium mb-1">Unable to load booking detail</p>
         <p className="text-red-600 mb-3">{error?.response?.data?.message || 'Failed to load booking detail.'}</p>
         <div className="flex items-center justify-center gap-3">
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
@@ -201,7 +227,8 @@ export default function BookingDetailPage() {
   if (!booking) {
     return (
       <div className="max-w-2xl mx-auto text-center py-14">
-        <p className="text-gray-500 mb-3">Booking not found</p>
+        <p className="text-gray-700 font-medium mb-1">Booking not found</p>
+        <p className="text-gray-500 text-sm mb-3">This booking may have been removed or is unavailable.</p>
         <Link href={backHref} className="btn-primary btn-sm">
           {backLabel}
         </Link>
@@ -247,7 +274,7 @@ export default function BookingDetailPage() {
 
         <hr className="border-gray-100" />
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Subject</p>
             <p className="font-medium text-gray-900">{booking.subject || '-'}</p>

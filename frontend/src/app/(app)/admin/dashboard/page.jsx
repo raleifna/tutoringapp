@@ -107,10 +107,17 @@ export default function AdminDashboardPage() {
 
       {isError ? (
         <div className="card p-6 text-center">
-          <p className="text-sm text-red-600 mb-3">Failed to load dashboard data</p>
-          <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
-            Retry
-          </button>
+          <ClockIcon className="w-10 h-10 mx-auto text-red-300 mb-2" />
+          <p className="text-sm font-medium text-red-700 mb-1">Failed to load dashboard data</p>
+          <p className="text-xs text-red-600 mb-4">Please check your connection and try again.</p>
+          <div className="flex items-center justify-center gap-2">
+            <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
+              Retry
+            </button>
+            <Link href="/admin/operations?tab=bookings" className="btn-secondary btn-sm">
+              Open operations
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -141,9 +148,17 @@ export default function AdminDashboardPage() {
             </div>
 
             {isLoading ? (
-              <div className="py-8 px-4 text-sm text-gray-500">Loading recent bookings...</div>
+              <div className="px-4 py-4 space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-10 rounded-lg bg-gray-100 animate-pulse" />
+                ))}
+              </div>
             ) : recentBookings.length === 0 ? (
-              <div className="py-8 px-4 text-sm text-gray-500">No bookings found</div>
+              <div className="py-10 px-4 text-center">
+                <CalendarDaysIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm font-medium text-gray-700">No recent bookings</p>
+                <p className="text-xs text-gray-500 mt-1">Bookings will appear here once users place sessions.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

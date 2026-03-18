@@ -11,9 +11,22 @@ export const metadata = {
     default: 'TutorConnect - Find Your Perfect Tutor',
     template: '%s | TutorConnect',
   },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   description:
     'Connect with qualified tutors for personalized learning. Find expert tutors in any subject, book sessions online or in-person, and track your progress.',
   keywords: ['tutoring', 'online tutoring', 'find tutor', 'learning', 'education'],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TutorConnect',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'TutorConnect',
+    title: 'TutorConnect - Find Your Perfect Tutor',
+    description: 'Connect with qualified tutors for personalized learning.',
+  },
 };
 
 export const viewport = {
@@ -23,15 +36,14 @@ export const viewport = {
   themeColor: '#2563eb',
 };
 
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body>
+      <body className="min-h-screen">
         <Providers>
           {children}
 

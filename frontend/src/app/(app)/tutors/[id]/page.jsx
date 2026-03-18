@@ -257,7 +257,7 @@ export default function TutorDetailPage() {
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-xl font-bold text-gray-900">{formatRate(tutor.hourlyRate, tutor.currency)}</p>
                 <p className="text-xs text-gray-400">per hour</p>
               </div>

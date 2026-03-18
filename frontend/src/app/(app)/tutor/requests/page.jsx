@@ -1,7 +1,7 @@
 // src/app/(app)/tutor/requests/page.jsx - Tutor Booking Requests Management
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -74,6 +74,14 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
 };
 
 export default function TutorRequestsPage() {
+  return (
+    <Suspense fallback={<TutorRequestsFallback />}>
+      <TutorRequestsContent />
+    </Suspense>
+  );
+}
+
+function TutorRequestsContent() {
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
   const [activeStatus, setActiveStatus] = useState(() =>
@@ -307,6 +315,20 @@ export default function TutorRequestsPage() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function TutorRequestsFallback() {
+  return (
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="card p-5 animate-pulse h-28" />
+        ))}
+      </div>
     </div>
   );
 }
