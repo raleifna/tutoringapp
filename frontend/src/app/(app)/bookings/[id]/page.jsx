@@ -1,9 +1,13 @@
-// src/app/(app)/bookings/[id]/page.jsx - Booking detail page (learner stage)
+// src/app/(app)/bookings/[id]/page.jsx -  Booking Detail Page
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
@@ -15,6 +19,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+
+const rescheduleSchema = z.object({
+  newDate: z.string().min(1, 'Please select a new date'),
+  reason: z.string().optional(),
+});
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -70,6 +79,7 @@ export default function BookingDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   const from = searchParams.get('from');
   const backHref = from === 'tutor-requests' ? '/tutor/requests' : '/bookings';
@@ -88,7 +98,9 @@ export default function BookingDetailPage() {
   });
 
   const booking = data?.data?.data;
+  const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
+  const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status);
 
   const cancelMutation = useMutation({
@@ -101,6 +113,50 @@ export default function BookingDetailPage() {
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');
     },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: () => bookingApi.accept(id),
+    onSuccess: () => {
+      toast.success('Booking accepted!');
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to accept');
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: () => bookingApi.decline(id),
+    onSuccess: () => {
+      toast.success('Booking declined');
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to decline');
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: () => bookingApi.complete(id),
+    onSuccess: () => {
+      toast.success('Session marked as complete');
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to complete');
+    },
+  });
+
+  const {
+    register: registerReschedule,
+    handleSubmit: handleRescheduleSubmit,
+    formState: { errors: rescheduleErrors },
+  } = useForm({
+    resolver: zodResolver(rescheduleSchema),
   });
 
   if (isLoading) {
@@ -142,8 +198,6 @@ export default function BookingDetailPage() {
       </div>
     );
   }
-
-  const other = booking?.tutorProfile?.user || booking?.tutor || {};
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
@@ -171,7 +225,9 @@ export default function BookingDetailPage() {
             className="w-14 h-14 rounded-full object-cover"
           />
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Tutor</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
+              {isTutor ? 'Learner' : 'Tutor'}
+            </p>
             <h2 className="font-semibold text-gray-900">
               {other?.firstName || 'Tutor'} {other?.lastName || ''}
             </h2>
@@ -225,8 +281,8 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {canCancel && (
-        <div>
+      <div className="flex flex-wrap gap-3">
+        {canCancel && (
           <button
             type="button"
             onClick={() => {
@@ -235,10 +291,115 @@ export default function BookingDetailPage() {
               }
             }}
             disabled={cancelMutation.isPending}
-            className="btn w-full justify-center bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+            className="btn-danger gap-2"
           >
+            <XCircleIcon className="w-4 h-4" />
             {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking'}
           </button>
+        )}
+
+        {isTutor && booking.status === 'PENDING' && (
+          <>
+            <button
+              type="button"
+              onClick={() => acceptMutation.mutate()}
+              disabled={acceptMutation.isPending}
+              className="btn-primary gap-2"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              {acceptMutation.isPending ? 'Accepting...' : 'Accept'}
+            </button>
+            <button
+              type="button"
+              onClick={() => declineMutation.mutate()}
+              disabled={declineMutation.isPending}
+              className="btn-danger gap-2"
+            >
+              <XCircleIcon className="w-4 h-4" />
+              {declineMutation.isPending ? 'Declining...' : 'Decline'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRescheduleModal(true)}
+              className="btn-secondary gap-2"
+            >
+              <CalendarDaysIcon className="w-4 h-4" />
+              Reschedule
+            </button>
+          </>
+        )}
+
+        {isTutor && booking.status === 'ACCEPTED' && (
+          <button
+            type="button"
+            onClick={() => completeMutation.mutate()}
+            disabled={completeMutation.isPending}
+            className="btn-primary gap-2"
+          >
+            <CheckCircleIcon className="w-4 h-4" />
+            {completeMutation.isPending ? 'Saving...' : 'Mark Complete'}
+          </button>
+        )}
+      </div>
+
+      {showRescheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="mb-5 text-lg font-bold text-gray-900">Propose Reschedule</h2>
+            <form
+              onSubmit={handleRescheduleSubmit((formData) => {
+                bookingApi
+                  .reschedule(id, {
+                    scheduledAt: new Date(formData.newDate).toISOString(),
+                    reason: formData.reason,
+                  })
+                  .then(() => {
+                    toast.success('Reschedule proposed');
+                    setShowRescheduleModal(false);
+                    queryClient.invalidateQueries({ queryKey: ['booking', id] });
+                    queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+                  })
+                  .catch((err) => {
+                    toast.error(err?.response?.data?.message || 'Failed');
+                  });
+              })}
+              className="space-y-4"
+            >
+              <div>
+                <label className="label">New Date & Time</label>
+                <input
+                  type="datetime-local"
+                  {...registerReschedule('newDate')}
+                  className="input"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+                {rescheduleErrors.newDate && (
+                  <p className="error-text">{rescheduleErrors.newDate.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="label">Reason (optional)</label>
+                <textarea
+                  {...registerReschedule('reason')}
+                  rows={2}
+                  className="input resize-none"
+                  placeholder="Reason for rescheduling..."
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="submit" className="btn-primary flex-1">
+                  Propose
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRescheduleModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

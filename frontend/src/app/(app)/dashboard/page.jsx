@@ -69,24 +69,28 @@ export default function DashboardPage() {
       value: totalBookings,
       icon: CalendarDaysIcon,
       color: 'bg-blue-100 text-blue-600',
+      href: '/bookings',
     },
     {
       label: 'Completed',
       value: completedCount,
       icon: CheckCircleIcon,
       color: 'bg-green-100 text-green-600',
+      href: '/bookings?status=COMPLETED',
     },
     {
       label: 'Pending',
       value: pendingCount,
       icon: ClockIcon,
       color: 'bg-amber-100 text-amber-600',
+      href: '/bookings?status=PENDING',
     },
     {
       label: 'Upcoming',
       value: upcomingCount,
       icon: StarIcon,
       color: 'bg-purple-100 text-purple-600',
+      href: '/bookings?status=ACCEPTED',
     },
   ];
 
@@ -111,7 +115,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-3">
         {summaryItems.map((item) => (
-          <div key={item.label} className="card p-4">
+          <Link key={item.label} href={item.href} className="card p-4 hover:shadow-md transition-shadow">
             <div
               className={`w-9 h-9 rounded-xl ${item.color} flex items-center justify-center mb-2.5`}
             >
@@ -119,7 +123,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-2xl font-bold text-gray-900">{isLoading ? '-' : item.value}</div>
             <div className="text-xs text-gray-500 mt-0.5">{item.label}</div>
-          </div>
+          </Link>
         ))}
       </div>
 

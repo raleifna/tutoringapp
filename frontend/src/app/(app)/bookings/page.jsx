@@ -1,11 +1,13 @@
-// src/app/(app)/bookings/page.jsx - Learner bookings list
+// src/app/(app)/bookings/page.jsx - bookings list page
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
+import { useAuthStore } from '../../../lib/store';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
@@ -14,6 +16,13 @@ const STATUS_TABS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
+
+const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
+
+const getInitialStatus = (value) => {
+  const next = String(value || '').toUpperCase();
+  return STATUS_VALUES.has(next) ? next : '';
+};
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -67,12 +76,34 @@ const getBookingStatusClass = (status) => {
 };
 
 export default function BookingsPage() {
-  const [activeStatus, setActiveStatus] = useState('');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get('status');
+  const { user } = useAuthStore();
+  const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
   const [page, setPage] = useState(1);
+  const isTutor = user?.role === 'TUTOR';
+  const fallbackBackHref = isTutor ? '/tutor/dashboard' : '/dashboard';
+
+  useEffect(() => {
+    setActiveStatus(getInitialStatus(statusParam));
+    setPage(1);
+  }, [statusParam]);
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(fallbackBackHref);
+  };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['my-bookings', activeStatus, page],
-    queryFn: () => bookingApi.getMyBookings({ status: activeStatus, page, limit: 10 }),
+    queryKey: ['bookings', activeStatus, page, isTutor],
+    queryFn: () =>
+      isTutor
+        ? bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 })
+        : bookingApi.getMyBookings({ status: activeStatus, page, limit: 10 }),
     keepPreviousData: true,
   });
 
@@ -84,6 +115,16 @@ export default function BookingsPage() {
   return (
     <div className="space-y-5">
       <div>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
+        >
+          <span>←</span> Back
+        </button>
+      </div>
+
+      <div className="pl-4">
         <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
         <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
       </div>
@@ -141,14 +182,16 @@ export default function BookingsPage() {
           <p className="text-sm text-gray-500 mb-4">
             {activeStatus ? `No ${activeStatus.toLowerCase()} bookings` : "You haven't made any bookings yet"}
           </p>
-          <Link href="/search" className="btn-primary">
-            Find a Tutor
-          </Link>
+          {!isTutor && (
+            <Link href="/search" className="btn-primary">
+              Find a Tutor
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} />
+            <BookingCard key={booking.id} booking={booking} isTutor={isTutor} />
           ))}
         </div>
       )}
@@ -184,10 +227,10 @@ export default function BookingsPage() {
   );
 }
 
-function BookingCard({ booking }) {
-  const tutor = booking?.tutorProfile?.user || booking?.tutor || {};
-  const tutorFirstName = tutor?.firstName || 'Tutor';
-  const tutorLastName = tutor?.lastName || '';
+function BookingCard({ booking, isTutor }) {
+  const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor || {};
+  const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
+  const otherLastName = other?.lastName || '';
   const sessionType = booking?.sessionType ? String(booking.sessionType).replace('_', '-') : 'Session';
   const totalAmount =
     booking?.totalAmount ??
@@ -200,15 +243,15 @@ function BookingCard({ booking }) {
     >
       <div className="flex items-start gap-4">
         <img
-          src={getAvatarUrl(tutor?.avatar, tutorFirstName, tutorLastName)}
-          alt={tutorFirstName}
+          src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+          alt={otherFirstName}
           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-semibold text-gray-900 text-sm">
-                Session with: {tutorFirstName} {tutorLastName}
+                Session with: {otherFirstName} {otherLastName}
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">{booking?.subject || 'Session'}</p>
             </div>

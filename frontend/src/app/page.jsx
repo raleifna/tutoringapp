@@ -34,6 +34,11 @@ export default function HomePage() {
     router.push(subject ? `/search?subject=${encodeURIComponent(subject)}` : '/search');
   };
 
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    handleSearch();
+  };
+
   const currentUser = mounted ? user : null;
   const dashboardHref = currentUser?.role === 'TUTOR' ? '/tutor/dashboard' : '/dashboard';
 
@@ -83,28 +88,25 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/60">
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 sm:flex-row">
               <div className="flex flex-1 items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
                 <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSearch();
-                  }}
                   placeholder="Search by subject, for example Mathematics or Python"
                   className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                   style={{ fontSize: '16px' }}
                 />
               </div>
               <button
-                onClick={handleSearch}
+                type="submit"
                 className="btn-primary justify-center rounded-2xl px-6 py-3"
               >
                 Search tutors
               </button>
-            </div>
+            </form>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
