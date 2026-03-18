@@ -1,7 +1,7 @@
 // src/app/(app)/bookings/page.jsx - bookings list page
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -76,6 +76,14 @@ const getBookingStatusClass = (status) => {
 };
 
 export default function BookingsPage() {
+  return (
+    <Suspense fallback={<BookingsPageFallback />}>
+      <BookingsPageContent />
+    </Suspense>
+  );
+}
+
+function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
@@ -236,6 +244,20 @@ export default function BookingsPage() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function BookingsPageFallback() {
+  return (
+    <div className="space-y-5">
+      <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
+      <div className="h-8 w-40 bg-gray-200 rounded animate-pulse" />
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse h-24" />
+        ))}
+      </div>
     </div>
   );
 }

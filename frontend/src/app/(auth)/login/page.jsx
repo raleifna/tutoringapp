@@ -47,7 +47,7 @@ export default function LoginPage() {
             const userRole = data?.user?.role;
             if (userRole === 'TUTOR') {
                 router.push('/tutor/dashboard');
-            } else if (userRole === 'ADMIN') {
+            } else if (userRole === 'ADMIN' || userRole === 'SYSTEM_ADMIN') {
                 router.push('/admin/dashboard');
             } else {
                 router.push('/dashboard');
