@@ -1,6 +1,8 @@
 // src/mocks/stage2.mock.js - Mock tutor/subject APIs for stage 2 pages
 
 const wait = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+const STAGE4_TUTOR_PROFILES_KEY = 'mock_stage4_tutor_profiles_v1';
+const STAGE5_SUBJECTS_KEY = 'mock_stage5_subjects_v1';
 
 const ok = (data = null, message = 'OK') => ({
   data: {
@@ -16,6 +18,29 @@ const fail = (message, status = 400) =>
       data: { message },
     },
   });
+
+const readJson = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  const raw = localStorage.getItem(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
+const getStage5Subjects = () => {
+  const extras = readJson(STAGE5_SUBJECTS_KEY, []);
+  if (!Array.isArray(extras)) return [];
+  return extras
+    .map((item) => ({
+      id: item?.id ? String(item.id) : '',
+      name: item?.name ? String(item.name) : '',
+      category: item?.category ? String(item.category) : '',
+    }))
+    .filter((item) => item.id && item.name);
+};
 
 const MOCK_TUTORS = [
   {
@@ -163,6 +188,63 @@ const normalize = (value = '') => String(value).trim().toLowerCase();
 
 const clone = (data) => JSON.parse(JSON.stringify(data));
 
+const mapStage4Education = (education = []) => {
+  if (!Array.isArray(education)) return [];
+  return education
+    .map((item) => {
+      if (typeof item === 'string') return { degree: item };
+      if (item && typeof item === 'object') {
+        return {
+          degree: item.degree || item.text || '',
+          field: item.field || '',
+          institution: item.institution || '',
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
+
+const getTutorFromStage4 = (id) => {
+  const profiles = readJson(STAGE4_TUTOR_PROFILES_KEY, []);
+  const profile = profiles.find((item) => String(item.id) === String(id));
+  if (!profile) return null;
+
+  return {
+    id: profile.id,
+    userId: profile.userId,
+    user: {
+      firstName: profile.user?.firstName || 'Tutor',
+      lastName: profile.user?.lastName || '',
+      avatar: profile.user?.avatar || '',
+    },
+    headline: profile.headline || 'Tutor',
+    bio: profile.bio || '',
+    hourlyRate: Number(profile.hourlyRate || 0),
+    currency: profile.currency || 'AUD',
+    rating: 0,
+    totalSessions: 0,
+    location: profile.location || '',
+    isVerified: String(profile.status || '').toUpperCase() === 'ACTIVE',
+    yearsExperience: Number(profile.yearsExperience || 0),
+    languages: Array.isArray(profile.languages) ? profile.languages : [],
+    education: mapStage4Education(profile.education),
+    sessionTypes: Array.isArray(profile.sessionTypes) ? profile.sessionTypes : ['ONLINE'],
+    subjects: Array.isArray(profile.subjects)
+      ? profile.subjects.map((item, index) => ({
+          id: item.id || `stage4_subject_${index}`,
+          subjectId: item.subjectId || item.subject?.id || '',
+          level: String(item.level || 'ALL_LEVELS').toUpperCase(),
+          subject: item.subject || {
+            id: item.subjectId || '',
+            name: 'Subject',
+            category: 'General',
+          },
+        }))
+      : [],
+  };
+};
+
 const getAllSubjects = () => {
   const map = new Map();
 
@@ -176,6 +258,12 @@ const getAllSubjects = () => {
         map.set(id, { id, name, category });
       }
     });
+  });
+
+  getStage5Subjects().forEach((item) => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
   });
 
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -239,7 +327,7 @@ export const subjectApi = {
 
   getAll: async () => {
     await wait();
-    return ok(getAllSubjects());
+    return ok({ subjects: getAllSubjects() });
   },
 };
 
@@ -269,15 +357,21 @@ export const tutorApi = {
 
   getById: async (id) => {
     await wait();
-    const tutor = MOCK_TUTORS.find((item) => String(item.id) === String(id));
+    const tutor =
+      MOCK_TUTORS.find((item) => String(item.id) === String(id)) || getTutorFromStage4(id);
     if (!tutor) return fail('Tutor not found', 404);
     return ok(clone(tutor));
   },
 
   getAvailability: async (id) => {
     await wait(200);
-    const tutor = MOCK_TUTORS.find((item) => String(item.id) === String(id));
+    const tutor =
+      MOCK_TUTORS.find((item) => String(item.id) === String(id)) || getTutorFromStage4(id);
     if (!tutor) return fail('Tutor not found', 404);
-    return ok(clone(MOCK_AVAILABILITY[id] || []));
+    if (MOCK_AVAILABILITY[id]) return ok(clone(MOCK_AVAILABILITY[id]));
+
+    const profiles = readJson(STAGE4_TUTOR_PROFILES_KEY, []);
+    const profile = profiles.find((item) => String(item.id) === String(id));
+    return ok(clone(profile?.availability || []));
   },
 };

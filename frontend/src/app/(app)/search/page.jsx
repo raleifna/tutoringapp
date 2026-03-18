@@ -3,6 +3,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,6 +13,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { subjectApi, tutorApi } from '../../../lib/api-entry';
+import { useAuthStore } from '../../../lib/store';
 
 const SESSION_TYPES = [
   { value: '', label: 'Any type' },
@@ -36,7 +38,10 @@ export default function SearchPage() {
 }
 
 function SearchPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
+  const from = (searchParams.get('from') || '').toLowerCase();
 
   const [filters, setFilters] = useState({
     subject: searchParams.get('subject') || '',
@@ -103,12 +108,31 @@ function SearchPageContent() {
     setFilters((prev) => ({ ...prev, page: nextPage }));
   };
 
+  const fallbackBackHrefMap = {
+    home: '/',
+    dashboard: '/dashboard',
+    bookings: '/bookings',
+    'tutor-dashboard': '/tutor/dashboard',
+    'tutor-requests': '/tutor/requests',
+  };
+
+  const fallbackBackHref =
+    fallbackBackHrefMap[from] || (user?.role === 'TUTOR' ? '/tutor/dashboard' : user ? '/dashboard' : '/');
+
+  const handleBack = () => {
+    router.push(fallbackBackHref);
+  };
+
   return (
     <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
       <div className="mb-5">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
+        >
           <span>←</span> Back
-        </Link>
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
@@ -231,7 +255,9 @@ function SearchPageContent() {
           </div>
         )}
 
-        {!isLoading && !isError && tutors.map((tutor) => <TutorCard key={tutor.id} tutor={tutor} />)}
+        {!isLoading &&
+          !isError &&
+          tutors.map((tutor) => <TutorCard key={tutor.id} tutor={tutor} searchFrom={from} />)}
       </div>
 
       {!isLoading && !isError && totalPages > 1 && (
@@ -275,7 +301,7 @@ function SearchFallback() {
   );
 }
 
-function TutorCard({ tutor }) {
+function TutorCard({ tutor, searchFrom }) {
   const name = `${tutor?.user?.firstName || ''} ${tutor?.user?.lastName || ''}`.trim() || 'Tutor';
   const avatar =
     tutor?.user?.avatar ||
@@ -288,8 +314,15 @@ function TutorCard({ tutor }) {
     .slice(0, 3);
   const hourlyRate = tutor?.hourlyRate || 0;
 
+  const params = new URLSearchParams();
+  params.set('from', 'search');
+  if (searchFrom) params.set('searchFrom', searchFrom);
+
   return (
-    <Link href={`/tutors/${tutor.id}`} className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-primary-300">
+    <Link
+      href={`/tutors/${tutor.id}?${params.toString()}`}
+      className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-primary-300"
+    >
       <div className="flex gap-3">
         <img src={avatar} alt={name} className="w-14 h-14 rounded-xl object-cover border border-gray-100" />
         <div className="flex-1 min-w-0">

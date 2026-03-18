@@ -2,21 +2,36 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AcademicCapIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { authApi } from '../../../lib/api-entry';
+import toast from 'react-hot-toast';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const rawToken = searchParams.get('token');
+  const token = rawToken ? String(rawToken).trim().replace(/^['"]|['"]$/g, '') : '';
+  const rawEmail = searchParams.get('email');
+  const email = rawEmail ? String(rawEmail).trim() : '';
   const [status, setStatus] = useState('loading'); // loading | success | error
   const [message, setMessage] = useState('');
+  const [isResending, setIsResending] = useState(false);
+  const hasRequestedRef = useRef(false);
 
   useEffect(() => {
+    if (hasRequestedRef.current) return;
+    hasRequestedRef.current = true;
+
     if (!token) {
-      setStatus('error');
-      setMessage('No verification token provided.');
+      if (email) {
+        setStatus('pending');
+        setMessage(`We sent a verification link to ${email}`);
+      } else {
+        setStatus('error');
+        setMessage('No verification token provided.');
+      }
       return;
     }
 
@@ -74,7 +89,7 @@ function VerifyEmailContent() {
             <p className="text-gray-600 mb-6">{message}</p>
             <div className="space-y-3">
               <Link href="/login" className="btn-primary btn-lg justify-center inline-flex w-full">
-                Back to Login
+                Back
               </Link>
               <p className="text-sm text-gray-500">
                 Need a new link?{' '}
@@ -83,6 +98,40 @@ function VerifyEmailContent() {
                 </Link>
                 .
               </p>
+            </div>
+          </>
+        )}
+
+        {status === 'pending' && (
+          <>
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AcademicCapIcon className="w-9 h-9 text-primary-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+            <p className="text-gray-600 mb-6">{message}</p>
+            <div className="space-y-3">
+              <Link href="/login" className="btn-primary btn-lg justify-center inline-flex w-full">
+                Back
+              </Link>
+              <button
+                type="button"
+                disabled={isResending}
+                className="w-full text-sm text-primary-600 hover:underline disabled:opacity-60"
+                onClick={async () => {
+                  if (!email) return;
+                  setIsResending(true);
+                  try {
+                    await authApi.resendVerification({ email });
+                    toast.success('Verification email resent');
+                  } catch (error) {
+                    toast.error(error?.response?.data?.message || 'Resend failed');
+                  } finally {
+                    setIsResending(false);
+                  }
+                }}
+              >
+                {isResending ? 'Sending...' : 'Resend verification email'}
+              </button>
             </div>
           </>
         )}

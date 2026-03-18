@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,9 +69,19 @@ const formatRate = (amount, currency = 'AUD') => {
 export default function TutorDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('about');
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const from = searchParams.get('from');
+  const searchFrom = (searchParams.get('searchFrom') || '').toLowerCase();
+  const isFromTutorDashboard = from === 'tutor-dashboard';
+  const backHref = isFromTutorDashboard
+    ? '/tutor/dashboard'
+    : searchFrom
+      ? `/search?from=${encodeURIComponent(searchFrom)}`
+      : '/search';
+  const backLabel = 'Back';
 
   // Stage 2 priority #1
   const {
@@ -189,8 +199,8 @@ export default function TutorDetailPage() {
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          <Link href="/search" className="text-sm text-primary-600 hover:underline">
-            Back to Search
+          <Link href={backHref} className="text-sm text-primary-600 hover:underline">
+            {backLabel}
           </Link>
         </div>
       </div>
@@ -201,8 +211,8 @@ export default function TutorDetailPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
         <p className="text-gray-600 mb-3">Tutor not found.</p>
-        <Link href="/search" className="btn-primary btn-sm">
-          Browse Tutors
+        <Link href={backHref} className="btn-primary btn-sm">
+          {backLabel}
         </Link>
       </div>
     );
@@ -210,9 +220,9 @@ export default function TutorDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <Link href="/search" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600">
+      <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600">
         <ArrowLeftIcon className="w-4 h-4" />
-        Back to search
+        {backLabel}
       </Link>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">

@@ -115,7 +115,28 @@ export const tutorApi = {
     getAvailability: (id) => {
         return api.get(`/tutors/${id}/availability`);
     },
-
+    getMyProfile: () => {
+        return api.get('/tutors/me/profile');
+    },
+    updateApplication: (formData) => {
+        return api.put('/tutors/me/application', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+        });
+    },
+    updateProfile: (data) => {
+        return api.put('/tutors/me/profile', data);
+    },
+    updateAvailability: (availability) => {
+        return api.put('/tutors/me/availability', { availability });
+    },
+    addSubject: (subjectId, data) => {
+        return api.post('/tutors/me/subjects', { subjectId, ...data });
+    },
+    removeSubject: (subjectId) => {
+        return api.delete(`/tutors/me/subjects/${subjectId}`);
+    },
 };
 
 // booking APIs
@@ -149,6 +170,26 @@ export const bookingApi = {
     },
 };
 
+// admin APIs
+export const adminApi = {
+    getDashboard: () => api.get('/admin/dashboard'),
+    getAnalytics: (params) => api.get('/admin/analytics', { params }),
+    getUsers: (params) => api.get('/admin/users', { params }),
+    getUser: (id) => api.get(`/admin/users/${id}`),
+    updateUserStatus: (id, data) => api.patch(`/admin/users/${id}/status`, data),
+    getPendingTutors: (params) => api.get('/admin/tutors/pending', { params }),
+    approveTutor: (id) => api.patch(`/admin/tutors/${id}/approve`),
+    rejectTutor: (id, reason) =>
+      api.patch(`/admin/tutors/${id}/reject`, typeof reason === 'object' ? reason : { reason }),
+    returnTutor: (id, feedback) =>
+      api.patch(`/admin/tutors/${id}/return`, typeof feedback === 'object' ? feedback : { feedback }),
+    getBookings: (params) => api.get('/admin/bookings', { params }),
+    getActions: (params) => api.get('/admin/actions', { params }),
+    createSubject: (data) => api.post('/admin/subjects', data),
+    updateSubject: (id, data) => api.put(`/admin/subjects/${id}`, data),
+    deleteSubject: (id) => api.delete(`/admin/subjects/${id}`),
+};
+
 // subject APIs
 export const subjectApi = {
     getAll: (params) => {
@@ -156,6 +197,20 @@ export const subjectApi = {
     },
     getCategories: () => {
         return api.get('/subjects/categories');
+    },
+};
+
+// user APIs
+export const userApi = {
+    updateProfile: (data) => {
+        return api.put('/users/me', data);
+    },
+    uploadAvatar: (formData) => {
+        return api.post('/users/me/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+        });
     },
 };
   
