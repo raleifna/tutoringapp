@@ -136,12 +136,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500">
-          <span>←</span> Back
-        </Link>
-      </div>
+    <div className="relative max-w-2xl mx-auto space-y-6">
+      <Link href={backHref} className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+        <span>←</span> Back
+      </Link>
 
       <h1 className="page-title">My Profile</h1>
 

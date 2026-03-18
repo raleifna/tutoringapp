@@ -70,12 +70,10 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-white flex flex-col">
-            <div className="px-4 pt-4">
-                <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
-                    <span>←</span> Back
-                </Link>
-            </div>
+        <div className="relative min-h-screen bg-white flex flex-col">
+            <Link href="/" className="absolute top-4 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500">
+                <span>←</span> Back
+            </Link>
 
             <div className="flex-1 w-full max-w-md mx-auto px-6 pt-8 pb-8">
                 {/* the logo */}
