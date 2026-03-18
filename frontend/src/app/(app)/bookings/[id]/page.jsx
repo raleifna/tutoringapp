@@ -79,11 +79,20 @@ export default function BookingDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
-  const from = searchParams.get('from');
-  const backHref = from === 'tutor-requests' ? '/tutor/requests' : '/bookings';
-  const backLabel = from === 'tutor-requests' ? 'Back to requests' : 'Back to bookings';
+  const from = (searchParams.get('from') || '').toLowerCase();
+  const backConfigMap = {
+    'tutor-requests': { href: '/tutor/requests', label: 'Back' },
+    'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
+    dashboard: { href: '/dashboard', label: 'Back' },
+    search: { href: '/search', label: 'Back' },
+    bookings: { href: '/bookings', label: 'Back' },
+  };
+  const backConfig = backConfigMap[from] || backConfigMap.bookings;
+  const backHref = backConfig.href;
+  const backLabel = backConfig.label;
 
   const {
     data,
@@ -92,9 +101,9 @@ export default function BookingDetailPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['booking', id],
+    queryKey: ['booking', currentUserId, id],
     queryFn: () => bookingApi.getById(id),
-    enabled: !!id,
+    enabled: !!id && !!currentUserId,
   });
 
   const booking = data?.data?.data;
@@ -107,8 +116,9 @@ export default function BookingDetailPage() {
     mutationFn: () => bookingApi.cancel(id),
     onSuccess: () => {
       toast.success('Booking cancelled');
-      queryClient.invalidateQueries({ queryKey: ['booking', id] });
-      queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+      queryClient.invalidateQueries({ queryKey: ['myBookings'] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');
@@ -119,7 +129,7 @@ export default function BookingDetailPage() {
     mutationFn: () => bookingApi.accept(id),
     onSuccess: () => {
       toast.success('Booking accepted!');
-      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
     },
     onError: (err) => {
@@ -131,7 +141,7 @@ export default function BookingDetailPage() {
     mutationFn: () => bookingApi.decline(id),
     onSuccess: () => {
       toast.success('Booking declined');
-      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
     },
     onError: (err) => {
@@ -143,7 +153,7 @@ export default function BookingDetailPage() {
     mutationFn: () => bookingApi.complete(id),
     onSuccess: () => {
       toast.success('Session marked as complete');
-      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
     },
     onError: (err) => {
@@ -180,8 +190,8 @@ export default function BookingDetailPage() {
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          <Link href="/bookings" className="btn-secondary btn-sm">
-            Back
+          <Link href={backHref} className="btn-secondary btn-sm">
+            {backLabel}
           </Link>
         </div>
       </div>
@@ -192,8 +202,8 @@ export default function BookingDetailPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-14">
         <p className="text-gray-500 mb-3">Booking not found</p>
-        <Link href="/bookings" className="btn-primary btn-sm">
-          View All Bookings
+        <Link href={backHref} className="btn-primary btn-sm">
+          {backLabel}
         </Link>
       </div>
     );
@@ -356,7 +366,7 @@ export default function BookingDetailPage() {
                   .then(() => {
                     toast.success('Reschedule proposed');
                     setShowRescheduleModal(false);
-                    queryClient.invalidateQueries({ queryKey: ['booking', id] });
+                    queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
                     queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
                   })
                   .catch((err) => {

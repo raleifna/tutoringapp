@@ -53,6 +53,16 @@ export default function LoginPage() {
                 router.push('/dashboard');
             }
         } catch (error) {
+            const status = error?.response?.status;
+            const message = String(error?.response?.data?.message || '').toLowerCase();
+            const shouldRedirectToVerify =
+                status === 403 ||
+                (status === 401 && (message.includes('verify') || message.includes('verified')));
+
+            if (shouldRedirectToVerify) {
+                router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+                return;
+            }
             toast.error(error?.response?.data?.message || 'Login failed');
         } finally {
             setIsLoading(false);

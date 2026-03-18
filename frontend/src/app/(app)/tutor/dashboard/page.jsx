@@ -54,7 +54,14 @@ const formatDuration = (minutes) => {
 };
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
+  const avatarValue = String(avatar || '');
+  if (
+    avatarValue &&
+    !avatarValue.startsWith('blob:') &&
+    !avatarValue.includes('mock.local/avatar/')
+  ) {
+    return avatarValue;
+  }
   const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
@@ -63,32 +70,36 @@ export default function TutorDashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const currentUserId = user?.id || '';
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
+  const displayName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
 
   const { data: requestsData, isLoading: requestsLoading } = useQuery({
-    queryKey: ['tutor-requests', 'PENDING'],
+    queryKey: ['tutor-requests', currentUserId, 'PENDING'],
     queryFn: () => bookingApi.getTutorBookings({ status: 'PENDING', limit: 5 }),
+    enabled: mounted && !!currentUserId,
   });
 
   const { data: upcomingData, isLoading: upcomingLoading } = useQuery({
-    queryKey: ['tutor-bookings', 'ACCEPTED'],
+    queryKey: ['tutor-bookings', currentUserId, 'ACCEPTED'],
     queryFn: () => bookingApi.getTutorBookings({ status: 'ACCEPTED', limit: 5 }),
+    enabled: mounted && !!currentUserId,
   });
 
   const { data: allBookingsData } = useQuery({
-    queryKey: ['tutor-bookings-all'],
+    queryKey: ['tutor-bookings-all', currentUserId],
     queryFn: () => bookingApi.getTutorBookings({ limit: 100 }),
+    enabled: mounted && !!currentUserId,
   });
 
   const { data: myProfileData } = useQuery({
-    queryKey: ['tutor-public-profile-id'],
+    queryKey: ['tutor-public-profile-id', currentUserId],
     queryFn: () => tutorApi.getMyProfile(),
-    enabled: user?.role === 'TUTOR',
+    enabled: mounted && user?.role === 'TUTOR' && !!currentUserId,
   });
 
   const requests = requestsData?.data?.data?.bookings || [];
@@ -141,6 +152,10 @@ export default function TutorDashboardPage() {
     await logout();
     router.push('/login');
   };
+
+  if (!mounted) {
+    return <div className="space-y-5" />;
+  }
 
   if (!user?.tutorProfile && !user?.tutorProfileId) {
     return (
@@ -213,7 +228,7 @@ export default function TutorDashboardPage() {
               return (
                 <Link
                   key={booking.id}
-                  href={`/bookings/${booking.id}?from=tutor-requests`}
+                  href={`/bookings/${booking.id}?from=tutor-dashboard`}
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <img
@@ -243,7 +258,7 @@ export default function TutorDashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Upcoming Sessions</h2>
           <Link
-            href="/bookings"
+            href="/bookings?from=tutor-dashboard"
             className="text-sm text-primary-600 hover:underline flex items-center gap-1"
           >
             View all <ArrowRightIcon className="w-3.5 h-3.5" />
@@ -264,7 +279,7 @@ export default function TutorDashboardPage() {
               return (
                 <Link
                   key={booking.id}
-                  href={`/bookings/${booking.id}`}
+                  href={`/bookings/${booking.id}?from=tutor-dashboard`}
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <img

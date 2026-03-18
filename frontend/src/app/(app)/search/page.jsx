@@ -41,6 +41,7 @@ function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
+  const from = (searchParams.get('from') || '').toLowerCase();
 
   const [filters, setFilters] = useState({
     subject: searchParams.get('subject') || '',
@@ -107,13 +108,18 @@ function SearchPageContent() {
     setFilters((prev) => ({ ...prev, page: nextPage }));
   };
 
-  const fallbackBackHref = user?.role === 'TUTOR' ? '/tutor/dashboard' : user ? '/dashboard' : '/';
+  const fallbackBackHrefMap = {
+    home: '/',
+    dashboard: '/dashboard',
+    bookings: '/bookings',
+    'tutor-dashboard': '/tutor/dashboard',
+    'tutor-requests': '/tutor/requests',
+  };
+
+  const fallbackBackHref =
+    fallbackBackHrefMap[from] || (user?.role === 'TUTOR' ? '/tutor/dashboard' : user ? '/dashboard' : '/');
 
   const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
-    }
     router.push(fallbackBackHref);
   };
 
@@ -249,7 +255,9 @@ function SearchPageContent() {
           </div>
         )}
 
-        {!isLoading && !isError && tutors.map((tutor) => <TutorCard key={tutor.id} tutor={tutor} />)}
+        {!isLoading &&
+          !isError &&
+          tutors.map((tutor) => <TutorCard key={tutor.id} tutor={tutor} searchFrom={from} />)}
       </div>
 
       {!isLoading && !isError && totalPages > 1 && (
@@ -293,7 +301,7 @@ function SearchFallback() {
   );
 }
 
-function TutorCard({ tutor }) {
+function TutorCard({ tutor, searchFrom }) {
   const name = `${tutor?.user?.firstName || ''} ${tutor?.user?.lastName || ''}`.trim() || 'Tutor';
   const avatar =
     tutor?.user?.avatar ||
@@ -306,8 +314,15 @@ function TutorCard({ tutor }) {
     .slice(0, 3);
   const hourlyRate = tutor?.hourlyRate || 0;
 
+  const params = new URLSearchParams();
+  params.set('from', 'search');
+  if (searchFrom) params.set('searchFrom', searchFrom);
+
   return (
-    <Link href={`/tutors/${tutor.id}`} className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-primary-300">
+    <Link
+      href={`/tutors/${tutor.id}?${params.toString()}`}
+      className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-primary-300"
+    >
       <div className="flex gap-3">
         <img src={avatar} alt={name} className="w-14 h-14 rounded-xl object-cover border border-gray-100" />
         <div className="flex-1 min-w-0">

@@ -5,6 +5,7 @@ import { tutorApi as stage2TutorApi } from './stage2.mock.js';
 const USERS_KEY = 'mock_auth_users_v1';
 const SESSION_KEY = 'mock_auth_session_v1';
 const BOOKINGS_KEY = 'mock_stage3_bookings_v1';
+const TUTOR_USER_MAP_KEY = 'mock_stage4_tutor_user_map_v1';
 
 const wait = (ms = 280) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -40,6 +41,7 @@ const fail = (message, status = 400) =>
   });
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const getUsers = () => readJson(USERS_KEY, []);
 
 const getSessionUser = () => {
   if (typeof window === 'undefined') return null;
@@ -57,6 +59,354 @@ const getSessionUser = () => {
 const readBookings = () => readJson(BOOKINGS_KEY, []);
 
 const writeBookings = (bookings) => writeJson(BOOKINGS_KEY, bookings);
+
+const buildSeedBookings = () => {
+  const now = Date.now();
+  const h = 60 * 60 * 1000;
+  const d = 24 * h;
+
+  return [
+    {
+      id: 'mock_booking_seed_1',
+      learnerId: 'mock_seed_learner_1',
+      tutorId: 'mock_tutor_1',
+      tutorProfile: {
+        id: 'mock_tutor_1',
+        user: {
+          id: 'mock_seed_tutor_user_1',
+          firstName: 'Emma',
+          lastName: 'Wilson',
+          avatar: '',
+          email: 'emma.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_math',
+      subject: 'Mathematics',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + d).toISOString(),
+      duration: 60,
+      notes: 'Please focus on calculus practice questions.',
+      status: 'PENDING',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 65,
+      createdAt: new Date(now - 4 * h).toISOString(),
+      updatedAt: new Date(now - 4 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_1_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 4 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_2',
+      learnerId: 'mock_seed_learner_1',
+      tutorId: 'mock_tutor_1',
+      tutorProfile: {
+        id: 'mock_tutor_1',
+        user: {
+          id: 'mock_seed_tutor_user_1',
+          firstName: 'Emma',
+          lastName: 'Wilson',
+          avatar: '',
+          email: 'emma.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_physics',
+      subject: 'Physics',
+      sessionType: 'IN_PERSON',
+      scheduledAt: new Date(now + 2 * d).toISOString(),
+      duration: 90,
+      notes: 'Mechanics revision before quiz.',
+      status: 'ACCEPTED',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 97.5,
+      createdAt: new Date(now - 10 * h).toISOString(),
+      updatedAt: new Date(now - 8 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_2_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 10 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_2_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 8 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_3',
+      learnerId: 'mock_seed_learner_1',
+      tutorId: 'mock_tutor_2',
+      tutorProfile: {
+        id: 'mock_tutor_2',
+        user: {
+          id: 'mock_seed_tutor_user_2',
+          firstName: 'Liam',
+          lastName: 'Chen',
+          avatar: '',
+          email: 'liam.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_programming',
+      subject: 'Programming',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now - 2 * d).toISOString(),
+      duration: 60,
+      notes: 'Finished fundamentals module.',
+      status: 'COMPLETED',
+      currency: 'AUD',
+      hourlyRate: 72,
+      totalAmount: 72,
+      createdAt: new Date(now - 4 * d).toISOString(),
+      updatedAt: new Date(now - 2 * d).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_3_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 4 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_3_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 3 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_3_h3',
+          status: 'COMPLETED',
+          createdAt: new Date(now - 2 * d).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_4',
+      learnerId: 'mock_seed_learner_1',
+      tutorId: 'mock_tutor_2',
+      tutorProfile: {
+        id: 'mock_tutor_2',
+        user: {
+          id: 'mock_seed_tutor_user_2',
+          firstName: 'Liam',
+          lastName: 'Chen',
+          avatar: '',
+          email: 'liam.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_data_science',
+      subject: 'Data Science',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now - d).toISOString(),
+      duration: 60,
+      notes: 'Cancelled due to schedule conflict.',
+      status: 'CANCELLED',
+      currency: 'AUD',
+      hourlyRate: 72,
+      totalAmount: 72,
+      createdAt: new Date(now - 2 * d).toISOString(),
+      updatedAt: new Date(now - 30 * h).toISOString(),
+      cancelReason: 'Unavailable this week',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_4_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 2 * d).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_4_h2',
+          status: 'CANCELLED',
+          createdAt: new Date(now - 30 * h).toISOString(),
+          reason: 'Unavailable this week',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_5',
+      learnerId: 'mock_seed_learner_2',
+      tutorId: 'mock_tutor_1',
+      tutorProfile: {
+        id: 'mock_tutor_1',
+        user: {
+          id: 'mock_seed_tutor_user_1',
+          firstName: 'Emma',
+          lastName: 'Wilson',
+          avatar: '',
+          email: 'emma.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_math',
+      subject: 'Mathematics',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 3 * d).toISOString(),
+      duration: 60,
+      notes: 'Needs help with algebra before test.',
+      status: 'PENDING',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 65,
+      createdAt: new Date(now - 2 * h).toISOString(),
+      updatedAt: new Date(now - 2 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_5_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 2 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_6',
+      learnerId: 'mock_seed_learner_3',
+      tutorId: 'mock_tutor_1',
+      tutorProfile: {
+        id: 'mock_tutor_1',
+        user: {
+          id: 'mock_seed_tutor_user_1',
+          firstName: 'Emma',
+          lastName: 'Wilson',
+          avatar: '',
+          email: 'emma.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_physics',
+      subject: 'Physics',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 4 * d).toISOString(),
+      duration: 60,
+      notes: 'Upcoming chapter review.',
+      status: 'ACCEPTED',
+      currency: 'AUD',
+      hourlyRate: 65,
+      totalAmount: 65,
+      createdAt: new Date(now - 9 * h).toISOString(),
+      updatedAt: new Date(now - 7 * h).toISOString(),
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_6_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 9 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_6_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 7 * h).toISOString(),
+          reason: '',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_7',
+      learnerId: 'mock_seed_learner_2',
+      tutorId: 'mock_tutor_3',
+      tutorProfile: {
+        id: 'mock_tutor_3',
+        user: {
+          id: 'mock_seed_tutor_user_3',
+          firstName: 'Sophie',
+          lastName: 'Brown',
+          avatar: '',
+          email: 'sophie.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_english',
+      subject: 'English',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 2 * d).toISOString(),
+      duration: 60,
+      notes: 'Declined due to mismatch in level.',
+      status: 'DECLINED',
+      currency: 'AUD',
+      hourlyRate: 58,
+      totalAmount: 58,
+      createdAt: new Date(now - 12 * h).toISOString(),
+      updatedAt: new Date(now - 10 * h).toISOString(),
+      declineReason: 'Not available at requested level',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_7_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 12 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_7_h2',
+          status: 'DECLINED',
+          createdAt: new Date(now - 10 * h).toISOString(),
+          reason: 'Not available at requested level',
+        },
+      ],
+    },
+    {
+      id: 'mock_booking_seed_8',
+      learnerId: 'mock_seed_learner_3',
+      tutorId: 'mock_tutor_2',
+      tutorProfile: {
+        id: 'mock_tutor_2',
+        user: {
+          id: 'mock_seed_tutor_user_2',
+          firstName: 'Liam',
+          lastName: 'Chen',
+          avatar: '',
+          email: 'liam.tutor@example.com',
+        },
+      },
+      subjectId: 'subj_data_science',
+      subject: 'Data Science',
+      sessionType: 'ONLINE',
+      scheduledAt: new Date(now + 5 * d).toISOString(),
+      duration: 90,
+      notes: 'Rescheduled once.',
+      status: 'RESCHEDULED',
+      currency: 'AUD',
+      hourlyRate: 72,
+      totalAmount: 108,
+      createdAt: new Date(now - 14 * h).toISOString(),
+      updatedAt: new Date(now - 6 * h).toISOString(),
+      rescheduleReason: 'Tutor requested time shift',
+      statusHistory: [
+        {
+          id: 'mock_booking_seed_8_h1',
+          status: 'PENDING',
+          createdAt: new Date(now - 14 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_8_h2',
+          status: 'ACCEPTED',
+          createdAt: new Date(now - 11 * h).toISOString(),
+          reason: '',
+        },
+        {
+          id: 'mock_booking_seed_8_h3',
+          status: 'RESCHEDULED',
+          createdAt: new Date(now - 6 * h).toISOString(),
+          reason: 'Tutor requested time shift',
+        },
+      ],
+    },
+  ];
+};
+
+const ensureBookings = () => {
+  const current = readBookings();
+  if (Array.isArray(current) && current.length > 0) return current;
+  const seeded = buildSeedBookings();
+  writeBookings(seeded);
+  return seeded;
+};
 
 const parsePage = (page) => {
   const parsed = Number(page);
@@ -100,12 +450,45 @@ const ensureLearner = (user) => {
   return null;
 };
 
+const getTutorProfileIdFromUser = (user) => {
+  if (!user) return null;
+  if (user.tutorProfileId) return String(user.tutorProfileId);
+  const map = readJson(TUTOR_USER_MAP_KEY, {});
+  if (map && map[user.id]) return String(map[user.id]);
+  return null;
+};
+
 const sortBookings = (bookings) =>
   [...bookings].sort((a, b) => {
     const aTime = new Date(a.createdAt || a.scheduledAt || 0).getTime();
     const bTime = new Date(b.createdAt || b.scheduledAt || 0).getTime();
     return bTime - aTime;
   });
+
+const toLearnerSummary = (learnerId) => {
+  const user = getUsers().find((item) => String(item.id) === String(learnerId));
+  if (!user) {
+    return {
+      id: String(learnerId || ''),
+      firstName: 'Learner',
+      lastName: '',
+      email: '',
+      avatar: '',
+    };
+  }
+  return {
+    id: String(user.id || learnerId || ''),
+    firstName: user.firstName || 'Learner',
+    lastName: user.lastName || '',
+    email: user.email || '',
+    avatar: user.avatar || '',
+  };
+};
+
+const enrichBooking = (booking) => ({
+  ...booking,
+  learner: toLearnerSummary(booking?.learnerId),
+});
 
 export const bookingApi = {
   create: async (payload = {}) => {
@@ -152,6 +535,7 @@ export const bookingApi = {
     const newBooking = {
       id: `mock_booking_${Date.now()}`,
       learnerId: sessionUser.id,
+      learner: toLearnerSummary(sessionUser.id),
       tutorId: tutor.id,
       tutorProfile: {
         id: tutor.id,
@@ -177,11 +561,11 @@ export const bookingApi = {
       updatedAt: new Date().toISOString(),
     };
 
-    const bookings = readBookings();
+    const bookings = ensureBookings();
     bookings.unshift(newBooking);
     writeBookings(bookings);
 
-    return ok(clone(newBooking), 'Booking created');
+    return ok(clone(enrichBooking(newBooking)), 'Booking created');
   },
 
   getMyBookings: async (params = {}) => {
@@ -194,7 +578,7 @@ export const bookingApi = {
     const page = parsePage(params?.page);
     const limit = parseLimit(params?.limit);
 
-    let bookings = readBookings().filter((item) => item.learnerId === sessionUser.id);
+    let bookings = ensureBookings().filter((item) => item.learnerId === sessionUser.id);
 
     if (status) {
       bookings = bookings.filter((item) => String(item.status || '').toUpperCase() === status);
@@ -206,7 +590,7 @@ export const bookingApi = {
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, totalPages);
     const start = (safePage - 1) * limit;
-    const paged = bookings.slice(start, start + limit);
+    const paged = bookings.slice(start, start + limit).map(enrichBooking);
 
     return ok({
       bookings: clone(paged),
@@ -225,14 +609,21 @@ export const bookingApi = {
     const sessionUser = getSessionUser();
     if (!sessionUser) return fail('Unauthorized', 401);
 
-    const booking = readBookings().find((item) => String(item.id) === String(id));
+    const booking = ensureBookings().find((item) => String(item.id) === String(id));
     if (!booking) return fail('Booking not found', 404);
 
-    if (booking.learnerId !== sessionUser.id && booking.tutorId !== sessionUser.id) {
+    if (sessionUser.role === 'LEARNER') {
+      if (String(booking.learnerId) !== String(sessionUser.id)) return fail('Forbidden', 403);
+    } else if (sessionUser.role === 'TUTOR') {
+      const tutorProfileId = getTutorProfileIdFromUser(sessionUser);
+      if (!tutorProfileId || String(booking.tutorId) !== String(tutorProfileId)) {
+        return fail('Forbidden', 403);
+      }
+    } else if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'SYSTEM_ADMIN') {
       return fail('Forbidden', 403);
     }
 
-    return ok(clone(booking));
+    return ok(clone(enrichBooking(booking)));
   },
 
   cancel: async (id, reason) => {
@@ -242,7 +633,7 @@ export const bookingApi = {
     const learnerError = ensureLearner(sessionUser);
     if (learnerError) return learnerError;
 
-    const bookings = readBookings();
+    const bookings = ensureBookings();
     const booking = bookings.find((item) => String(item.id) === String(id));
     if (!booking) return fail('Booking not found', 404);
     if (booking.learnerId !== sessionUser.id) return fail('Forbidden', 403);
@@ -255,7 +646,7 @@ export const bookingApi = {
     booking.updatedAt = new Date().toISOString();
 
     writeBookings(bookings);
-    return ok(clone(booking), 'Booking cancelled');
+    return ok(clone(enrichBooking(booking)), 'Booking cancelled');
   },
 
   // Stage 3 learner scope: keep methods for API shape compatibility.

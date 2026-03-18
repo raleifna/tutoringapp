@@ -1,13 +1,20 @@
 // src/app/(app)/profile/page.jsx - User Profile Edit Page
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { CameraIcon, KeyIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import {
+  CameraIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  KeyIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline';
 import { authApi, userApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
 
@@ -30,7 +37,14 @@ const passwordSchema = z
   });
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
+  const avatarValue = String(avatar || '');
+  if (
+    avatarValue &&
+    !avatarValue.startsWith('blob:') &&
+    !avatarValue.includes('mock.local/avatar/')
+  ) {
+    return avatarValue;
+  }
   const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
@@ -39,6 +53,15 @@ export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('profile');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const backHref =
+    user?.role === 'TUTOR'
+      ? '/tutor/dashboard'
+      : user?.role === 'ADMIN' || user?.role === 'SYSTEM_ADMIN'
+        ? '/admin/dashboard'
+        : '/dashboard';
 
   const {
     register,
@@ -114,6 +137,12 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+          <span>←</span> Back
+        </Link>
+      </div>
+
       <h1 className="page-title">My Profile</h1>
 
       <div className="card p-6 flex items-center gap-5">
@@ -247,12 +276,25 @@ export default function ProfilePage() {
           >
             <div>
               <label className="label">Current Password</label>
-              <input
-                {...registerPwd('currentPassword')}
-                type="password"
-                className="input"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  {...registerPwd('currentPassword')}
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  className="input pr-10"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showCurrentPassword ? (
+                    <EyeSlashIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {pwdErrors.currentPassword && (
                 <p className="error-text">{pwdErrors.currentPassword.message}</p>
               )}
@@ -260,12 +302,25 @@ export default function ProfilePage() {
 
             <div>
               <label className="label">New Password</label>
-              <input
-                {...registerPwd('newPassword')}
-                type="password"
-                className="input"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  {...registerPwd('newPassword')}
+                  type={showNewPassword ? 'text' : 'password'}
+                  className="input pr-10"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showNewPassword ? (
+                    <EyeSlashIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {pwdErrors.newPassword && (
                 <p className="error-text">{pwdErrors.newPassword.message}</p>
               )}
@@ -273,12 +328,25 @@ export default function ProfilePage() {
 
             <div>
               <label className="label">Confirm New Password</label>
-              <input
-                {...registerPwd('confirmPassword')}
-                type="password"
-                className="input"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <input
+                  {...registerPwd('confirmPassword')}
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="input pr-10"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showConfirmPassword ? (
+                    <EyeSlashIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {pwdErrors.confirmPassword && (
                 <p className="error-text">{pwdErrors.confirmPassword.message}</p>
               )}

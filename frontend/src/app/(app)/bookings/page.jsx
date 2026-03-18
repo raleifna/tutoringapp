@@ -79,11 +79,22 @@ export default function BookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
+  const fromParam = (searchParams.get('from') || '').toLowerCase();
   const { user } = useAuthStore();
+  const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
   const [page, setPage] = useState(1);
   const isTutor = user?.role === 'TUTOR';
-  const fallbackBackHref = isTutor ? '/tutor/dashboard' : '/dashboard';
+  const fallbackBackHrefMap = {
+    home: '/',
+    search: '/search',
+    dashboard: '/dashboard',
+    bookings: isTutor ? '/tutor/dashboard' : '/dashboard',
+    'tutor-dashboard': '/tutor/dashboard',
+    'tutor-requests': '/tutor/requests',
+  };
+  const fallbackBackHref =
+    fallbackBackHrefMap[fromParam] || (isTutor ? '/tutor/dashboard' : '/dashboard');
 
   useEffect(() => {
     setActiveStatus(getInitialStatus(statusParam));
@@ -91,19 +102,16 @@ export default function BookingsPage() {
   }, [statusParam]);
 
   const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
-    }
     router.push(fallbackBackHref);
   };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['bookings', activeStatus, page, isTutor],
+    queryKey: ['bookings', currentUserId, activeStatus, page, isTutor],
     queryFn: () =>
       isTutor
         ? bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 })
         : bookingApi.getMyBookings({ status: activeStatus, page, limit: 10 }),
+    enabled: !!currentUserId,
     keepPreviousData: true,
   });
 
@@ -183,7 +191,7 @@ export default function BookingsPage() {
             {activeStatus ? `No ${activeStatus.toLowerCase()} bookings` : "You haven't made any bookings yet"}
           </p>
           {!isTutor && (
-            <Link href="/search" className="btn-primary">
+            <Link href="/search?from=bookings" className="btn-primary">
               Find a Tutor
             </Link>
           )}
@@ -191,7 +199,12 @@ export default function BookingsPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} isTutor={isTutor} />
+            <BookingCard
+              key={booking.id}
+              booking={booking}
+              isTutor={isTutor}
+              detailFrom={fromParam || 'bookings'}
+            />
           ))}
         </div>
       )}
@@ -227,7 +240,7 @@ export default function BookingsPage() {
   );
 }
 
-function BookingCard({ booking, isTutor }) {
+function BookingCard({ booking, isTutor, detailFrom }) {
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor || {};
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
   const otherLastName = other?.lastName || '';
@@ -238,7 +251,7 @@ function BookingCard({ booking, isTutor }) {
 
   return (
     <Link
-      href={`/bookings/${booking.id}`}
+      href={`/bookings/${booking.id}?from=${encodeURIComponent(detailFrom || 'bookings')}`}
       className="block bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all"
     >
       <div className="flex items-start gap-4">
