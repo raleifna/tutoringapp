@@ -60,6 +60,8 @@ app.use(errorHandler);
 // app.use('/api/v1/tutors', tutorRoutes);
 // app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/admin', adminRoutes);
+
 
 
 module.exports = app;

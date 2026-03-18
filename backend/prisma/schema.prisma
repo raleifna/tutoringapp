@@ -1,3 +1,6 @@
+// Prisma Schema for TutorConnect App
+// Database: PostgreSQL
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +9,8 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ==================== ENUMS ====================
 
 enum Role {
   LEARNER
@@ -45,44 +50,65 @@ enum MeetingTool {
   OTHER
 }
 
-enum MeetingTool {
-  GOOGLE_MEET
-  ZOOM
-  MICROSOFT_TEAMS
-  SKYPE
-  OTHER
-}
-
 enum SessionType {
   ONLINE
   IN_PERSON
   HYBRID
 }
 
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ==================== USER ====================
 
 model User {
-  id                       String        @id @default(uuid())
-  email                    String        @unique
-  password                 String
-  role                     Role          @default(LEARNER)
-  status                   ProfileStatus @default(ACTIVE)
-  firstName                String
-  lastName                 String
-  avatar                   String?
-  phone                    String?
-  dateOfBirth              DateTime?
-  bio                      String?
-  preferredLang            String        @default("en")
-  timezone                 String        @default("UTC")
-  isEmailVerified          Boolean       @default(false)
-  emailVerificationToken   String?       @unique
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  role          Role          @default(LEARNER)
+  status        ProfileStatus @default(ACTIVE)
+  firstName     String
+  lastName      String
+  avatar        String?
+  phone         String?
+  dateOfBirth   DateTime?
+  bio           String?
+  preferredLang String        @default("en")
+  timezone      String        @default("UTC")
+  isEmailVerified          Boolean   @default(false)
+  emailVerificationToken   String?   @unique
   emailVerificationExpiry  DateTime?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  lastLoginAt              DateTime?
+  preferredMeetingTool     MeetingTool?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastLoginAt   DateTime?
 
-  refreshTokens            RefreshToken[]
-  tutorProfile             TutorProfile?
+  // Relations
+  learnerProfile  LearnerProfile?
+  tutorProfile    TutorProfile?
+  bookingsAsLearner Booking[]      @relation("LearnerBookings")
+  subscription    Subscription?
+  payments        Payment[]
+  refreshTokens   RefreshToken[]
+  adminActions    AdminAction[]    @relation("AdminActioner")
+  adminTargeted   AdminAction[]    @relation("AdminTarget")
 
   @@index([email])
   @@index([role])
@@ -90,31 +116,27 @@ model User {
   @@map("users")
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+// ==================== PROFILES ====================
+
+model LearnerProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  gradeLevel      String?
+  learningGoals   String?
+  subjects        String[] // subjects they want to learn
+  preferredStyle  String?  // visual, auditory, kinesthetic
+  // Parent / Guardian fields (for minors)
+  isMinor         Boolean  @default(false)
+  parentName      String?
+  parentEmail     String?
+  parentPhone     String?
+  parentRelationship String? // mother, father, guardian, etc.
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([token])
-  @@map("refresh_tokens")
-}
-
-
-model Subject {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  category    String
-  description String?
-  createdAt   DateTime @default(now())
-
-  tutors TutorSubject[]
-
-  @@index([category])
-  @@map("subjects")
+  @@map("learner_profiles")
 }
 
 model TutorProfile {
@@ -156,6 +178,18 @@ model TutorProfile {
   @@map("tutor_profiles")
 }
 
+model Subject {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+
+  tutors TutorSubject[]
+
+  @@index([category])
+  @@map("subjects")
+}
 
 model TutorSubject {
   id           String @id @default(uuid())
@@ -184,6 +218,8 @@ model TutorAvailability {
   @@index([tutorId])
   @@map("tutor_availability")
 }
+
+// ==================== BOOKINGS ====================
 
 model Booking {
   id              String        @id @default(uuid())
@@ -234,4 +270,83 @@ model BookingStatusHistory {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("booking_status_history")
+}
+
+// ==================== PAYMENTS & SUBSCRIPTIONS ====================
+
+model Subscription {
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId String?
+  stripePriceId    String?
+  stripeSubId      String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean          @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  userId          String
+  bookingId       String?       @unique
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("AUD")
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?
+  stripeSessionId String?
+  description     String?
+  // Platform fee / commission
+  platformFeePercent Decimal?   @db.Decimal(5, 2)  // e.g. 15.00 for 15%
+  platformFeeAmount  Decimal?   @db.Decimal(10, 2) // actual $ amount kept by platform
+  tutorPayoutAmount  Decimal?   @db.Decimal(10, 2) // amount sent to tutor
+  payoutStatus       String?    @default("PENDING")  // PENDING, PAID, FAILED
+  payoutAt           DateTime?
+  refundAmount    Decimal?      @db.Decimal(10, 2)
+  refundedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([userId])
+  @@map("payments")
+}
+
+// ==================== ADMIN ====================
+
+model AdminAction {
+  id          String   @id @default(uuid())
+  adminId     String
+  targetUserId String?
+  action      String
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  admin      User  @relation("AdminActioner", fields: [adminId], references: [id])
+  targetUser User? @relation("AdminTarget", fields: [targetUserId], references: [id])
+
+  @@map("admin_actions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("refresh_tokens")
 }
