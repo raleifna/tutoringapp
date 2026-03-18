@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -68,7 +68,17 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function AdminUsersPage() {
+function AdminUsersPageFallback() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="card h-16 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function AdminUsersPageContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -406,5 +416,13 @@ export default function AdminUsersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminUsersPage() {
+  return (
+    <Suspense fallback={<AdminUsersPageFallback />}>
+      <AdminUsersPageContent />
+    </Suspense>
   );
 }

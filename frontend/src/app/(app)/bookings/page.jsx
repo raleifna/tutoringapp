@@ -1,7 +1,7 @@
 // src/app/(app)/bookings/page.jsx - bookings list page
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -75,7 +75,17 @@ const getBookingStatusClass = (status) => {
   return 'bg-gray-100 text-gray-700 border border-gray-200';
 };
 
-export default function BookingsPage() {
+function BookingsPageFallback() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse h-24" />
+      ))}
+    </div>
+  );
+}
+
+function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
@@ -292,5 +302,13 @@ function BookingCard({ booking, isTutor, detailFrom }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={<BookingsPageFallback />}>
+      <BookingsPageContent />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -77,7 +77,17 @@ const formatApplicationItem = (item) => {
 
 const isUploadedFile = (item) => item && typeof item === 'object' && item.url;
 
-export default function AdminTutorsPage() {
+function AdminTutorsPageFallback() {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="card p-6 animate-pulse h-48" />
+      ))}
+    </div>
+  );
+}
+
+function AdminTutorsPageContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -412,5 +422,13 @@ export default function AdminTutorsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminTutorsPage() {
+  return (
+    <Suspense fallback={<AdminTutorsPageFallback />}>
+      <AdminTutorsPageContent />
+    </Suspense>
   );
 }

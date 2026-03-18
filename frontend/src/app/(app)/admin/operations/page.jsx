@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -85,7 +85,17 @@ function Pagination({ currentPage, totalPages, onPrevious, onNext }) {
   );
 }
 
-export default function AdminOperationsPage() {
+function AdminOperationsPageFallback() {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="card p-5 h-40 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function AdminOperationsPageContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -615,5 +625,13 @@ export default function AdminOperationsPage() {
         </section>
       )}
     </div>
+  );
+}
+
+export default function AdminOperationsPage() {
+  return (
+    <Suspense fallback={<AdminOperationsPageFallback />}>
+      <AdminOperationsPageContent />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/api-entry';
@@ -59,7 +59,17 @@ function MetricList({ items, formatter, emptyLabel, tone = 'bg-primary-600' }) {
   );
 }
 
-export default function AdminAnalyticsPage() {
+function AdminAnalyticsPageFallback() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="card p-5 h-72 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function AdminAnalyticsPageContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const searchParams = useSearchParams();
@@ -223,5 +233,13 @@ export default function AdminAnalyticsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AdminAnalyticsPage() {
+  return (
+    <Suspense fallback={<AdminAnalyticsPageFallback />}>
+      <AdminAnalyticsPageContent />
+    </Suspense>
   );
 }

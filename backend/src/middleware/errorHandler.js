@@ -1,7 +1,13 @@
+class AppError extends Error {
+    constructor(message, statusCode = 500) {
+        super(message);
+        this.statusCode = statusCode;
+    }
+}
+
 function notFound(req, res, next) {
     // means this route doesn't exist
-    const err = new Error(`Route not found: ${req.method} ${req.originalUrl}`);
-    err.statusCode = 404;
+    const err = new AppError(`Route not found: ${req.method} ${req.originalUrl}`, 404);
     next(err);
 }
 
@@ -15,4 +21,4 @@ function errorHandler(err, req, res, next) {
 }
 
 
-module.exports = { notFound, errorHandler };
+module.exports = { AppError, notFound, errorHandler };
