@@ -7,10 +7,11 @@ const {
     getMe,
 } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
+const { upload } = require('../middleware/upload');
 
 const router = express.Router();
 
-router.post('/register', register);
+router.post('/register', upload.array('verificationFiles', 5), register);
 router.post('/login', login);
 router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
