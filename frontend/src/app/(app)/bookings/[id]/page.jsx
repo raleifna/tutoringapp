@@ -10,7 +10,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeftIcon,
   CalendarDaysIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -240,10 +239,9 @@ export default function BookingDetailPage() {
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600">
-        <ArrowLeftIcon className="w-4 h-4" />
-        {backLabel}
+    <div className="relative max-w-2xl mx-auto space-y-5">
+      <Link href={backHref} className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+        <span>←</span> {backLabel}
       </Link>
 
       <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(booking.status)}`}>

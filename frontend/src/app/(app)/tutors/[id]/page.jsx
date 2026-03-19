@@ -10,7 +10,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeftIcon,
   CalendarDaysIcon,
   CheckBadgeIcon,
   AcademicCapIcon,
@@ -219,10 +218,9 @@ export default function TutorDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600">
-        <ArrowLeftIcon className="w-4 h-4" />
-        {backLabel}
+    <div className="relative max-w-4xl mx-auto px-4 py-6 space-y-5">
+      <Link href={backHref} className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+        <span>←</span> {backLabel}
       </Link>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">

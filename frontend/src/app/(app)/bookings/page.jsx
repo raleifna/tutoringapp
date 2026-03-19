@@ -129,16 +129,14 @@ function BookingsPageContent() {
   const currentPage = pagination?.page || page;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
-        >
-          <span>←</span> Back
-        </button>
-      </div>
+    <div className="relative space-y-5">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+      >
+        <span>←</span> Back
+      </button>
 
       <div className="pl-4">
         <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>

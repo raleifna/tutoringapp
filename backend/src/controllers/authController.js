@@ -1,5 +1,45 @@
 const { prisma } = require('../config/database');
 
+const authUserSelect = {
+    id: true,
+    email: true,
+    firstName: true,
+    lastName: true,
+    role: true,
+    status: true,
+    isEmailVerified: true,
+    tutorProfile: {
+        select: {
+            id: true,
+            status: true,
+            isVerified: true,
+        },
+    },
+};
+
+const authUserSelectWithPassword = {
+    ...authUserSelect,
+    password: true,
+};
+
+const serializeAuthUser = (user) => ({
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+    status: user.status,
+    isEmailVerified: Boolean(user.isEmailVerified),
+    tutorProfileId: user.tutorProfile?.id || null,
+    tutorProfile: user.tutorProfile
+        ? {
+              id: user.tutorProfile.id,
+              status: user.tutorProfile.status,
+              isVerified: Boolean(user.tutorProfile.isVerified),
+          }
+        : null,
+});
+
 async function register(req, res) {
     const { email, password, firstName, lastName } = req.body;
 
@@ -28,19 +68,13 @@ async function register(req, res) {
             firstName,
             lastName,
         },
+        select: authUserSelect,
     });
 
     return res.status(201).json({
         success: true,
         message: 'Register successful.',
-        user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            status: user.status,
-        },
+        user: serializeAuthUser(user),
     });
 }
 
@@ -56,6 +90,7 @@ async function login(req, res) {
 
     const user = await prisma.user.findUnique({
         where: { email },
+        select: authUserSelectWithPassword,
     });
 
     if (!user || user.password !== password) {
@@ -70,14 +105,7 @@ async function login(req, res) {
         message: 'Login successful.',
         accessToken: `demo-token-${user.id}`,
         refreshToken: `demo-refresh-${user.id}`,
-        user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            status: user.status,
-        },
+        user: serializeAuthUser(user),
     });
 }
 
@@ -136,6 +164,7 @@ async function getMe(req, res) {
 
     const user = await prisma.user.findUnique({
         where: { id: req.user.id },
+        select: authUserSelect,
     });
 
     if (!user) {
@@ -147,14 +176,7 @@ async function getMe(req, res) {
 
     return res.status(200).json({
         success: true,
-        user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            status: user.status,
-        },
+        user: serializeAuthUser(user),
     });
 }
 

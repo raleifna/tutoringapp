@@ -133,16 +133,14 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-4xl mx-auto">
-      <div className="mb-5">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500"
-        >
-          <span>←</span> Back
-        </button>
-      </div>
+    <div className="relative min-h-screen px-4 py-6 max-w-4xl mx-auto">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+      >
+        <span>←</span> Back
+      </button>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="flex items-center gap-2">

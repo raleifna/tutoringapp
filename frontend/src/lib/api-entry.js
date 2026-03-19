@@ -6,7 +6,6 @@
 //   subjectApi as realSubjectApi,
 //   tutorApi as realTutorApi,
 //   userApi as realUserApi,
-
 export {
   adminApi,
   authApi,

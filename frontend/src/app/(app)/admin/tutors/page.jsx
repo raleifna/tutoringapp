@@ -171,8 +171,8 @@ function AdminTutorsContent() {
   };
 
   return (
-    <div className="space-y-5">
-      <Link href="/admin/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500">
+    <div className="relative space-y-5">
+      <Link href="/admin/dashboard" className="absolute top-1 right-2 z-10 inline-flex items-center gap-1.5 text-sm text-white hover:text-white/80">
         <span>←</span> Back
       </Link>
 
