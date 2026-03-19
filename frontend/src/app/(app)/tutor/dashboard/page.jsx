@@ -96,22 +96,29 @@ export default function TutorDashboardPage() {
     enabled: mounted && !!currentUserId,
   });
 
-  const { data: myProfileData } = useQuery({
+  const { data: myProfileData, isLoading: myProfileLoading } = useQuery({
     queryKey: ['tutor-public-profile-id', currentUserId],
     queryFn: () => tutorApi.getMyProfile(),
     enabled: mounted && user?.role === 'TUTOR' && !!currentUserId,
+    retry: false,
   });
 
   const requests = requestsData?.data?.data?.bookings || [];
   const upcomingBookings = upcomingData?.data?.data?.bookings || [];
   const allBookings = allBookingsData?.data?.data?.bookings || [];
+  const myProfile = myProfileData?.data?.data || null;
+  const tutorProfileId = myProfile?.id || user?.tutorProfileId || user?.tutorProfile?.id || null;
+  const tutorProfileStatus = myProfile?.status || user?.tutorProfile?.status || null;
+  const hasTutorProfile = Boolean(tutorProfileId);
+  const shouldWaitForTutorProfile =
+    mounted && user?.role === 'TUTOR' && !!currentUserId && myProfileLoading && !user?.tutorProfile;
 
   const completedBookings = allBookings.filter((booking) => booking.status === 'COMPLETED');
   const totalEarnings = completedBookings.reduce(
     (sum, booking) => sum + Number(booking.totalAmount || 0),
     0
   );
-  const tutorPublicId = myProfileData?.data?.data?.id || user?.tutorProfileId || null;
+  const tutorPublicId = tutorProfileId;
   const viewAsLearnerHref = tutorPublicId ? `/tutors/${tutorPublicId}` : '/tutor/profile';
   const viewAsLearnerNavHref = viewAsLearnerHref.startsWith('/tutors/')
     ? `${viewAsLearnerHref}?from=tutor-dashboard`
@@ -157,16 +164,30 @@ export default function TutorDashboardPage() {
     return <div className="space-y-5" />;
   }
 
-  if (!user?.tutorProfile && !user?.tutorProfileId) {
+  if (shouldWaitForTutorProfile) {
+    return <div className="space-y-5" />;
+  }
+
+  if (!hasTutorProfile || tutorProfileStatus !== 'ACTIVE') {
+    const title = !hasTutorProfile
+      ? 'Complete Your Tutor Profile'
+      : tutorProfileStatus === 'PENDING'
+        ? 'Tutor Verification In Review'
+        : 'Tutor Verification Required';
+    const description = !hasTutorProfile
+      ? 'Set up your profile to start receiving booking requests from learners.'
+      : tutorProfileStatus === 'PENDING'
+        ? 'Your tutor application is under admin review. Open your profile to review your submission.'
+        : 'Your tutor profile is not active yet. Open your profile to review feedback and update your submission.';
+    const actionLabel = !hasTutorProfile ? 'Set Up Profile' : 'Open Tutor Profile';
+
     return (
       <div className="max-w-lg mx-auto text-center py-16">
         <StarIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Complete Your Tutor Profile</h2>
-        <p className="text-gray-500 mb-6 text-sm">
-          Set up your profile to start receiving booking requests from learners.
-        </p>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">{title}</h2>
+        <p className="text-gray-500 mb-6 text-sm">{description}</p>
         <Link href="/tutor/profile" className="btn-primary">
-          Set Up Profile
+          {actionLabel}
         </Link>
       </div>
     );
