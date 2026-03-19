@@ -1,5 +1,34 @@
 const { prisma } = require('../config/database');
 
+const toBoolean = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+    }
+    return false;
+};
+
+const toReviewItems = (value) =>
+    typeof value === 'string'
+        ? value
+              .split('\n')
+              .map((item) => item.trim())
+              .filter(Boolean)
+              .map((item) => ({ text: item }))
+        : [];
+
+const toUploadedFileItems = (files = []) =>
+    files.map((file) => ({
+        kind: 'file',
+        originalName: file.originalname,
+        fileName: file.filename,
+        url: `/uploads/documents/${file.filename}`,
+        mimeType: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+    }));
+
 const authUserSelect = {
     id: true,
     email: true,
@@ -41,17 +70,64 @@ const serializeAuthUser = (user) => ({
 });
 
 async function register(req, res) {
-    const { email, password, firstName, lastName } = req.body;
+    const {
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        isMinor,
+        parentName,
+        parentEmail,
+        parentPhone,
+        tutorEducationSummary,
+        tutorExperienceYears,
+        tutorSupportingNotes,
+    } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedFirstName = String(firstName || '').trim();
+    const normalizedLastName = String(lastName || '').trim();
+    const normalizedRole = String(role || 'LEARNER').trim().toUpperCase();
+    const uploadedVerificationFiles = Array.isArray(req.files) ? req.files : [];
+
+    if (!normalizedEmail || !password || !normalizedFirstName || !normalizedLastName) {
         return res.status(400).json({
             success: false,
             message: 'Email, password, first name and last name are required.',
         });
     }
 
+    if (!['LEARNER', 'TUTOR'].includes(normalizedRole)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Role must be LEARNER or TUTOR.',
+        });
+    }
+
+    if (normalizedRole === 'LEARNER' && toBoolean(isMinor) && !String(parentName || '').trim()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Parent/guardian name is required for minors.',
+        });
+    }
+
+    if (normalizedRole === 'TUTOR' && !String(tutorEducationSummary || '').trim()) {
+        return res.status(400).json({
+            success: false,
+            message: 'Education summary is required for tutors.',
+        });
+    }
+
+    if (normalizedRole === 'TUTOR' && uploadedVerificationFiles.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Please upload at least one verification file.',
+        });
+    }
+
     const existingUser = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -63,10 +139,41 @@ async function register(req, res) {
 
     const user = await prisma.user.create({
         data: {
-            email,
+            email: normalizedEmail,
             password,
-            firstName,
-            lastName,
+            firstName: normalizedFirstName,
+            lastName: normalizedLastName,
+            role: normalizedRole,
+            ...(normalizedRole === 'LEARNER'
+                ? {
+                      learnerProfile: {
+                          create: {
+                              subjects: [],
+                              isMinor: toBoolean(isMinor),
+                              parentName: String(parentName || '').trim() || null,
+                              parentEmail: String(parentEmail || '').trim() || null,
+                              parentPhone: String(parentPhone || '').trim() || null,
+                          },
+                      },
+                  }
+                : {
+                      tutorProfile: {
+                          create: {
+                              status: 'PENDING',
+                              yearsExperience: parseInt(tutorExperienceYears, 10) || 0,
+                              education: toReviewItems(tutorEducationSummary),
+                              certifications: [
+                                  ...toUploadedFileItems(uploadedVerificationFiles),
+                                  ...toReviewItems(tutorSupportingNotes).map((item) => ({
+                                      ...item,
+                                      kind: 'note',
+                                  })),
+                              ],
+                              isVerified: false,
+                              verifiedAt: null,
+                          },
+                      },
+                  }),
         },
         select: authUserSelect,
     });
