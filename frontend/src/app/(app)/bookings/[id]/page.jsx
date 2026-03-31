@@ -109,7 +109,9 @@ export default function BookingDetailPage() {
   const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
-  const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status);
+  const scheduledAt = booking?.scheduledAt;
+  const timeDelta = new Date(scheduledAt) -  new Date(); 
+  const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status) && (timeDelta < 1000 * 60 * 60 *24);
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingApi.cancel(id),
