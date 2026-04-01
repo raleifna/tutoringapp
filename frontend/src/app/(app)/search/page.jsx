@@ -96,11 +96,18 @@ export const locationOptions = [
   }
 ];
 
-const LocationCascader = ({ updateFilter }) => {
+const LocationCascader = ({ value, updateFilter }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPath, setSelectedPath] = useState([]); 
   const [activePath, setActivePath] = useState([]);     
   const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedPath([]);
+      setActivePath([]);
+    }
+  }, [value]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -330,7 +337,7 @@ function SearchPageContent() {
           </div>
           <div>
             <label className="label">Location</label>
-            <LocationCascader updateFilter={updateFilter} />
+            <LocationCascader value={filters.location} updateFilter={updateFilter} />
           </div>
           <div>
             <label className="label">Session Type</label>
