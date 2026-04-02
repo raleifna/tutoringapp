@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
+import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -357,7 +358,7 @@ export default function TutorProfilePage() {
 
   if (profileLoading || subjectsLoading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4 animate-pulse">
+      <div className="max-w-5xl mx-auto space-y-4 animate-pulse">
         <div className="h-10 bg-gray-200 rounded w-1/3" />
         <div className="card p-6 h-48" />
       </div>
@@ -366,7 +367,7 @@ export default function TutorProfilePage() {
 
   if (profileError || subjectsError || !profile) {
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="card p-6">
           <h1 className="page-title">Tutor Profile</h1>
           <p className="text-sm text-gray-600 mt-3">
@@ -380,7 +381,7 @@ export default function TutorProfilePage() {
   }
 
   return (
-    <div className="relative max-w-3xl mx-auto space-y-5">
+    <div className="relative max-w-5xl mx-auto space-y-5">
       <Link href="/tutor/dashboard" className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
         <span>←</span> Back
       </Link>
@@ -769,56 +770,18 @@ export default function TutorProfilePage() {
 
           {activeTab === 'availability' && (
         <div className="card p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div>
             <h3 className="font-semibold text-gray-900">Weekly Availability</h3>
-            <button type="button" onClick={addAvailabilitySlot} className="btn-secondary btn-sm gap-1.5">
-              <PlusIcon className="w-4 h-4" /> Add Slot
-            </button>
+            <p className="mt-1 text-sm text-gray-500">Click cells to toggle 1-hour blocks.</p>
           </div>
 
-          {availability.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">
-              No availability added. Click &quot;Add Slot&quot; to start.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {availability.map((slot, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <select
-                    value={slot.dayOfWeek}
-                    onChange={(e) => updateSlot(index, 'dayOfWeek', e.target.value)}
-                    className="input flex-1"
-                  >
-                    {DAY_OPTIONS.map((day) => (
-                      <option key={day.value} value={day.value}>
-                        {day.label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) => updateSlot(index, 'startTime', e.target.value)}
-                    className="input w-28"
-                  />
-                  <span className="text-gray-400 text-sm">to</span>
-                  <input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) => updateSlot(index, 'endTime', e.target.value)}
-                    className="input w-28"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeAvailabilitySlot(index)}
-                    className="p-2 text-red-400 hover:text-red-600"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <AvailabilityCalendar slots={availability} mode="edit" onChange={setAvailability} />
+
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            {availability.length === 0
+              ? 'No availability selected yet.'
+              : `${availability.length} weekly availability block${availability.length > 1 ? 's' : ''} selected.`}
+          </div>
 
           <button
             type="button"
