@@ -12,3 +12,6 @@ frontend/out/
 .env.*
 !.env.example
 !.env.local.example
+
+# Doc files
+docs/*
