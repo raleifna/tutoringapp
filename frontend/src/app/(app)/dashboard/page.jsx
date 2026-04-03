@@ -17,7 +17,8 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
-import { bookingApi } from '../../../lib/api-entry';
+import { bookingApi, notificationApi } from '../../../lib/api-entry';
+
 import toast from 'react-hot-toast';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
@@ -47,56 +48,13 @@ const getStatusClass = (status) => {
   return 'bg-gray-100 text-gray-700 border border-gray-200';
 };
 
-// Mock notification data - replace with actual API calls
-const mockNotifications = [
-  {
-    id: 1,
-    type: 'booking',
-    title: 'New Booking Request',
-    message: 'John Smith requested a Math session for tomorrow',
-    timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-    read: false,
-    link: '/tutor/requests'
-  },
-  {
-    id: 2,
-    type: 'booking',
-    title: 'Booking Confirmed',
-    message: 'Your Science session with Dr. Brown has been confirmed',
-    timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-    read: false,
-    link: '/bookings'
-  },
-  {
-    id: 3,
-    type: 'system',
-    title: 'System Update',
-    message: 'New features available! Check out the updated dashboard',
-    timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-    read: true,
-    link: '/dashboard'
-  },
-  {
-    id: 4,
-    type: 'message',
-    title: 'New Message',
-    message: 'You have a new message from your tutor',
-    timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-    read: true,
-    link: '/messages'
-  },
-  {
-    id: 5,
-    type: 'booking',
-    title: 'Session Reminder',
-    message: 'Your English session starts in 1 hour',
-    timestamp: new Date(Date.now() - 86400000), // 1 day ago
-    read: true,
-    link: '/bookings'
-  }
-];
 
 const formatTimeAgo = (timestamp) => {
+  // timestamp is string, convert to Date object
+  if (typeof timestamp === 'string') {
+    timestamp = new Date(timestamp);
+  }
+
   const now = new Date();
   const diff = now - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -113,7 +71,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
-  const [notifications, setNotifications] = useState(mockNotifications);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const currentUserId = user?.id || '';
 
@@ -121,23 +78,43 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
+  // ============= notifications ===============
+  const { data: notificationsData, refetch: fetchNotifications } = useQuery({
+    queryKey: ['notifications', currentUserId],
+    queryFn: () => notificationApi.search({ 
+      page: 1, 
+      limit: 10 
+    }),
+    enabled: !!currentUserId,
+    keepPreviousData: true,
+  });
+  const recentNotifications = notificationsData?.data?.data?.notifications || [];
+  const notifications = notificationsData?.data?.data?.notifications || [];
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleNotificationClick = () => {
     setIsNotificationOpen(!isNotificationOpen);
   };
 
-  const handleMarkAsRead = (notificationId) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
-    toast.success('Notification marked as read');
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await notificationApi.markAsRead(notificationId);
+      fetchNotifications();
+      toast.success('Notification marked as read');
+    } catch (error) {
+      toast.error('Failed to mark notification as read');
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    toast.success('All notifications marked as read');
-    setIsNotificationOpen(false);
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationApi.markAsRead('all');
+      fetchNotifications();
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      toast.error('Failed to mark all notifications as read');
+    }
   };
 
   const handleNotificationAction = (notification) => {
@@ -147,7 +124,9 @@ export default function DashboardPage() {
     }
   };
 
-  const recentNotifications = notifications.slice(0, 10);
+  
+
+  // ============= notifications ===============
 
   const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
   const { data: bookingsData, isLoading } = useQuery({
