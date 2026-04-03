@@ -127,7 +127,7 @@ const LocationCascader = ({ value, updateFilter }) => {
     if (!option.children || option.children.length === 0) {
       setSelectedPath(newActivePath);
       setIsOpen(false); 
-      const locationString = newActivePath.map(item => item.label).reverse().join(', ');
+      const locationString = newActivePath.map(item => item.label).reverse()[0];
       updateFilter('location', locationString);
     }
   };
