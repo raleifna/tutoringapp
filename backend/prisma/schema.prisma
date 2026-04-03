@@ -109,6 +109,7 @@ model User {
   refreshTokens   RefreshToken[]
   adminActions    AdminAction[]    @relation("AdminActioner")
   adminTargeted   AdminAction[]    @relation("AdminTarget")
+  notifications Notification[] @relation("Notification")
 
   @@index([email])
   @@index([role])
@@ -361,7 +362,7 @@ model Notification {
   read Boolean @default(false)
   link String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("Notification", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("notifications")
