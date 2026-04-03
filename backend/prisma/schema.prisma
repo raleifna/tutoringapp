@@ -349,3 +349,23 @@ model RefreshToken {
   @@index([token])
   @@map("refresh_tokens")
 }
+
+// ==================== NOTIFICATION ====================
+model Notification {
+  id String @id @default(uuid())
+  userId String
+  type String @default("system") // system, message, booking, payment
+  title String
+  message String
+  timestamp DateTime @default(now())
+  read Boolean @default(false)
+  link String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+
+
