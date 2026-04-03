@@ -309,7 +309,7 @@ function SearchPageContent() {
       <button
         type="button"
         onClick={handleBack}
-        className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+        className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
       >
         <span>←</span> Back
       </button>
