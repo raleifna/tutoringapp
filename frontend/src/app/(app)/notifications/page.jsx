@@ -17,19 +17,6 @@ import { useAuthStore } from '../../../lib/store';
 import toast from 'react-hot-toast';
 import { notificationApi } from '../../../lib/api';
 
-// Mock notification API - replace with actual API calls
-const fakeApi = {
-  markAsRead: async (notificationId) => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return { data: { success: true } };
-  },
-  
-  markAllAsRead: async () => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return { data: { success: true } };
-  }
-};
-
 const STATUS_TABS = [
   { value: '', label: 'All' },
   { value: 'unread', label: 'Unread' },
@@ -44,6 +31,11 @@ const getInitialStatus = (value) => {
 };
 
 const formatTimeAgo = (timestamp) => {
+  // timestamp is string, convert to Date object
+  if (typeof timestamp === 'string') {
+    timestamp = new Date(timestamp);
+  }
+
   const now = new Date();
   const diff = now - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -132,7 +124,7 @@ function NotificationsPageContent() {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await fakeApi.markAsRead(notificationId);
+      await notificationApi.markAsRead(notificationId);
       refetch();
       toast.success('Notification marked as read');
     } catch (error) {
@@ -142,7 +134,7 @@ function NotificationsPageContent() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await fakeApi.markAllAsRead();
+      await notificationApi.markAsRead('all');
       refetch();
       toast.success('All notifications marked as read');
     } catch (error) {
@@ -171,15 +163,23 @@ function NotificationsPageContent() {
         
         
         <div className='flex justify-between'>
-        <p className="text-gray-600 mt-1">Stay updated with your tutoring activities</p>
-            <button
-                onClick={handleMarkAllAsRead}
-                className="btn-secondary btn-sm gap-1.5"
-                disabled={isFetching}
-            >
-                <CheckCircleIcon className="w-4 h-4" />
-                Mark All as Read
-            </button>
+          <p className="text-gray-600 mt-1">Stay updated with your tutoring activities</p>
+          <button
+              onClick={handleMarkAllAsRead}
+              className="btn-secondary btn-sm gap-1.5"
+              disabled={isFetching}
+          >
+              <CheckCircleIcon className="w-4 h-4" />
+              Mark All as Read
+          </button>
+          <button
+              onClick={async () => { await notificationApi.addTestsData(); refetch(); }}
+              className="btn-secondary btn-sm gap-1.5"
+              disabled={isFetching}
+          >
+              <CheckCircleIcon className="w-4 h-4" />
+              Add 20 Test Data
+          </button>
         </div>
       </div>
 

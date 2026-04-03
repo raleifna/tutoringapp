@@ -224,5 +224,11 @@ export const notificationApi = {
     search: (params) => {
         return api.get('/notifications', { params });
     },
+    markAsRead: (ids) => {
+        return api.put(`/notifications/read?ids=${ids}`);
+    },
+    addTestsData: () => {
+        return api.post('/notifications/test');
+    },
 };
 
