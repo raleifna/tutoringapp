@@ -12,7 +12,7 @@ const tutorRoutes = require('./routes/tutors');
 const subjectRoutes = require('./routes/subjects');
 const bookingRoutes = require('./routes/bookings');
 const adminRoutes = require('./routes/admin');
-// const tutorRoutes = require('./routes/tutors');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -63,7 +63,7 @@ app.use('/api/v1/tutors', tutorRoutes);
 app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/admin', adminRoutes);
-// app.use('/api/v1/tutors', tutorRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
