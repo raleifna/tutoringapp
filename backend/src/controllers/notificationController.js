@@ -61,7 +61,7 @@ exports.markAsRead = async (req, res) => {
   // batch update notifications to mark as read
   await prisma.notification.updateMany({
     where: {
-      ...(ids === 'all' ? {} : { id: { in: ids.split(',').map((id) => parseInt(id, 10)) } }),
+      ...(ids === 'all' ? {} : { id: { in: ids.split(',') } }),
       userId: req.user.id,
     },
     data: {
