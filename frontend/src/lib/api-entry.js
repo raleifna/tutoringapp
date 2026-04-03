@@ -13,6 +13,7 @@ export {
   subjectApi,
   tutorApi,
   userApi,
+  notificationApi,
 } from './api';
 // import { authApi as mockAuthApi } from '../mocks/stage1.mock';
 // import { bookingApi as mockBookingApi } from '../mocks/stage3.mock';

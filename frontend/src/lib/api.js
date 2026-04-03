@@ -218,4 +218,11 @@ export const userApi = {
         });
     },
 };
-  
+
+// notification APIs
+export const notificationApi = {
+    search: (params) => {
+        return api.get('/notifications', { params });
+    },
+};
+
