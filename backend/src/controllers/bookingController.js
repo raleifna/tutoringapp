@@ -260,6 +260,9 @@ exports.acceptBooking = async (req, res) => {
     include: bookingInclude,
   });
 
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
+
   res.json({ success: true, message: 'Booking accepted', data: updated });
 };
 
