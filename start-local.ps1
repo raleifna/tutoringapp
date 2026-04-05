@@ -84,6 +84,18 @@ function Invoke-BackendCommand {
     }
 }
 
+function Test-BackendScript {
+    param([string]$ScriptName)
+
+    $packageJson = Join-Path $ProjectRoot 'backend/package.json'
+    if (-not (Test-Path $packageJson)) {
+        return $false
+    }
+
+    $package = Get-Content $packageJson -Raw | ConvertFrom-Json
+    return $null -ne $package.scripts.PSObject.Properties[$ScriptName]
+}
+
 function Wait-ForUrl {
     param(
         [string]$Url,
@@ -151,14 +163,23 @@ if (-not $SkipSeed) {
     }
 
     if ($shouldSeed) {
-        Write-Step 'Seeding demo accounts and subjects'
-        Invoke-BackendCommand -CommandArgs @('pnpm', 'run', 'db:seed')
+        if (Test-BackendScript -ScriptName 'db:seed') {
+            Write-Step 'Seeding demo accounts and subjects'
+            Invoke-BackendCommand -CommandArgs @('pnpm', 'run', 'db:seed')
+        } else {
+            Write-Host 'Seed skipped: backend/package.json does not define db:seed.' -ForegroundColor Yellow
+        }
     }
 }
 
 if ($RunSmokeTest) {
-    Write-Step 'Running backend smoke test'
-    Invoke-BackendCommand -CommandArgs @('node', 'scripts/api-mock-smoke.js')
+    $smokeScript = Join-Path $ProjectRoot 'backend/scripts/api-mock-smoke.js'
+    if (Test-Path $smokeScript) {
+        Write-Step 'Running backend smoke test'
+        Invoke-BackendCommand -CommandArgs @('node', 'scripts/api-mock-smoke.js')
+    } else {
+        Write-Host 'Smoke test skipped: backend/scripts/api-mock-smoke.js not found.' -ForegroundColor Yellow
+    }
 }
 
 Write-Host ''

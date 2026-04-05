@@ -74,8 +74,8 @@ export default function AdminDashboardPage() {
       href: '/admin/operations?tab=bookings',
     },
     {
-      label: 'Revenue (AUD)',
-      value: formatCurrency(overview.totalRevenue || 0),
+      label: 'Analytics',
+      // value: formatCurrency(overview.totalRevenue || 0),
       icon: CurrencyDollarIcon,
       iconColor: 'bg-orange-100 text-orange-600',
       href: '/admin/analytics?period=30',
