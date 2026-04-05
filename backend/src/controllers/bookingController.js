@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const notificationService = require('../services/notificationService');
 
 const bookingInclude = {
   learner: {
@@ -77,6 +78,9 @@ exports.createBooking = async (req, res) => {
     },
     include: bookingInclude,
   });
+
+  // notify tutor
+  await notificationService.notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
 
   res.status(201).json({
     success: true,
