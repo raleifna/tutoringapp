@@ -312,7 +312,10 @@ exports.rescheduleBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  res.json({ success: true, message: 'Booking rescheduled', data: updated });
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Rescheduled', `A booking has been rescheduled.`, `/bookings/${updated.id}`);
+
+   res.json({ success: true, message: 'Booking rescheduled', data: updated });
 };
 
 exports.completeBooking = async (req, res) => {
