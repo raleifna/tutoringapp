@@ -236,7 +236,7 @@ exports.cancelBooking = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
+  await notificationService.notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
 
   res.json({ success: true, message: 'Booking cancelled', data: updated });
 };

@@ -15,6 +15,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+import NotificationBox from '../../../../components/notificationBox';
+
 
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
@@ -202,6 +204,7 @@ export default function TutorDashboardPage() {
         <button onClick={handleLogout} className="btn-secondary mt-4">
           Log out
         </button>
+        <NotificationBox currentUserId={currentUserId} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
