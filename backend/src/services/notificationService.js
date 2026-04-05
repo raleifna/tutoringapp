@@ -16,6 +16,20 @@ class NotificationService {
       link
     });
   }
+
+  async notifyAdmin(type, title, message, link) {
+    const admins = await db.users.find({ role: 'admin' });
+    const notifications = admins.map(admin => ({
+      userId: admin.id,
+      type,
+      title,
+      message,
+      read: false,
+      timestamp: new Date(),
+      link
+    }));
+    await db.notifications.insertMany(notifications);
+  }
 }
 
 module.exports = new NotificationService();

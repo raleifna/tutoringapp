@@ -294,7 +294,7 @@ exports.updateApplication = async (req, res) => {
   const latestReviewAction = await getLatestReviewAction(req.user.id);
 
   // notify admin
-  await notificationService.notify(ADMIN_ID, 'system', 'Tutor Application Resubmitted', `A tutor application has been resubmitted for review.`, `/admin/tutors?status=PENDING`);
+  await notificationService.notifyAdmin('system', 'Tutor Application Resubmitted', `A tutor application has been resubmitted for review.`, `/admin/tutors?status=PENDING`);
 
   res.json({
     success: true,
