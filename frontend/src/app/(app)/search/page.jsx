@@ -151,7 +151,7 @@ const LocationCascader = ({ value, updateFilter }) => {
     : '';
 
   return (
-    <div className="relative w-full max-w-sm" ref={wrapperRef}>
+    <div className="relative w-full" ref={wrapperRef}>
       <div 
         className="w-full p-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex justify-between items-center hover:border-blue-400 transition-colors"
         onClick={() => {
