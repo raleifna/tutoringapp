@@ -285,6 +285,9 @@ exports.declineBooking = async (req, res) => {
     include: bookingInclude,
   });
 
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Declined', `A booking has been declined.`, `/bookings/${updated.id}`);
+
   res.json({ success: true, message: 'Booking declined', data: updated });
 };
 
