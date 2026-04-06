@@ -175,6 +175,27 @@ export const bookingApi = {
     },
 };
 
+export const messageApi = {
+    getConversations: () => {
+        return api.get('/messages/conversations');
+    },
+    createConversation: (userId) => {
+        return api.post('/messages/conversations', { userId });
+    },
+    getMessages: (conversationId, params) => {
+        return api.get(`/messages/conversations/${conversationId}`, { params });
+    },
+    sendMessage: (conversationId, data) => {
+        return api.post(`/messages/conversations/${conversationId}`, data);
+    },
+    markAsRead: (conversationId) => {
+        return api.patch(`/messages/conversations/${conversationId}/read`);
+    },
+    getUnreadCount: () => {
+        return api.get('/messages/unread-count');
+    },
+};
+
 // admin APIs
 export const adminApi = {
     getDashboard: () => api.get('/admin/dashboard'),

@@ -113,3 +113,9 @@ export const useAuthStore = create((set, get) => ({
   isLearner: () => get().user?.role === 'LEARNER',
   isAdmin: () => get().user?.role === 'ADMIN',
 }));
+
+export const useMessageStore = create((set) => ({
+  unreadCount: 0,
+  setUnreadCount: (count) => set({ unreadCount: count }),
+  clearUnread: () => set({ unreadCount: 0 }),
+}));

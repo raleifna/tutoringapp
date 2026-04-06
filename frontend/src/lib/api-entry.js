@@ -10,6 +10,7 @@ export {
   adminApi,
   authApi,
   bookingApi,
+  messageApi,
   subjectApi,
   tutorApi,
   userApi,
