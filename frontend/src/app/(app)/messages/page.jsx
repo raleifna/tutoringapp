@@ -13,6 +13,8 @@ import { useAuthStore, useMessageStore } from '../../../lib/store';
 
 let socket = null;
 
+const IS_MOCK_CHAT = process.env.NEXT_PUBLIC_STAGE4_API_MODE === 'mock';
+
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
   const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
@@ -157,7 +159,7 @@ export default function MessagesPage() {
   }, [queryClient, selectedConversationId, setUnreadCount, user?.id]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || IS_MOCK_CHAT) return;
 
     socket = io(getSocketUrl(), {
       auth: { token: accessToken },

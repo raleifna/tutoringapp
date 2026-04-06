@@ -45,6 +45,7 @@ Currently mocked:
 - `stage4 tutorApi` (getMyProfile/updateProfile/updateAvailability/addSubject/removeSubject/updateApplication)
 - `stage4 bookingApi` (getTutorBookings/getById/accept/decline/reschedule/complete)
 - `userApi` (updateProfile/uploadAvatar)
+- `messageApi` (getConversations/createConversation/getMessages/sendMessage/markAsRead/getUnreadCount)
 - `adminApi` (getDashboard/getAnalytics/getUsers/getUser/updateUserStatus/getPendingTutors/approveTutor/rejectTutor/returnTutor/getBookings/getActions/createSubject/updateSubject/deleteSubject)
 
 The switch logic is in:
@@ -84,6 +85,7 @@ If you need a fresh test run, remove mock keys in browser console:
   'mock_stage3_bookings_v1',
   'mock_stage4_tutor_profiles_v1',
   'mock_stage4_tutor_user_map_v1',
+  'mock_stage4_messages_v1',
   'mock_stage5_subjects_v1',
   'mock_stage5_admin_actions_v1',
   'mock_stage5_user_status_v1',
@@ -139,6 +141,7 @@ NEXT_PUBLIC_STAGE5_API_MODE=mock
 - `stage4 tutorApi`（getMyProfile/updateProfile/updateAvailability/addSubject/removeSubject/updateApplication）
 - `stage4 bookingApi`（getTutorBookings/getById/accept/decline/reschedule/complete）
 - `userApi`（updateProfile/uploadAvatar）
+- `messageApi`（getConversations/createConversation/getMessages/sendMessage/markAsRead/getUnreadCount）
 - `adminApi`（getDashboard/getAnalytics/getUsers/getUser/updateUserStatus/getPendingTutors/approveTutor/rejectTutor/returnTutor/getBookings/getActions/createSubject/updateSubject/deleteSubject）
 
 开关逻辑位置：
@@ -178,6 +181,7 @@ NEXT_PUBLIC_STAGE5_API_MODE=mock
   'mock_stage3_bookings_v1',
   'mock_stage4_tutor_profiles_v1',
   'mock_stage4_tutor_user_map_v1',
+  'mock_stage4_messages_v1',
   'mock_stage5_subjects_v1',
   'mock_stage5_admin_actions_v1',
   'mock_stage5_user_status_v1',
