@@ -127,7 +127,7 @@ const LocationCascader = ({ value, updateFilter }) => {
     if (!option.children || option.children.length === 0) {
       setSelectedPath(newActivePath);
       setIsOpen(false); 
-      const locationString = newActivePath.map(item => item.label).reverse().join(', ');
+      const locationString = newActivePath.map(item => item.label).reverse()[0];
       updateFilter('location', locationString);
     }
   };
@@ -151,7 +151,7 @@ const LocationCascader = ({ value, updateFilter }) => {
     : '';
 
   return (
-    <div className="relative w-full max-w-sm" ref={wrapperRef}>
+    <div className="relative w-full" ref={wrapperRef}>
       <div 
         className="w-full p-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex justify-between items-center hover:border-blue-400 transition-colors"
         onClick={() => {
@@ -309,7 +309,7 @@ function SearchPageContent() {
       <button
         type="button"
         onClick={handleBack}
-        className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+        className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
       >
         <span>←</span> Back
       </button>

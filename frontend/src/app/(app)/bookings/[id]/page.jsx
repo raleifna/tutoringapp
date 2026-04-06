@@ -111,7 +111,7 @@ export default function BookingDetailPage() {
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const scheduledAt = booking?.scheduledAt;
   const timeDelta = new Date(scheduledAt) -  new Date(); 
-  const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status) && (timeDelta < 1000 * 60 * 60 *24);
+  const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status) && (timeDelta > 1000 * 60 * 60 *24);
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingApi.cancel(id),
@@ -242,16 +242,15 @@ export default function BookingDetailPage() {
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-5">
-      <Link href={backHref} className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-        <span>←</span> {backLabel}
-      </Link>
-
       <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(booking.status)}`}>
         {booking.status === 'PENDING' && <ExclamationTriangleIcon className="w-5 h-5" />}
         {booking.status === 'ACCEPTED' && <CheckCircleIcon className="w-5 h-5" />}
         {booking.status === 'COMPLETED' && <CheckCircleIcon className="w-5 h-5" />}
         {booking.status === 'CANCELLED' && <XCircleIcon className="w-5 h-5" />}
-        Booking Status: <strong>{booking.status}</strong>
+        Booking Status: <strong className='flex-1'>{booking.status}</strong>
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+          <span>←</span> {backLabel}
+        </Link>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
@@ -319,6 +318,7 @@ export default function BookingDetailPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
+        <div className='text-gray-700 text-sm mb-2 mt-2'>Please note that your subscription must be cancelled one day in advance.</div>
         {canCancel && (
           <button
             type="button"
