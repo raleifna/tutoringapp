@@ -109,7 +109,12 @@ export default function TutorDetailPage() {
   });
 
   const tutor = tutorData?.data?.data;
-  const availability = availabilityData?.data?.data || [];
+  const availabilityState = availabilityData?.data?.data || {};
+  const availability = availabilityState?.availability || [];
+  const currentWeekAvailability = availabilityState?.currentWeekEffectiveAvailability || availability;
+  const hasCurrentWeekAvailabilityOverride = Boolean(
+    availabilityState?.hasCurrentWeekAvailabilityOverride
+  );
   const isSelf = !!user && (user.id === tutor?.userId || user.id === tutor?.user?.id);
   const isLearner = user?.role === 'LEARNER';
   const isGuest = !user;
@@ -525,9 +530,16 @@ export default function TutorDetailPage() {
                 <p className="mb-2 text-sm text-gray-500">
                   Click multiple available cells to send more than one booking request.
                 </p>
+                {hasCurrentWeekAvailabilityOverride && (
+                  <p className="mb-2 text-sm text-amber-700">
+                    This week includes temporary availability changes from the tutor.
+                  </p>
+                )}
                 <input type="hidden" {...register('scheduledAt')} />
                 <AvailabilityCalendar
                   slots={availability}
+                  currentWeekSlots={currentWeekAvailability}
+                  hasCurrentWeekOverride={hasCurrentWeekAvailabilityOverride}
                   mode="select"
                   selectedKeys={selectedSlots.map((slot) => slot.key)}
                   onSelect={handleSlotSelect}

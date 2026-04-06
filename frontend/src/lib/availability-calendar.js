@@ -10,7 +10,7 @@ export const DAY_LABELS = {
   6: 'Sat',
 };
 
-export const HOURS = Array.from({ length: 14 }, (_, index) => index + 8);
+export const HOURS = Array.from({ length: 24 }, (_, index) => index);
 
 export const buildCellKey = (dayOfWeek, hour) => `${dayOfWeek}-${hour}`;
 
@@ -21,12 +21,20 @@ const readHour = (value, fallback) => {
 
 const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;
 
+export const cloneSlots = (slots = []) =>
+  slots.map((slot) => ({
+    dayOfWeek: String(slot?.dayOfWeek),
+    startTime: slot?.startTime,
+    endTime: slot?.endTime,
+    ...(slot?.timezone ? { timezone: slot.timezone } : {}),
+  }));
+
 export const slotsToCells = (slots = []) => {
   const cells = new Set();
 
   slots.forEach((slot) => {
     const dayOfWeek = Number(slot?.dayOfWeek);
-    const startHour = readHour(slot?.startTime, 8);
+    const startHour = readHour(slot?.startTime, 0);
     const endHour = readHour(slot?.endTime, startHour);
 
     for (let hour = startHour; hour < endHour; hour += 1) {

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
+import { cloneSlots } from '../../../../lib/availability-calendar';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -80,6 +81,9 @@ export default function TutorProfilePage() {
     languages: '',
   });
   const [availability, setAvailability] = useState([]);
+  const [currentWeekAvailability, setCurrentWeekAvailability] = useState([]);
+  const [hasCurrentWeekAvailabilityOverride, setHasCurrentWeekAvailabilityOverride] = useState(false);
+  const [showCurrentWeekEditor, setShowCurrentWeekEditor] = useState(false);
   const [mySubjects, setMySubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
@@ -133,13 +137,12 @@ export default function TutorProfilePage() {
       languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : '',
     });
 
-    setAvailability(
-      (profile.availability || []).map((slot) => ({
-        dayOfWeek: String(slot.dayOfWeek),
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-      }))
+    setAvailability(cloneSlots(profile.availability || []));
+    setCurrentWeekAvailability(
+      cloneSlots(profile.currentWeekEffectiveAvailability || profile.availability || [])
     );
+    setHasCurrentWeekAvailabilityOverride(Boolean(profile.hasCurrentWeekAvailabilityOverride));
+    setShowCurrentWeekEditor(Boolean(profile.hasCurrentWeekAvailabilityOverride));
 
     setMySubjects(profile.subjects || []);
     setApplicationSummary(
@@ -169,9 +172,34 @@ export default function TutorProfilePage() {
     onSuccess: () => {
       toast.success('Availability updated');
       queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
     },
     onError: () => {
       toast.error('Failed to update availability');
+    },
+  });
+
+  const updateCurrentWeekAvailabilityMutation = useMutation({
+    mutationFn: (slots) => tutorApi.updateCurrentWeekAvailability(slots),
+    onSuccess: () => {
+      toast.success('This week availability updated');
+      queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to update this week availability');
+    },
+  });
+
+  const clearCurrentWeekAvailabilityMutation = useMutation({
+    mutationFn: () => tutorApi.clearCurrentWeekAvailability(),
+    onSuccess: () => {
+      toast.success('This week is back to your regular schedule');
+      queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to clear this week availability');
     },
   });
 
@@ -277,6 +305,23 @@ export default function TutorProfilePage() {
 
   const handleSaveAvailability = () => {
     updateAvailabilityMutation.mutate(availability);
+  };
+
+  const handleToggleCurrentWeekEditor = () => {
+    setShowCurrentWeekEditor((current) => {
+      if (!current && !hasCurrentWeekAvailabilityOverride) {
+        setCurrentWeekAvailability(cloneSlots(availability));
+      }
+      return !current;
+    });
+  };
+
+  const handleSaveCurrentWeekAvailability = () => {
+    updateCurrentWeekAvailabilityMutation.mutate(currentWeekAvailability);
+  };
+
+  const handleClearCurrentWeekAvailability = () => {
+    clearCurrentWeekAvailabilityMutation.mutate();
   };
 
   const currentSubjectIds = mySubjects.map((item) => item.subjectId);
@@ -772,7 +817,7 @@ export default function TutorProfilePage() {
         <div className="card p-5 space-y-4">
           <div>
             <h3 className="font-semibold text-gray-900">Weekly Availability</h3>
-            <p className="mt-1 text-sm text-gray-500">Click cells to toggle 1-hour blocks.</p>
+            <p className="mt-1 text-sm text-gray-500">Click cells to toggle 1-hour blocks across the full 24-hour day.</p>
           </div>
 
           <AvailabilityCalendar slots={availability} mode="edit" onChange={setAvailability} />
@@ -791,6 +836,81 @@ export default function TutorProfilePage() {
           >
             {updateAvailabilityMutation.isPending ? 'Saving...' : 'Save Availability'}
           </button>
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h4 className="font-semibold text-gray-900">Temporary Modify This Week</h4>
+                <p className="mt-1 text-sm text-gray-600">
+                  Use a separate current-week table when you need one-off changes. Students will see this week&apos;s temporary timetable instead of the regular weekly schedule.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleCurrentWeekEditor}
+                className="btn-secondary"
+              >
+                {showCurrentWeekEditor
+                  ? 'Hide This Week Editor'
+                  : hasCurrentWeekAvailabilityOverride
+                    ? 'Edit This Week Override'
+                    : 'Open This Week Editor'}
+              </button>
+            </div>
+
+            {hasCurrentWeekAvailabilityOverride && (
+              <div className="rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-800">
+                A temporary schedule is active for this week. Students are currently seeing the override below for the current week only.
+              </div>
+            )}
+
+            {showCurrentWeekEditor && (
+              <div className="space-y-4">
+                <AvailabilityCalendar
+                  slots={currentWeekAvailability}
+                  mode="edit"
+                  onChange={setCurrentWeekAvailability}
+                  fixedWeekOffset={0}
+                  hideWeekNavigation
+                  title="This Week Only"
+                />
+
+                <div className="rounded-xl bg-white/80 px-3 py-2 text-sm text-gray-600">
+                  {currentWeekAvailability.length === 0
+                    ? 'No hours selected for this week. Saving now will make you unavailable for the current week.'
+                    : `${currentWeekAvailability.length} current-week availability block${currentWeekAvailability.length > 1 ? 's' : ''} selected.`}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveCurrentWeekAvailability}
+                    disabled={updateCurrentWeekAvailabilityMutation.isPending}
+                    className="btn-primary"
+                  >
+                    {updateCurrentWeekAvailabilityMutation.isPending
+                      ? 'Saving This Week...'
+                      : 'Save This Week Only'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearCurrentWeekAvailability}
+                    disabled={
+                      !hasCurrentWeekAvailabilityOverride ||
+                      clearCurrentWeekAvailabilityMutation.isPending
+                    }
+                    className="btn-secondary"
+                  >
+                    {clearCurrentWeekAvailabilityMutation.isPending
+                      ? 'Clearing...'
+                      : 'Clear Temporary Changes'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
           )}
         </>

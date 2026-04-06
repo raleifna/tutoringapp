@@ -23,10 +23,20 @@ export default function AvailabilityCalendar({
   onSelect,
   selectedKey = '',
   selectedKeys = [],
+  currentWeekSlots = [],
+  hasCurrentWeekOverride = false,
+  fixedWeekOffset,
+  hideWeekNavigation = false,
+  title,
 }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const cells = useMemo(() => slotsToCells(slots), [slots]);
+  const [internalWeekOffset, setInternalWeekOffset] = useState(0);
+  const weekOffset = typeof fixedWeekOffset === 'number' ? fixedWeekOffset : internalWeekOffset;
+  const baseCells = useMemo(() => slotsToCells(slots), [slots]);
+  const overrideCells = useMemo(() => slotsToCells(currentWeekSlots), [currentWeekSlots]);
+  const cells = hasCurrentWeekOverride && weekOffset === 0 ? overrideCells : baseCells;
   const activeSelections = selectedKeys.length ? selectedKeys : selectedKey ? [selectedKey] : [];
+  const heading =
+    title || (mode === 'edit' ? 'Weekly availability preview' : 'Pick a slot');
 
   const handleClick = (dayOfWeek, hour) => {
     const key = buildCellKey(dayOfWeek, hour);
@@ -51,18 +61,20 @@ export default function AvailabilityCalendar({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 text-sm">
         <div>
-          <div className="font-medium text-gray-700">{mode === 'edit' ? 'Weekly availability preview' : 'Pick a slot'}</div>
+          <div className="font-medium text-gray-700">{heading}</div>
           <div className="text-xs text-gray-400">{formatWeekRange(weekOffset)}</div>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setWeekOffset((value) => value - 1)} className="btn-secondary btn-sm">Prev</button>
-          <button type="button" onClick={() => setWeekOffset((value) => value + 1)} className="btn-secondary btn-sm">Next</button>
-        </div>
+        {!hideWeekNavigation && typeof fixedWeekOffset !== 'number' && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setInternalWeekOffset((value) => value - 1)} className="btn-secondary btn-sm">Prev</button>
+            <button type="button" onClick={() => setInternalWeekOffset((value) => value + 1)} className="btn-secondary btn-sm">Next</button>
+          </div>
+        )}
       </div>
       <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white p-3">
         <div
-          className="grid min-w-[860px] gap-2 text-xs"
-          style={{ gridTemplateColumns: '56px repeat(7, minmax(110px, 1fr))' }}
+          className="grid min-w-[820px] gap-2 text-xs"
+          style={{ gridTemplateColumns: '58px repeat(7, minmax(104px, 1fr))' }}
         >
           <div />
           {DAY_ORDER.map((dayOfWeek) => (
@@ -91,7 +103,7 @@ export default function AvailabilityCalendar({
 function FragmentRow({ hour, mode, cells, selectedKeys, weekOffset, onClick }) {
   return (
     <>
-      <div className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-400">
+          <div className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-400">
         {String(hour).padStart(2, '0')}:00
       </div>
       {DAY_ORDER.map((dayOfWeek) => {
@@ -106,7 +118,7 @@ function FragmentRow({ hour, mode, cells, selectedKeys, weekOffset, onClick }) {
             type="button"
             disabled={mode === 'view' || disabled}
             onClick={() => onClick(dayOfWeek, hour)}
-            className={`flex h-11 items-center justify-center rounded-lg border px-2 text-center transition-colors ${
+            className={`flex h-9 items-center justify-center rounded-lg border px-2 text-center transition-colors ${
               selected
                 ? 'border-primary-600 bg-primary-100 text-primary-700'
                 : active
