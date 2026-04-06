@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ChatBubbleLeftRightIcon,
+  PaperAirplaneIcon,
+} from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
 
@@ -28,10 +31,12 @@ const formatTime = (value) => {
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [selectedConversationId, setSelectedConversationId] = useState(
     searchParams.get('conversationId') || ''
   );
+  const [messageInput, setMessageInput] = useState('');
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -39,13 +44,50 @@ export default function MessagesPage() {
     enabled: !!user?.id,
   });
 
+  const {
+    data: messagesData,
+    isLoading: messagesLoading,
+    isError: messagesError,
+    error: messagesQueryError,
+  } = useQuery({
+    queryKey: ['messages', selectedConversationId],
+    queryFn: () => messageApi.getMessages(selectedConversationId),
+    enabled: !!selectedConversationId,
+  });
+
   const conversations =
     data?.data?.data?.conversations || data?.data?.data || [];
+  const messages = messagesData?.data?.data?.messages || [];
+  const selectedConversation = conversations.find(
+    (conversation) => conversation.id === selectedConversationId
+  );
+  const selectedPartner = selectedConversation?.participants?.find(
+    (item) => item.userId !== user?.id
+  )?.user;
 
   useEffect(() => {
     const nextId = searchParams.get('conversationId') || '';
     setSelectedConversationId(nextId);
   }, [searchParams]);
+
+  const sendMutation = useMutation({
+    mutationFn: ({ conversationId, content }) =>
+      messageApi.sendMessage(conversationId, { content }),
+    onSuccess: () => {
+      setMessageInput('');
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+    },
+  });
+
+  const handleSend = () => {
+    const content = messageInput.trim();
+    if (!content || !selectedConversationId) return;
+    sendMutation.mutate({
+      conversationId: selectedConversationId,
+      content,
+    });
+  };
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -132,19 +174,115 @@ export default function MessagesPage() {
           )}
         </div>
 
-        <div className="flex min-h-[320px] items-center justify-center p-10 text-center">
-          <div>
-            <ChatBubbleLeftRightIcon className="mx-auto h-12 w-12 text-gray-300" />
-            <h2 className="mt-4 text-lg font-semibold text-gray-900">
-              {selectedConversationId ? 'Chat coming next' : 'Pick a chat'}
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              {selectedConversationId
-                ? 'The message panel will be added in the next step.'
-                : 'Choose a conversation from the list.'}
-            </p>
+        {!selectedConversationId ? (
+          <div className="flex min-h-[320px] items-center justify-center p-10 text-center">
+            <div>
+              <ChatBubbleLeftRightIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <h2 className="mt-4 text-lg font-semibold text-gray-900">Pick a chat</h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Choose a conversation from the list.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex min-h-[520px] flex-col">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src={getAvatarUrl(
+                    selectedPartner?.avatar,
+                    selectedPartner?.firstName,
+                    selectedPartner?.lastName
+                  )}
+                  alt={selectedPartner?.firstName || 'User'}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {selectedPartner?.firstName || 'User'} {selectedPartner?.lastName || ''}
+                  </p>
+                  <p className="text-xs text-gray-500">Conversation</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4">
+              {messagesLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div className="h-14 w-44 rounded-2xl bg-gray-200 animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : messagesError ? (
+                <div className="text-sm text-red-600">
+                  {messagesQueryError?.response?.data?.message || 'Failed to load messages.'}
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-center">
+                  <div>
+                    <ChatBubbleLeftRightIcon className="mx-auto h-10 w-10 text-gray-300" />
+                    <p className="mt-3 text-sm font-medium text-gray-900">No messages yet</p>
+                    <p className="mt-1 text-sm text-gray-500">Say hi to start the chat.</p>
+                  </div>
+                </div>
+              ) : (
+                messages.map((message) => {
+                  const isMine = message.senderId === user?.id;
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
+                          isMine
+                            ? 'rounded-br-sm bg-blue-600 text-white'
+                            : 'rounded-bl-sm bg-white text-gray-900 border border-gray-200'
+                        }`}
+                      >
+                        <p>{message.content}</p>
+                        <p
+                          className={`mt-1 text-xs ${
+                            isMine ? 'text-blue-100' : 'text-gray-400'
+                          }`}
+                        >
+                          {formatTime(message.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 p-4">
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={messageInput}
+                  onChange={(event) => setMessageInput(event.target.value)}
+                  placeholder="Type a message..."
+                  rows={2}
+                  className="input min-h-[48px] flex-1 resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!messageInput.trim() || sendMutation.isPending}
+                  className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  <PaperAirplaneIcon className="h-4 w-4" />
+                  {sendMutation.isPending ? 'Sending' : 'Send'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
