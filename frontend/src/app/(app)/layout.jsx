@@ -17,7 +17,8 @@ import {
   ChatBubbleLeftRightIcon as ChatBubbleLeftRightIconSolid,
   UserIcon as UserIconSolid,
 } from '@heroicons/react/24/solid';
-import { useAuthStore } from '../../lib/store';
+import { messageApi } from '../../lib/api-entry';
+import { useAuthStore, useMessageStore } from '../../lib/store';
 
 const isGuestBrowsePath = (pathname = '') =>
   pathname === '/search' || pathname.startsWith('/tutors/');
@@ -68,6 +69,8 @@ export default function AppLayout({ children }) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const unreadCount = useMessageStore((state) => state.unreadCount);
+  const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -83,6 +86,31 @@ export default function AppLayout({ children }) {
 
     router.replace('/login');
   }, [mounted, isGuestPath, accessToken, router]);
+
+  useEffect(() => {
+    if (!accessToken || !user || user.role === 'ADMIN') return;
+
+    let cancelled = false;
+
+    const loadUnread = async () => {
+      try {
+        const res = await messageApi.getUnreadCount();
+        if (!cancelled) {
+          setUnreadCount(res?.data?.data?.count || 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    loadUnread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, pathname, setUnreadCount, user]);
 
   if (!mounted) {
     return <div className="min-h-screen" />;
@@ -130,7 +158,14 @@ export default function AppLayout({ children }) {
                   href={item.href}
                   className="flex flex-1 flex-col items-center justify-center gap-1 py-1"
                 >
-                  <Icon className={`h-5 w-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                  <div className="relative">
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                    {item.href === '/messages' && unreadCount > 0 && (
+                      <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-[11px] ${isActive ? 'font-semibold text-primary-600' : 'text-gray-400'}`}
                   >

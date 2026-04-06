@@ -8,7 +8,7 @@ import {
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
-import { useAuthStore } from '../../../lib/store';
+import { useAuthStore, useMessageStore } from '../../../lib/store';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -33,10 +33,12 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [selectedConversationId, setSelectedConversationId] = useState(
     searchParams.get('conversationId') || ''
   );
   const [messageInput, setMessageInput] = useState('');
+  const requestedUserId = searchParams.get('userId') || '';
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -69,6 +71,71 @@ export default function MessagesPage() {
     const nextId = searchParams.get('conversationId') || '';
     setSelectedConversationId(nextId);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!requestedUserId || !user?.id || selectedConversationId) return;
+
+    let cancelled = false;
+
+    messageApi
+      .createConversation(requestedUserId)
+      .then((res) => {
+        if (cancelled) return;
+        const conversationId = res?.data?.data?.id || '';
+        if (!conversationId) return;
+        setSelectedConversationId(conversationId);
+        router.replace(`/messages?conversationId=${conversationId}`);
+        queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient, requestedUserId, router, selectedConversationId, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUnread = async () => {
+      if (!user?.id) return;
+      try {
+        const res = await messageApi.getUnreadCount();
+        if (!cancelled) {
+          setUnreadCount(res?.data?.data?.count || 0);
+        }
+      } catch {}
+    };
+
+    syncUnread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setUnreadCount, user?.id]);
+
+  useEffect(() => {
+    if (!selectedConversationId) return;
+
+    let cancelled = false;
+
+    const markRead = async () => {
+      try {
+        await messageApi.markAsRead(selectedConversationId);
+        const res = await messageApi.getUnreadCount();
+        if (!cancelled) {
+          setUnreadCount(res?.data?.data?.count || 0);
+        }
+        queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+      } catch {}
+    };
+
+    markRead();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient, selectedConversationId, setUnreadCount, user?.id]);
 
   const sendMutation = useMutation({
     mutationFn: ({ conversationId, content }) =>
@@ -132,6 +199,7 @@ export default function MessagesPage() {
                 )?.user;
                 const lastMessage = conversation.lastMessage || conversation.messages?.[0];
                 const isSelected = selectedConversationId === conversation.id;
+                const unread = conversation.unreadCount || 0;
 
                 return (
                   <button
@@ -144,26 +212,33 @@ export default function MessagesPage() {
                     className={`flex w-full items-start gap-3 px-4 py-4 text-left transition ${
                       isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                     }`}
-                  >
-                    <img
-                      src={getAvatarUrl(
-                        partner?.avatar,
-                        partner?.firstName,
-                        partner?.lastName
+                    >
+                    <div className="relative">
+                      <img
+                        src={getAvatarUrl(
+                          partner?.avatar,
+                          partner?.firstName,
+                          partner?.lastName
+                        )}
+                        alt={partner?.firstName || 'User'}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                      {unread > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                          {unread > 9 ? '9+' : unread}
+                        </span>
                       )}
-                      alt={partner?.firstName || 'User'}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-gray-900">
+                        <p className={`truncate text-sm ${unread > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                           {partner?.firstName || 'User'} {partner?.lastName || ''}
                         </p>
                         <span className="shrink-0 text-xs text-gray-400">
                           {formatTime(lastMessage?.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-1 truncate text-sm text-gray-500">
+                      <p className={`mt-1 truncate text-sm ${unread > 0 ? 'font-medium text-gray-700' : 'text-gray-500'}`}>
                         {lastMessage?.content || 'No messages yet'}
                       </p>
                     </div>
