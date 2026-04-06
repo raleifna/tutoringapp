@@ -22,6 +22,16 @@ router.put(
 );
 router.put('/me/profile', authorize('TUTOR'), tutorController.updateProfile);
 router.put('/me/availability', authorize('TUTOR'), tutorController.updateAvailability);
+router.put(
+  '/me/availability/current-week',
+  authorize('TUTOR'),
+  tutorController.updateCurrentWeekAvailability
+);
+router.delete(
+  '/me/availability/current-week',
+  authorize('TUTOR'),
+  tutorController.clearCurrentWeekAvailability
+);
 router.post('/me/subjects', authorize('TUTOR'), tutorController.addSubject);
 router.delete('/me/subjects/:subjectId', authorize('TUTOR'), tutorController.removeSubject);
 

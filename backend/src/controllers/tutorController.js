@@ -24,6 +24,126 @@ const normalizeDayOfWeek = (value) => {
   throw new AppError('Invalid day of week', 400);
 };
 
+const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;
+
+const readHour = (value, { allow24 = false } = {}) => {
+  const [rawHour, rawMinute] = String(value || '').trim().split(':');
+  const hour = Number.parseInt(rawHour, 10);
+  const minute = Number.parseInt(rawMinute, 10);
+
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    minute !== 0 ||
+    hour < 0 ||
+    hour > (allow24 ? 24 : 23) ||
+    (!allow24 && hour === 24)
+  ) {
+    throw new AppError('Availability time must use whole hours like 09:00 or 24:00', 400);
+  }
+
+  return hour;
+};
+
+const normalizeAvailabilitySlots = (availability) => {
+  if (availability == null) return [];
+  if (!Array.isArray(availability)) throw new AppError('Availability must be an array', 400);
+
+  const normalized = availability
+    .map((slot) => {
+      const dayOfWeek = normalizeDayOfWeek(slot?.dayOfWeek);
+      const startHour = readHour(slot?.startTime);
+      const endHour = readHour(slot?.endTime, { allow24: true });
+
+      if (endHour <= startHour) {
+        throw new AppError('Availability end time must be after start time', 400);
+      }
+
+      return {
+        dayOfWeek,
+        startHour,
+        endHour,
+        timezone: slot?.timezone || 'UTC',
+      };
+    })
+    .sort((left, right) => {
+      if (left.dayOfWeek !== right.dayOfWeek) return left.dayOfWeek - right.dayOfWeek;
+      if (left.startHour !== right.startHour) return left.startHour - right.startHour;
+      return left.endHour - right.endHour;
+    });
+
+  return normalized.reduce((merged, slot) => {
+    const previous = merged[merged.length - 1];
+
+    if (
+      previous &&
+      previous.dayOfWeek === slot.dayOfWeek &&
+      previous.timezone === slot.timezone &&
+      slot.startHour <= previous.endHour
+    ) {
+      previous.endHour = Math.max(previous.endHour, slot.endHour);
+      return merged;
+    }
+
+    merged.push({ ...slot });
+    return merged;
+  }, []).map((slot) => ({
+    dayOfWeek: slot.dayOfWeek,
+    startTime: formatHour(slot.startHour),
+    endTime: formatHour(slot.endHour),
+    timezone: slot.timezone,
+  }));
+};
+
+const getCurrentWeekStart = (date = new Date()) => {
+  const start = new Date(date);
+  const dayOffset = (start.getDay() + 6) % 7;
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - dayOffset);
+  return start;
+};
+
+const availabilityOrderBy = [{ dayOfWeek: 'asc' }, { startTime: 'asc' }];
+
+const serializeAvailabilitySlots = (slots = [], defaultTimezone) =>
+  slots.map((slot) => ({
+    dayOfWeek: slot.dayOfWeek,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    timezone: slot.timezone || defaultTimezone || 'UTC',
+  }));
+
+const getCurrentWeekAvailabilityOverride = (tutorId) =>
+  prisma.tutorAvailabilityOverrideWeek.findUnique({
+    where: {
+      tutorId_weekStart: {
+        tutorId,
+        weekStart: getCurrentWeekStart(),
+      },
+    },
+    include: {
+      slots: {
+        orderBy: availabilityOrderBy,
+      },
+    },
+  });
+
+const buildAvailabilityState = (baseAvailability = [], currentWeekOverride = null) => {
+  const availability = serializeAvailabilitySlots(baseAvailability);
+  const currentWeekAvailabilityOverride = currentWeekOverride
+    ? serializeAvailabilitySlots(currentWeekOverride.slots, currentWeekOverride.timezone)
+    : [];
+
+  return {
+    availability,
+    currentWeekAvailabilityOverride,
+    currentWeekEffectiveAvailability: currentWeekOverride
+      ? currentWeekAvailabilityOverride
+      : availability,
+    hasCurrentWeekAvailabilityOverride: Boolean(currentWeekOverride),
+  };
+};
+
 const normalizeSubjectLevel = (value) => {
   if (!value) return 'all';
 
@@ -69,7 +189,9 @@ const tutorProfileSelect = {
   subjects: {
     include: { subject: true },
   },
-  availability: true,
+  availability: {
+    orderBy: availabilityOrderBy,
+  },
 };
 
 const REVIEW_ACTIONS = ['TUTOR_PROFILE_RETURNED', 'TUTOR_REJECTED', 'TUTOR_APPROVED'];
@@ -238,7 +360,17 @@ exports.getMyProfile = async (req, res) => {
   ]);
 
   if (!profile) throw new AppError('Tutor profile not found', 404);
-  res.json({ success: true, data: { ...profile, latestReviewAction } });
+
+  const currentWeekOverride = await getCurrentWeekAvailabilityOverride(profile.id);
+
+  res.json({
+    success: true,
+    data: {
+      ...profile,
+      ...buildAvailabilityState(profile.availability, currentWeekOverride),
+      latestReviewAction,
+    },
+  });
 };
 
 exports.updateApplication = async (req, res) => {
@@ -346,37 +478,138 @@ exports.updateProfile = async (req, res) => {
 
 exports.updateAvailability = async (req, res) => {
   const availability = Array.isArray(req.body) ? req.body : req.body.availability;
+  const normalizedAvailability = normalizeAvailabilitySlots(availability);
 
   const profile = await prisma.tutorProfile.findUnique({
     where: { userId: req.user.id },
   });
   ensureTutorProfileEditable(profile);
 
-  await prisma.tutorAvailability.deleteMany({ where: { tutorId: profile.id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.tutorAvailability.deleteMany({ where: { tutorId: profile.id } });
 
-  if (availability && availability.length > 0) {
-    await prisma.tutorAvailability.createMany({
-      data: availability.map((a) => ({
-        tutorId: profile.id,
-        dayOfWeek: normalizeDayOfWeek(a.dayOfWeek),
-        startTime: a.startTime,
-        endTime: a.endTime,
-        timezone: a.timezone || 'UTC',
-      })),
-    });
-  }
+    if (normalizedAvailability.length > 0) {
+      await tx.tutorAvailability.createMany({
+        data: normalizedAvailability.map((slot) => ({
+          tutorId: profile.id,
+          dayOfWeek: slot.dayOfWeek,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          timezone: slot.timezone,
+        })),
+      });
+    }
+  });
 
-  const updated = await prisma.tutorAvailability.findMany({ where: { tutorId: profile.id } });
+  const updated = await prisma.tutorAvailability.findMany({
+    where: { tutorId: profile.id },
+    orderBy: availabilityOrderBy,
+  });
   res.json({ success: true, data: updated });
+};
+
+exports.updateCurrentWeekAvailability = async (req, res) => {
+  const availability = Array.isArray(req.body) ? req.body : req.body.availability;
+  const normalizedAvailability = normalizeAvailabilitySlots(availability);
+
+  const profile = await prisma.tutorProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+  ensureTutorProfileEditable(profile);
+
+  const weekStart = getCurrentWeekStart();
+
+  const updated = await prisma.tutorAvailabilityOverrideWeek.upsert({
+    where: {
+      tutorId_weekStart: {
+        tutorId: profile.id,
+        weekStart,
+      },
+    },
+    create: {
+      tutorId: profile.id,
+      weekStart,
+      timezone: 'UTC',
+      ...(normalizedAvailability.length > 0
+        ? {
+            slots: {
+              create: normalizedAvailability.map((slot) => ({
+                dayOfWeek: slot.dayOfWeek,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+              })),
+            },
+          }
+        : {}),
+    },
+    update: {
+      timezone: 'UTC',
+      slots: {
+        deleteMany: {},
+        ...(normalizedAvailability.length > 0
+          ? {
+              create: normalizedAvailability.map((slot) => ({
+                dayOfWeek: slot.dayOfWeek,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+              })),
+            }
+          : {}),
+      },
+    },
+    include: {
+      slots: {
+        orderBy: availabilityOrderBy,
+      },
+    },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      currentWeekAvailabilityOverride: serializeAvailabilitySlots(updated.slots, updated.timezone),
+      hasCurrentWeekAvailabilityOverride: true,
+    },
+  });
+};
+
+exports.clearCurrentWeekAvailability = async (req, res) => {
+  const profile = await prisma.tutorProfile.findUnique({
+    where: { userId: req.user.id },
+  });
+  ensureTutorProfileEditable(profile);
+
+  await prisma.tutorAvailabilityOverrideWeek.deleteMany({
+    where: {
+      tutorId: profile.id,
+      weekStart: getCurrentWeekStart(),
+    },
+  });
+
+  res.json({
+    success: true,
+    message: 'Current week availability override cleared',
+  });
 };
 
 exports.getTutorAvailability = async (req, res) => {
   const profile = await prisma.tutorProfile.findFirst({
     where: { OR: [{ id: req.params.id }, { userId: req.params.id }] },
-    include: { availability: true },
+    select: {
+      id: true,
+      availability: {
+        orderBy: availabilityOrderBy,
+      },
+    },
   });
   if (!profile) throw new AppError('Tutor not found', 404);
-  res.json({ success: true, data: profile.availability });
+
+  const currentWeekOverride = await getCurrentWeekAvailabilityOverride(profile.id);
+
+  res.json({
+    success: true,
+    data: buildAvailabilityState(profile.availability, currentWeekOverride),
+  });
 };
 
 exports.addSubject = async (req, res) => {
