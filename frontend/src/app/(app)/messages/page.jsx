@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { io } from 'socket.io-client';
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
 import { useAuthStore, useMessageStore } from '../../../lib/store';
+
+let socket = null;
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -28,17 +31,33 @@ const formatTime = (value) => {
   }).format(date);
 };
 
+const getSocketUrl = () => {
+  if (typeof window === 'undefined') return '';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+  if (!apiUrl || apiUrl.startsWith('/')) return window.location.origin;
+
+  try {
+    return new URL(apiUrl).origin;
+  } catch {
+    return window.location.origin;
+  }
+};
+
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
+  const incrementUnread = useMessageStore((state) => state.incrementUnread);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [selectedConversationId, setSelectedConversationId] = useState(
     searchParams.get('conversationId') || ''
   );
   const [messageInput, setMessageInput] = useState('');
+  const [partnerTyping, setPartnerTyping] = useState(false);
   const requestedUserId = searchParams.get('userId') || '';
+  const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -137,6 +156,61 @@ export default function MessagesPage() {
     };
   }, [queryClient, selectedConversationId, setUnreadCount, user?.id]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+
+    socket = io(getSocketUrl(), {
+      auth: { token: accessToken },
+    });
+
+    socket.on('new_message', (message) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', message.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
+
+      if (message.conversationId !== selectedConversationId) {
+        incrementUnread();
+        return;
+      }
+
+      messageApi
+        .markAsRead(message.conversationId)
+        .then(() => messageApi.getUnreadCount())
+        .then((res) => setUnreadCount(res?.data?.data?.count || 0))
+        .catch(() => {});
+    });
+
+    socket.on('user_typing', ({ conversationId, userId, isTyping }) => {
+      if (conversationId === selectedConversationId && userId !== user?.id) {
+        setPartnerTyping(Boolean(isTyping));
+      }
+    });
+
+    return () => {
+      socket?.disconnect();
+      socket = null;
+    };
+  }, [accessToken, incrementUnread, queryClient, selectedConversationId, setUnreadCount, user?.id]);
+
+  useEffect(() => {
+    if (!socket || !selectedConversationId) return;
+
+    socket.emit('join_conversation', selectedConversationId);
+
+    return () => {
+      socket?.emit('leave_conversation', selectedConversationId);
+    };
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, partnerTyping]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
   const sendMutation = useMutation({
     mutationFn: ({ conversationId, content }) =>
       messageApi.sendMessage(conversationId, { content }),
@@ -154,6 +228,15 @@ export default function MessagesPage() {
       conversationId: selectedConversationId,
       content,
     });
+  };
+
+  const handleTyping = () => {
+    if (!socket || !selectedConversationId) return;
+    socket.emit('typing', { conversationId: selectedConversationId, isTyping: true });
+    clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket?.emit('typing', { conversationId: selectedConversationId, isTyping: false });
+    }, 1200);
   };
 
   return (
@@ -334,13 +417,32 @@ export default function MessagesPage() {
                   );
                 })
               )}
+              {partnerTyping && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-sm border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                    typing...
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="border-t border-gray-100 p-4">
               <div className="flex items-end gap-2">
                 <textarea
                   value={messageInput}
-                  onChange={(event) => setMessageInput(event.target.value)}
+                  onChange={(event) => {
+                    setMessageInput(event.target.value);
+                    handleTyping();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      handleSend();
+                    } else {
+                      handleTyping();
+                    }
+                  }}
                   placeholder="Type a message..."
                   rows={2}
                   className="input min-h-[48px] flex-1 resize-none"
