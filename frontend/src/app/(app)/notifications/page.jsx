@@ -15,135 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import toast from 'react-hot-toast';
-
-// Mock notification API - replace with actual API calls
-const notificationApi = {
-  getMyNotifications: async ({ status = '', page = 1, limit = 10 }) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Mock data structure
-    const mockNotifications = [
-      {
-        id: 1,
-        type: 'booking',
-        title: 'New Booking Request',
-        message: 'John Smith requested a Math session for tomorrow at 2:00 PM',
-        timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-        read: false,
-        status: 'unread',
-        link: '/tutor/requests'
-      },
-      {
-        id: 2,
-        type: 'booking',
-        title: 'Booking Confirmed',
-        message: 'Your Science session with Dr. Brown has been confirmed for Friday',
-        timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-        read: false,
-        status: 'unread',
-        link: '/bookings'
-      },
-      {
-        id: 3,
-        type: 'system',
-        title: 'System Update',
-        message: 'New features available! Check out the updated dashboard with improved notifications',
-        timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-        read: true,
-        status: 'read',
-        link: '/dashboard'
-      },
-      {
-        id: 4,
-        type: 'message',
-        title: 'New Message',
-        message: 'You have a new message from your tutor regarding the upcoming session',
-        timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-        read: true,
-        status: 'read',
-        link: '/messages'
-      },
-      {
-        id: 5,
-        type: 'booking',
-        title: 'Session Reminder',
-        message: 'Your English session starts in 1 hour. Please prepare your materials',
-        timestamp: new Date(Date.now() - 86400000), // 1 day ago
-        read: true,
-        status: 'read',
-        link: '/bookings'
-      },
-      {
-        id: 6,
-        type: 'payment',
-        title: 'Payment Received',
-        message: 'Payment of $50.00 has been processed for your tutoring session',
-        timestamp: new Date(Date.now() - 172800000), // 2 days ago
-        read: true,
-        status: 'read',
-        link: '/payments'
-      },
-      {
-        id: 7,
-        type: 'review',
-        title: 'New Review Received',
-        message: 'Sarah Johnson left a 5-star review for your recent session',
-        timestamp: new Date(Date.now() - 259200000), // 3 days ago
-        read: false,
-        status: 'unread',
-        link: '/reviews'
-      },
-      {
-        id: 8,
-        type: 'system',
-        title: 'Profile Reminder',
-        message: 'Complete your profile to get more tutoring opportunities',
-        timestamp: new Date(Date.now() - 345600000), // 4 days ago
-        read: true,
-        status: 'read',
-        link: '/profile'
-      }
-    ];
-
-    // Filter by status
-    let filteredNotifications = mockNotifications;
-    if (status === 'unread') {
-      filteredNotifications = mockNotifications.filter(n => !n.read);
-    } else if (status === 'read') {
-      filteredNotifications = mockNotifications.filter(n => n.read);
-    }
-
-    // Pagination logic
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
-    
-    return {
-      data: {
-        data: {
-          notifications: paginatedNotifications,
-          pagination: {
-            page,
-            limit,
-            total: filteredNotifications.length,
-            totalPages: Math.ceil(filteredNotifications.length / limit)
-          }
-        }
-      }
-    };
-  },
-  
-  markAsRead: async (notificationId) => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return { data: { success: true } };
-  },
-  
-  markAllAsRead: async () => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return { data: { success: true } };
-  }
-};
+import { notificationApi } from '../../../lib/api';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
@@ -159,6 +31,11 @@ const getInitialStatus = (value) => {
 };
 
 const formatTimeAgo = (timestamp) => {
+  // timestamp is string, convert to Date object
+  if (typeof timestamp === 'string') {
+    timestamp = new Date(timestamp);
+  }
+
   const now = new Date();
   const diff = now - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -231,7 +108,7 @@ function NotificationsPageContent() {
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['notifications', currentUserId, activeStatus, page],
-    queryFn: () => notificationApi.getMyNotifications({ 
+    queryFn: () => notificationApi.search({ 
       status: activeStatus, 
       page, 
       limit: 10 
@@ -257,7 +134,7 @@ function NotificationsPageContent() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await notificationApi.markAllAsRead();
+      await notificationApi.markAsRead('all');
       refetch();
       toast.success('All notifications marked as read');
     } catch (error) {
@@ -286,15 +163,23 @@ function NotificationsPageContent() {
         
         
         <div className='flex justify-between'>
-        <p className="text-gray-600 mt-1">Stay updated with your tutoring activities</p>
-            <button
-                onClick={handleMarkAllAsRead}
-                className="btn-secondary btn-sm gap-1.5"
-                disabled={isFetching}
-            >
-                <CheckCircleIcon className="w-4 h-4" />
-                Mark All as Read
-            </button>
+          <p className="text-gray-600 mt-1">Stay updated with your tutoring activities</p>
+          <button
+              onClick={handleMarkAllAsRead}
+              className="btn-secondary btn-sm gap-1.5"
+              disabled={isFetching}
+          >
+              <CheckCircleIcon className="w-4 h-4" />
+              Mark All as Read
+          </button>
+          <button
+              onClick={async () => { await notificationApi.addTestsData(); refetch(); }}
+              className="btn-secondary btn-sm gap-1.5"
+              disabled={isFetching}
+          >
+              <CheckCircleIcon className="w-4 h-4" />
+              Add 20 Test Data
+          </button>
         </div>
       </div>
 

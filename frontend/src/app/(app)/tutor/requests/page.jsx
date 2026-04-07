@@ -139,12 +139,13 @@ function TutorRequestsContent() {
 
   return (
     <div className="relative space-y-5">
-      <Link href="/tutor/dashboard" className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-        <span>←</span> Back
-      </Link>
-
       <div className="pl-4">
-        <h1 className="text-2xl font-bold text-gray-900">Booking Requests</h1>
+        <div className='flex'>
+          <h1 className="text-2xl font-bold text-gray-900 flex-1">Booking Requests</h1>
+          <Link href="/tutor/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+            <span>←</span> Back
+          </Link>
+        </div>
         <p className="text-gray-600 mt-1">Manage session requests from learners</p>
       </div>
 
