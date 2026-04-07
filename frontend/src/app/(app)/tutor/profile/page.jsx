@@ -381,12 +381,13 @@ export default function TutorProfilePage() {
 
   return (
     <div className="relative max-w-3xl mx-auto space-y-5">
-      <Link href="/tutor/dashboard" className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-        <span>←</span> Back
-      </Link>
-
       <div>
-          <h1 className="page-title">Tutor Profile</h1>
+        <div className='flex'>
+          <h1 className="page-title flex-1">Tutor Profile</h1>
+          <Link href="/tutor/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+            <span>←</span> Back
+          </Link>
+        </div>
         <p className="text-gray-600 mt-1">
           Status:{' '}
             <span

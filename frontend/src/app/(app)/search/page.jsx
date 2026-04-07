@@ -306,19 +306,18 @@ function SearchPageContent() {
 
   return (
     <div className="relative min-h-screen px-4 py-6 max-w-4xl mx-auto">
-      <button
-        type="button"
-        onClick={handleBack}
-        className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-      >
-        <span>←</span> Back
-      </button>
-
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="flex items-center gap-2">
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
-          <h1 className="text-xl font-bold text-gray-900">Find Tutors</h1>
+          <h1 className="text-xl font-bold text-gray-900 flex-1">Find Tutors</h1>
           {isFetching && !isLoading && <span className="text-xs text-gray-400">Updating...</span>}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+          >
+            <span>←</span> Back
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

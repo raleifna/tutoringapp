@@ -219,10 +219,11 @@ export default function TutorDetailPage() {
 
   return (
     <div className="relative max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <Link href={backHref} className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-        <span>←</span> {backLabel}
-      </Link>
-
+      <div className='flex justify-content-end'>
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+            <span>←</span> {backLabel}
+          </Link>
+      </div>
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
         <div className="flex flex-col sm:flex-row gap-5">
           <img
