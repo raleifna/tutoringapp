@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "start": "pnpm run db:push && node server.js",
     "dev": "pnpm run db:push && node --watch server.js"

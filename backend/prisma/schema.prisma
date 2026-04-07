@@ -179,6 +179,7 @@ model TutorProfile {
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects     TutorSubject[]
   availability TutorAvailability[]
+  availabilityOverrides TutorAvailabilityOverrideWeek[]
   bookings     Booking[]         @relation("TutorBookings")
 
   @@index([status])
@@ -226,6 +227,35 @@ model TutorAvailability {
 
   @@index([tutorId])
   @@map("tutor_availability")
+}
+
+model TutorAvailabilityOverrideWeek {
+  id        String   @id @default(uuid())
+  tutorId   String
+  weekStart DateTime
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tutor TutorProfile                  @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  slots TutorAvailabilityOverrideSlot[]
+
+  @@unique([tutorId, weekStart])
+  @@index([tutorId, weekStart])
+  @@map("tutor_availability_override_weeks")
+}
+
+model TutorAvailabilityOverrideSlot {
+  id             String @id @default(uuid())
+  overrideWeekId String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+
+  overrideWeek TutorAvailabilityOverrideWeek @relation(fields: [overrideWeekId], references: [id], onDelete: Cascade)
+
+  @@index([overrideWeekId])
+  @@map("tutor_availability_override_slots")
 }
 
 // ==================== BOOKINGS ====================

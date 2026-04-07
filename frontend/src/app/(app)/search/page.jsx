@@ -1,7 +1,7 @@
 // src/app/(app)/search/page.jsx - Tutor search page
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -28,6 +28,178 @@ const SORT_OPTIONS = [
   { value: 'rate_desc', label: 'Price high to low' },
   { value: 'experience', label: 'Most experienced' },
 ];
+
+export const locationOptions = [
+  {
+    value: 'United States',
+    label: 'United States',
+    children: [
+      {
+        value: 'California',
+        label: 'California',
+        children: [
+          { value: 'Los Angeles', label: 'Los Angeles' },
+          { value: 'San Francisco', label: 'San Francisco' }
+        ]
+      },
+      {
+        value: 'New York',
+        label: 'New York',
+        children: [
+          { value: 'New York City', label: 'New York City' },
+          { value: 'Buffalo', label: 'Buffalo' }
+        ]
+      }
+    ]
+  },
+  {
+    value: 'United Kingdom',
+    label: 'United Kingdom',
+    children: [
+      {
+        value: 'England',
+        label: 'England',
+        children: [
+          { value: 'London', label: 'London' },
+          { value: 'Manchester', label: 'Manchester' }
+        ]
+      }
+    ]
+  },
+  {
+    value: 'China',
+    label: 'China',
+    children: [
+      {
+        value: 'Guangdong',
+        label: 'Guangdong',
+        children: [
+          { value: 'Guangzhou', label: 'Guangzhou' },
+          { value: 'Shenzhen', label: 'Shenzhen' }
+        ]
+      }
+    ]
+  },
+  {
+    value: 'Australia',
+    label: 'Australia',
+    children: [
+      {
+        value: 'New South Wales',
+        label: 'New South Wales',
+        children: [
+          { value: 'Sydney', label: 'Sydney' },
+          { value: 'Newcastle', label: 'Newcastle' }
+        ]
+      }
+    ]
+  }
+];
+
+const LocationCascader = ({ value, updateFilter }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedPath, setSelectedPath] = useState([]); 
+  const [activePath, setActivePath] = useState([]);     
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedPath([]);
+      setActivePath([]);
+    }
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleOptionClick = (option, level) => {
+    const newActivePath = activePath.slice(0, level);
+    newActivePath.push(option);
+    setActivePath(newActivePath);
+
+    if (!option.children || option.children.length === 0) {
+      setSelectedPath(newActivePath);
+      setIsOpen(false); 
+      const locationString = newActivePath.map(item => item.label).reverse()[0];
+      updateFilter('location', locationString);
+    }
+  };
+  const getColumns = () => {
+    const columns = [locationOptions]; 
+    let currentOptions = locationOptions;
+
+    activePath.forEach(selectedItem => {
+      const option = currentOptions.find(opt => opt.value === selectedItem.value);
+      if (option && option.children) {
+        columns.push(option.children);
+        currentOptions = option.children;
+      }
+    });
+
+    return columns;
+  };
+
+  const displayValue = selectedPath.length > 0 
+    ? selectedPath.map(item => item.label).join(' / ') 
+    : '';
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <div 
+        className="w-full p-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex justify-between items-center hover:border-blue-400 transition-colors"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen && selectedPath.length > 0) {
+            setActivePath(selectedPath);
+          }
+        }}
+      >
+        <span className={displayValue ? "text-gray-900" : "text-gray-400"}>
+          {displayValue || "e.g. Sydney"}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 bg-white border border-gray-200 shadow-lg rounded-md flex overflow-hidden">
+          {getColumns().map((columnOptions, level) => (
+            <ul 
+              key={level} 
+              className="min-w-[150px] max-h-64 overflow-y-auto border-r border-gray-100 last:border-r-0 py-1"
+            >
+              {columnOptions.map(option => {
+                const isActive = activePath[level]?.value === option.value;
+                return (
+                  <li
+                    key={option.value}
+                    onClick={() => handleOptionClick(option, level)}
+                    className={`px-4 py-2 cursor-pointer text-sm flex justify-between items-center transition-colors
+                      ${isActive ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {option.label}
+                    {option.children && (
+                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function SearchPage() {
   return (
@@ -134,19 +306,18 @@ function SearchPageContent() {
 
   return (
     <div className="relative min-h-screen px-4 py-6 max-w-4xl mx-auto">
-      <button
-        type="button"
-        onClick={handleBack}
-        className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-      >
-        <span>←</span> Back
-      </button>
-
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="flex items-center gap-2">
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
-          <h1 className="text-xl font-bold text-gray-900">Find Tutors</h1>
+          <h1 className="text-xl font-bold text-gray-900 flex-1">Find Tutors</h1>
           {isFetching && !isLoading && <span className="text-xs text-gray-400">Updating...</span>}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+          >
+            <span>←</span> Back
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -165,13 +336,7 @@ function SearchPageContent() {
           </div>
           <div>
             <label className="label">Location</label>
-            <input
-              type="text"
-              value={filters.location}
-              onChange={(event) => updateFilter('location', event.target.value)}
-              className="input"
-              placeholder="e.g. Sydney"
-            />
+            <LocationCascader value={filters.location} updateFilter={updateFilter} />
           </div>
           <div>
             <label className="label">Session Type</label>

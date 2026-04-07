@@ -1,4 +1,5 @@
 const express = require('express');
+require('express-async-errors');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -20,6 +21,9 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(normalizeOrigin)
   .filter(Boolean);
+
+// Print allowed origins for debugging
+console.log('Allowed CORS origins:', allowedOrigins);
 
 app.set('trust proxy', 1);
 app.use(helmet());

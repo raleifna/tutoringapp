@@ -213,6 +213,14 @@ exports.cancelBooking = async (req, res) => {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
 
+  // if is learner,booking is accepted, can't cancel within 24 hours of scheduled time
+  const now = new Date();
+  const scheduledTime = new Date(booking.scheduledAt);
+  const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
+  if (isLearner && booking.status === 'ACCEPTED' && hoursUntilSession < 24) {
+    throw new AppError('Cannot cancel accepted booking within 24 hours of the session', 400);
+  }
+
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
     data: {

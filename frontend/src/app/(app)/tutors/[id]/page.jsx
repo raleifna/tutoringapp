@@ -10,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
+  ArrowLeftIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckBadgeIcon,
@@ -21,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 
 const bookingSchema = z.object({
   subjectId: z.string().min(1, 'Please select a subject'),
@@ -73,6 +75,7 @@ export default function TutorDetailPage() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('about');
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [selectedSlots, setSelectedSlots] = useState([]);
   const from = searchParams.get('from');
   const searchFrom = (searchParams.get('searchFrom') || '').toLowerCase();
   const isFromTutorDashboard = from === 'tutor-dashboard';
@@ -107,7 +110,12 @@ export default function TutorDetailPage() {
   });
 
   const tutor = tutorData?.data?.data;
-  const availability = availabilityData?.data?.data || [];
+  const availabilityState = availabilityData?.data?.data || {};
+  const availability = availabilityState?.availability || [];
+  const currentWeekAvailability = availabilityState?.currentWeekEffectiveAvailability || availability;
+  const hasCurrentWeekAvailabilityOverride = Boolean(
+    availabilityState?.hasCurrentWeekAvailabilityOverride
+  );
   const isSelf = !!user && (user.id === tutor?.userId || user.id === tutor?.user?.id);
   const isLearner = user?.role === 'LEARNER';
   const isGuest = !user;
@@ -115,6 +123,7 @@ export default function TutorDetailPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
     reset,
   } = useForm({
@@ -130,6 +139,10 @@ export default function TutorDetailPage() {
 
   const bookMutation = useMutation({
     mutationFn: (data) => {
+      if (!selectedSlots.length) {
+        throw new Error('Please select at least one available time slot');
+      }
+
       const selectedSubject = tutor?.subjects?.find((item) => {
         const subjectId = String(item?.subjectId || item?.subject?.id || item?.id || '');
         return subjectId === String(data.subjectId);
@@ -140,24 +153,35 @@ export default function TutorDetailPage() {
         throw new Error('Please select a valid subject');
       }
 
-      return bookingApi.create({
-        tutorId: id,
-        subjectId: data.subjectId,
-        subject: selectedSubjectName,
-        sessionType: data.sessionType,
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
-        duration: Number(data.duration),
-        notes: data.notes,
-      });
+      return Promise.all(
+        selectedSlots.map((slot) =>
+          bookingApi.create({
+            tutorId: id,
+            subjectId: data.subjectId,
+            subject: selectedSubjectName,
+            sessionType: data.sessionType,
+            scheduledAt: slot.date.toISOString(),
+            duration: Number(data.duration),
+            notes: data.notes,
+          })
+        )
+      );
     },
-    onSuccess: (res) => {
-      toast.success('Booking request sent!');
+    onSuccess: (responses) => {
+      toast.success(
+        selectedSlots.length > 1
+          ? `${selectedSlots.length} booking requests sent!`
+          : 'Booking request sent!'
+      );
       reset();
+      setSelectedSlots([]);
       setShowBookingForm(false);
-      const bookingId = res?.data?.data?.id;
-      if (bookingId) {
+      const bookingId = responses?.[0]?.data?.data?.id;
+      if (responses?.length === 1 && bookingId) {
         router.push(`/bookings/${bookingId}`);
+        return;
       }
+      router.push('/bookings');
     },
     onError: (err) => {
       const message =
@@ -184,6 +208,18 @@ export default function TutorDetailPage() {
   const requireLogin = () => {
     toast('Please log in to book a session.');
     router.push(`/login?next=/tutors/${id}`);
+  };
+
+  const handleSlotSelect = (slot) => {
+    setSelectedSlots((current) => {
+      const exists = current.some((item) => item.key === slot.key);
+      const next = exists
+        ? current.filter((item) => item.key !== slot.key)
+        : [...current, slot].sort((left, right) => left.date - right.date);
+
+      setValue('scheduledAt', next[0]?.date.toISOString() || '', { shouldValidate: true });
+      return next;
+    });
   };
 
   if (isLoading) {
@@ -231,8 +267,17 @@ export default function TutorDetailPage() {
   }
 
   return (
-    <div className="relative max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <Link href={backHref} className="absolute top-6 right-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+      <div className="flex justify-end">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          {backLabel}
+        </Link>
+      </div>
+      <Link href={backHref} className="hidden">
         <span>←</span> {backLabel}
       </Link>
 
@@ -291,7 +336,11 @@ export default function TutorDetailPage() {
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => (isGuest ? requireLogin() : setShowBookingForm(true))}
+                  onClick={() => {
+                    if (isGuest) return requireLogin();
+                    setSelectedSlots([]);
+                    setShowBookingForm(true);
+                  }}
                   className="btn-primary inline-flex items-center gap-2"
                 >
                   <CalendarDaysIcon className="w-4 h-4" />
@@ -460,7 +509,7 @@ export default function TutorDetailPage() {
 
       {showBookingForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-5">Book a Session with {getTutorName(tutor)}</h2>
 
             <form onSubmit={handleSubmit((data) => bookMutation.mutate(data))} className="space-y-4">
@@ -501,14 +550,42 @@ export default function TutorDetailPage() {
 
               <div>
                 <label className="label">
-                  Date & Time <span className="text-red-500">*</span>
+                  Dates & Times <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="datetime-local"
-                  {...register('scheduledAt')}
-                  className="input"
-                  min={new Date().toISOString().slice(0, 16)}
+                <p className="mb-2 text-sm text-gray-500">
+                  Click multiple available cells to send more than one booking request.
+                </p>
+                {hasCurrentWeekAvailabilityOverride && (
+                  <p className="mb-2 text-sm text-amber-700">
+                    This week includes temporary availability changes from the tutor.
+                  </p>
+                )}
+                <input type="hidden" {...register('scheduledAt')} />
+                <AvailabilityCalendar
+                  slots={availability}
+                  currentWeekSlots={currentWeekAvailability}
+                  hasCurrentWeekOverride={hasCurrentWeekAvailabilityOverride}
+                  mode="select"
+                  selectedKeys={selectedSlots.map((slot) => slot.key)}
+                  onSelect={handleSlotSelect}
                 />
+                {selectedSlots.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-gray-700">
+                      Selected {selectedSlots.length} slot{selectedSlots.length > 1 ? 's' : ''}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSlots.map((slot) => (
+                        <span
+                          key={slot.key}
+                          className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-700"
+                        >
+                          {slot.date.toLocaleString('en-AU')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {errors.scheduledAt && <p className="error-text">{errors.scheduledAt.message}</p>}
               </div>
 
@@ -535,7 +612,7 @@ export default function TutorDetailPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={bookMutation.isPending} className="btn-primary flex-1">
-                  {bookMutation.isPending ? 'Sending...' : 'Send Request'}
+                  {bookMutation.isPending ? 'Sending...' : selectedSlots.length > 1 ? 'Send Requests' : 'Send Request'}
                 </button>
                 <button
                   type="button"

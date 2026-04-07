@@ -136,6 +136,12 @@ export const tutorApi = {
     updateAvailability: (availability) => {
         return api.put('/tutors/me/availability', { availability });
     },
+    updateCurrentWeekAvailability: (availability) => {
+        return api.put('/tutors/me/availability/current-week', { availability });
+    },
+    clearCurrentWeekAvailability: () => {
+        return api.delete('/tutors/me/availability/current-week');
+    },
     addSubject: (subjectId, data) => {
         return api.post('/tutors/me/subjects', { subjectId, ...data });
     },
