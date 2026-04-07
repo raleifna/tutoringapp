@@ -10,6 +10,7 @@ const bookingInclude = {
       user: { select: { id: true, firstName: true, lastName: true, avatar: true, email: true } },
     },
   },
+  payment: true,
   statusHistory: { orderBy: { createdAt: 'desc' } },
 };
 
@@ -68,11 +69,20 @@ exports.createBooking = async (req, res) => {
       hourlyRate: rate,
       totalAmount,
       notes,
-      status: 'PENDING',
+      status: 'UNPAID',
       recurringType: recurringType || 'ONE_OFF',
       meetingTool: meetingTool || tutorProfile.preferredMeetingTool || null,
+      payment: {
+        create: {
+          userId: req.user.id,
+          amount: totalAmount,
+          currency: tutorProfile.currency || 'AUD',
+          status: 'PENDING',
+          description: `${bookingSubject} session booking payment`,
+        },
+      },
       statusHistory: {
-        create: { status: 'PENDING' },
+        create: { status: 'UNPAID' },
       },
     },
     include: bookingInclude,
@@ -134,6 +144,11 @@ exports.getTutorBookings = async (req, res) => {
   const skip = (parsedPage - 1) * parsedLimit;
   const where = {
     tutorId: tutorProfile.id,
+    payment: {
+      is: {
+        status: 'COMPLETED',
+      },
+    },
     ...(status && { status }),
   };
 
@@ -177,9 +192,10 @@ exports.getBooking = async (req, res) => {
 
   const isLearner = booking.learnerId === req.user.id;
   const isTutor = tutorProfile && booking.tutorId === tutorProfile.id;
+  const isTutorVisible = isTutor && booking?.payment?.status === 'COMPLETED';
   const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SYSTEM_ADMIN';
 
-  if (!isLearner && !isTutor && !isAdmin) {
+  if (!isLearner && !isTutorVisible && !isAdmin) {
     throw new AppError('Access denied', 403);
   }
 
@@ -193,6 +209,7 @@ exports.cancelBooking = async (req, res) => {
     include: {
       tutorProfile: { include: { user: true } },
       learner: true,
+      payment: true,
     },
   });
 
@@ -208,7 +225,7 @@ exports.cancelBooking = async (req, res) => {
 
   if (!isLearner && !isTutor) throw new AppError('Access denied', 403);
 
-  const cancellableStatuses = ['PENDING', 'ACCEPTED'];
+  const cancellableStatuses = ['UNPAID', 'PENDING', 'ACCEPTED'];
   if (!cancellableStatuses.includes(booking.status)) {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
@@ -217,8 +234,9 @@ exports.cancelBooking = async (req, res) => {
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
   const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
-  if (isLearner && booking.status === 'ACCEPTED' && hoursUntilSession < 24) {
-    throw new AppError('Cannot cancel accepted booking within 24 hours of the session', 400);
+  const isPaidBooking = booking?.payment?.status === 'COMPLETED';
+  if (isLearner && isPaidBooking && hoursUntilSession < 24) {
+    throw new AppError('Cannot cancel a paid booking within 24 hours of the session', 400);
   }
 
   const updated = await prisma.booking.update({
@@ -239,9 +257,15 @@ exports.acceptBooking = async (req, res) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
 
-  const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: { payment: true },
+  });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
+  if (!booking.payment || booking.payment.status !== 'COMPLETED') {
+    throw new AppError('Booking must be paid before it can be accepted', 400);
+  }
 
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
@@ -326,4 +350,54 @@ exports.completeBooking = async (req, res) => {
   });
 
   res.json({ success: true, message: 'Booking marked as completed', data: updated });
+};
+
+exports.payForBooking = async (req, res) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: { payment: true },
+  });
+
+  if (!booking || booking.learnerId !== req.user.id) {
+    throw new AppError('Booking not found', 404);
+  }
+
+  const payment =
+    booking.payment ||
+    (await prisma.payment.create({
+      data: {
+        userId: req.user.id,
+        bookingId: booking.id,
+        amount: booking.totalAmount,
+        currency: booking.currency || 'AUD',
+        status: 'PENDING',
+        description: `${booking.subject} session booking payment`,
+      },
+    }));
+
+  if (payment.status === 'COMPLETED') {
+    throw new AppError('This booking has already been paid', 400);
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id: req.params.id },
+    data: {
+      status: booking.status === 'UNPAID' ? 'PENDING' : booking.status,
+      payment: { update: { status: 'COMPLETED' } },
+      ...(booking.status === 'UNPAID'
+        ? {
+            statusHistory: {
+              create: { status: 'PENDING' },
+            },
+          }
+        : {}),
+    },
+    include: bookingInclude,
+  });
+
+  res.json({
+    success: true,
+    message: booking.status === 'UNPAID' ? 'Payment completed and booking is now pending' : 'Mock payment completed',
+    data: updated,
+  });
 };

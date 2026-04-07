@@ -65,12 +65,24 @@ const formatCurrency = (amount, currency = 'AUD') => {
 };
 
 const getStatusClass = (status) => {
+  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
   if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
   if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
   if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
   if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
   if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
   return 'bg-gray-100 text-gray-700 border border-gray-200';
+};
+
+const formatBookingStatus = (status) => {
+  if (status === 'UNPAID') return 'Unpaid';
+  if (status === 'PENDING') return 'Pending';
+  if (status === 'ACCEPTED') return 'Accepted';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === 'DECLINED') return 'Declined';
+  if (status === 'RESCHEDULED') return 'Rescheduled';
+  return status || 'Unknown';
 };
 
 export default function BookingDetailPage() {
@@ -82,6 +94,7 @@ export default function BookingDetailPage() {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   const from = (searchParams.get('from') || '').toLowerCase();
+  const paymentResult = (searchParams.get('payment') || '').toLowerCase();
   const backConfigMap = {
     'tutor-requests': { href: '/tutor/requests', label: 'Back' },
     'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
@@ -110,8 +123,12 @@ export default function BookingDetailPage() {
   const isLearner = user?.role === 'LEARNER';
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const scheduledAt = booking?.scheduledAt;
-  const timeDelta = new Date(scheduledAt) -  new Date(); 
-  const canCancel = isLearner && ['PENDING', 'ACCEPTED'].includes(booking?.status) && (timeDelta > 1000 * 60 * 60 *24);
+  const isPaidBooking = booking?.payment?.status === 'COMPLETED';
+  const timeDelta = new Date(scheduledAt) - new Date();
+  const canCancel =
+    isLearner &&
+    ['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status) &&
+    (!isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingApi.cancel(id),
@@ -242,12 +259,19 @@ export default function BookingDetailPage() {
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-5">
+      {paymentResult === 'success' && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          Payment successful. Your booking has been sent to the tutor for confirmation.
+        </div>
+      )}
+
       <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(booking.status)}`}>
+        {booking.status === 'UNPAID' && <ExclamationTriangleIcon className="w-5 h-5" />}
         {booking.status === 'PENDING' && <ExclamationTriangleIcon className="w-5 h-5" />}
         {booking.status === 'ACCEPTED' && <CheckCircleIcon className="w-5 h-5" />}
         {booking.status === 'COMPLETED' && <CheckCircleIcon className="w-5 h-5" />}
         {booking.status === 'CANCELLED' && <XCircleIcon className="w-5 h-5" />}
-        Booking Status: <strong className='flex-1'>{booking.status}</strong>
+        Booking Status: <strong className="flex-1">{formatBookingStatus(booking.status)}</strong>
         <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
           <span>←</span> {backLabel}
         </Link>
@@ -317,8 +341,54 @@ export default function BookingDetailPage() {
         )}
       </div>
 
+      {booking.status === 'UNPAID' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <p className="text-xs text-sky-700 uppercase tracking-[0.18em] font-semibold">
+                  Checkout
+                </p>
+                <div className="flex items-end gap-3">
+                  <h3 className="text-3xl font-bold tracking-tight text-gray-900">
+                    {formatCurrency(totalAmount, booking.currency || 'AUD')}
+                  </h3>
+                  <span className="mb-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700">
+                    Unpaid
+                  </span>
+                </div>
+                <p className="max-w-xl text-sm leading-6 text-gray-600">
+                  Complete payment to send this booking to the tutor for confirmation.
+                </p>
+              </div>
+
+              {isLearner && (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                  <Link
+                    href={`/bookings/${id}/payment`}
+                    className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                    Pay Now
+                  </Link>
+                  <p className="text-xs text-gray-500 sm:text-right">
+                    No real payment will be charged in this demo.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
-        <div className='text-gray-700 text-sm mb-2 mt-2'>Please note that your subscription must be cancelled one day in advance.</div>
+        {isLearner && (
+          <div className="text-gray-700 text-sm mb-2 mt-2">
+            {isPaidBooking
+              ? 'Paid bookings must be cancelled at least one day in advance.'
+              : 'Unpaid bookings can be cancelled any time before payment.'}
+          </div>
+        )}
         {canCancel && (
           <button
             type="button"

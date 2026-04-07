@@ -27,6 +27,7 @@ enum ProfileStatus {
 }
 
 enum BookingStatus {
+  UNPAID
   PENDING
   ACCEPTED
   DECLINED

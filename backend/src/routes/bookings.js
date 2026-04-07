@@ -44,6 +44,7 @@ router.post('/', authorize('LEARNER'), bookingRules, validate, bookingController
 router.get('/my-bookings', bookingController.getMyBookings);
 router.get('/tutor/requests', authorize('TUTOR'), bookingController.getTutorBookings);
 router.get('/:id', bookingController.getBooking);
+router.patch('/:id/payment/pay', authorize('LEARNER'), bookingController.payForBooking);
 router.post('/:id/cancel', bookingController.cancelBooking);
 router.patch('/:id/accept', authorize('TUTOR'), bookingController.acceptBooking);
 router.patch('/:id/decline', authorize('TUTOR'), bookingController.declineBooking);

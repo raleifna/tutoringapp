@@ -39,12 +39,24 @@ const formatDate = (dateTime) => {
 };
 
 const getStatusClass = (status) => {
+  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
   if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
   if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
   if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
   if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
   if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
   return 'bg-gray-100 text-gray-700 border border-gray-200';
+};
+
+const formatBookingStatus = (status) => {
+  if (status === 'UNPAID') return 'unpaid';
+  if (status === 'PENDING') return 'pending';
+  if (status === 'ACCEPTED') return 'accepted';
+  if (status === 'COMPLETED') return 'completed';
+  if (status === 'CANCELLED') return 'cancelled';
+  if (status === 'DECLINED') return 'declined';
+  if (status === 'RESCHEDULED') return 'rescheduled';
+  return (status || 'unknown').toLowerCase();
 };
 
 // Mock notification data - replace with actual API calls
@@ -159,6 +171,7 @@ export default function DashboardPage() {
   const bookings = bookingsData?.data?.data?.bookings || [];
   const totalBookings = bookingsData?.data?.data?.pagination?.total || 0;
   const completedCount = bookings.filter((item) => item.status === 'COMPLETED').length;
+  const unpaidCount = bookings.filter((item) => item.status === 'UNPAID').length;
   const pendingCount = bookings.filter((item) => item.status === 'PENDING').length;
   const upcomingCount = bookings.filter((item) => item.status === 'ACCEPTED').length;
 
@@ -176,6 +189,13 @@ export default function DashboardPage() {
       icon: CheckCircleIcon,
       color: 'bg-green-100 text-green-600',
       href: '/bookings?from=dashboard&status=COMPLETED',
+    },
+    {
+      label: 'Unpaid',
+      value: unpaidCount,
+      icon: ClockIcon,
+      color: 'bg-orange-100 text-orange-600',
+      href: '/bookings?from=dashboard&status=UNPAID',
     },
     {
       label: 'Pending',
@@ -379,7 +399,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
-                  {(booking.status || '').toLowerCase()}
+                  {formatBookingStatus(booking.status)}
                 </span>
               </Link>
             ))
