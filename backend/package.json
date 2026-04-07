@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "start": "pnpm run db:push && node server.js",
     "dev": "pnpm run db:push && node --watch server.js"
@@ -15,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.4",
     "express": "^4.21.2",
+    "express-async-errors": "^3.1.1",
     "express-validator": "^7.3.1",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
