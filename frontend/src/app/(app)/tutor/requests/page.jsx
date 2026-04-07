@@ -117,8 +117,8 @@ function TutorRequestsContent() {
 
   const declineMutation = useMutation({
     mutationFn: (id) => bookingApi.decline(id),
-    onSuccess: () => {
-      toast.success('Booking declined');
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking declined');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
     },
     onError: (err) => {

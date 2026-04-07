@@ -144,11 +144,23 @@ exports.getTutorBookings = async (req, res) => {
   const skip = (parsedPage - 1) * parsedLimit;
   const where = {
     tutorId: tutorProfile.id,
-    payment: {
-      is: {
-        status: 'COMPLETED',
+    OR: [
+      {
+        payment: {
+          is: {
+            status: 'COMPLETED',
+          },
+        },
       },
-    },
+      {
+        status: 'CANCELLED',
+        statusHistory: {
+          some: {
+            status: 'ACCEPTED',
+          },
+        },
+      },
+    ],
     ...(status && { status }),
   };
 
@@ -192,7 +204,11 @@ exports.getBooking = async (req, res) => {
 
   const isLearner = booking.learnerId === req.user.id;
   const isTutor = tutorProfile && booking.tutorId === tutorProfile.id;
-  const isTutorVisible = isTutor && booking?.payment?.status === 'COMPLETED';
+  const isTutorVisible =
+    isTutor &&
+    (booking?.payment?.status === 'COMPLETED' ||
+      (booking?.status === 'CANCELLED' &&
+        booking?.statusHistory?.some((entry) => entry.status === 'ACCEPTED')));
   const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SYSTEM_ADMIN';
 
   if (!isLearner && !isTutorVisible && !isAdmin) {
@@ -244,12 +260,40 @@ exports.cancelBooking = async (req, res) => {
     data: {
       status: 'CANCELLED',
       cancellationReason: reason,
+      ...(booking?.payment?.status === 'COMPLETED'
+        ? {
+            payment: {
+              update: {
+                status: 'REFUNDED',
+                refundAmount: booking.payment.amount,
+                refundedAt: new Date(),
+              },
+            },
+          }
+        : booking?.payment
+          ? {
+              payment: {
+                update: {
+                  status: 'CANCELLED',
+                },
+              },
+            }
+          : {}),
       statusHistory: { create: { status: 'CANCELLED', reason } },
     },
     include: bookingInclude,
   });
 
-  res.json({ success: true, message: 'Booking cancelled', data: updated });
+  res.json({
+    success: true,
+    message:
+      booking?.payment?.status === 'COMPLETED'
+        ? 'Booking cancelled and payment refunded'
+        : booking?.payment
+          ? 'Booking cancelled'
+        : 'Booking cancelled',
+    data: updated,
+  });
 };
 
 exports.acceptBooking = async (req, res) => {
@@ -285,7 +329,10 @@ exports.declineBooking = async (req, res) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
 
-  const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: { payment: true },
+  });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
 
@@ -294,12 +341,30 @@ exports.declineBooking = async (req, res) => {
     data: {
       status: 'DECLINED',
       declineReason: reason,
+      ...(booking?.payment?.status === 'COMPLETED'
+        ? {
+            payment: {
+              update: {
+                status: 'REFUNDED',
+                refundAmount: booking.payment.amount,
+                refundedAt: new Date(),
+              },
+            },
+          }
+        : {}),
       statusHistory: { create: { status: 'DECLINED', reason } },
     },
     include: bookingInclude,
   });
 
-  res.json({ success: true, message: 'Booking declined', data: updated });
+  res.json({
+    success: true,
+    message:
+      booking?.payment?.status === 'COMPLETED'
+        ? 'Booking declined and payment refunded'
+        : 'Booking declined',
+    data: updated,
+  });
 };
 
 exports.rescheduleBooking = async (req, res) => {

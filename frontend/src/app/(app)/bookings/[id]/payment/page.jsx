@@ -46,6 +46,7 @@ const getPaymentStatusClass = (status) => {
   if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
   if (status === 'FAILED') return 'bg-red-50 text-red-700 border border-red-200';
   if (status === 'REFUNDED') return 'bg-gray-100 text-gray-700 border border-gray-200';
+  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
   return 'bg-amber-50 text-amber-700 border border-amber-200';
 };
 
@@ -53,6 +54,7 @@ const formatPaymentStatus = (status) => {
   if (status === 'COMPLETED') return 'Paid';
   if (status === 'FAILED') return 'Payment Failed';
   if (status === 'REFUNDED') return 'Refunded';
+  if (status === 'CANCELLED') return 'Cancelled';
   return 'Unpaid';
 };
 

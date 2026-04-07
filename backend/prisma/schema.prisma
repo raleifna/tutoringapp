@@ -75,6 +75,7 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+  CANCELLED
 }
 
 // ==================== USER ====================

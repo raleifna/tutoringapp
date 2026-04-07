@@ -23,7 +23,7 @@ const OPERATION_TABS = [
   { key: 'actions', label: 'Audit Log', icon: RectangleStackIcon },
 ];
 
-const BOOKING_STATUSES = ['', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'RESCHEDULED'];
+const BOOKING_STATUSES = ['', 'UNPAID', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'RESCHEDULED'];
 const EMPTY_SUBJECT_FORM = { name: '', category: '', description: '' };
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
@@ -58,6 +58,7 @@ const formatDuration = (minutes) => {
 };
 
 const getBookingStatusColor = (status) => {
+  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
   if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
   if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
   if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
@@ -65,6 +66,24 @@ const getBookingStatusColor = (status) => {
   if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
   if (status === 'RESCHEDULED') return 'bg-purple-50 text-purple-700 border border-purple-200';
   return 'bg-gray-100 text-gray-700 border border-gray-200';
+};
+
+const getPaymentStatusColor = (status) => {
+  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
+  if (status === 'PENDING') return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
+  if (status === 'FAILED') return 'bg-red-50 text-red-700 border border-red-200';
+  if (status === 'REFUNDED') return 'bg-gray-100 text-gray-700 border border-gray-200';
+  if (status === 'CANCELLED') return 'bg-slate-100 text-slate-700 border border-slate-200';
+  return 'bg-gray-100 text-gray-600 border border-gray-200';
+};
+
+const formatPaymentStatus = (status) => {
+  if (status === 'COMPLETED') return 'Paid';
+  if (status === 'PENDING') return 'Unpaid';
+  if (status === 'FAILED') return 'Payment Failed';
+  if (status === 'REFUNDED') return 'Refunded';
+  if (status === 'CANCELLED') return 'Payment Cancelled';
+  return 'Unpaid';
 };
 
 function Pagination({ currentPage, totalPages, onPrevious, onNext }) {
@@ -333,18 +352,17 @@ function AdminOperationsContent() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-start lg:items-end gap-2">
-                        <span className={cn('badge', getBookingStatusColor(booking.status))}>{booking.status}</span>
-                        <span
-                          className={cn('badge', {
-                            'bg-green-50 text-green-700': booking.payment?.status === 'COMPLETED',
-                            'bg-yellow-50 text-yellow-700': booking.payment?.status === 'PENDING',
-                            'bg-red-50 text-red-700': booking.payment?.status === 'FAILED',
-                            'bg-gray-100 text-gray-600': !booking.payment?.status,
-                          })}
-                        >
-                          {booking.payment?.status || 'UNPAID'}
-                        </span>
+                      <div className="flex flex-col items-start lg:items-end gap-3">
+                        <div className="flex flex-col items-start gap-1 lg:items-end">
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">Booking Status</p>
+                          <span className={cn('badge', getBookingStatusColor(booking.status))}>{booking.status}</span>
+                        </div>
+                        <div className="flex flex-col items-start gap-1 lg:items-end">
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">Payment Status</p>
+                          <span className={cn('badge', getPaymentStatusColor(booking.payment?.status))}>
+                            {formatPaymentStatus(booking.payment?.status)}
+                          </span>
+                        </div>
                         <p className="text-sm font-semibold text-gray-900">
                           {formatCurrency(booking.totalAmount || 0, booking.currency || 'AUD')}
                         </p>

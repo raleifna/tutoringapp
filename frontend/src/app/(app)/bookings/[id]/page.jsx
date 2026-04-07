@@ -123,7 +123,10 @@ export default function BookingDetailPage() {
   const isLearner = user?.role === 'LEARNER';
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const scheduledAt = booking?.scheduledAt;
-  const isPaidBooking = booking?.payment?.status === 'COMPLETED';
+  const paymentStatus = booking?.payment?.status || 'PENDING';
+  const isPaidBooking = paymentStatus === 'COMPLETED';
+  const isRefunded = paymentStatus === 'REFUNDED';
+  const isDeclinedRefund = booking?.status === 'DECLINED' && isRefunded;
   const timeDelta = new Date(scheduledAt) - new Date();
   const canCancel =
     isLearner &&
@@ -132,8 +135,9 @@ export default function BookingDetailPage() {
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingApi.cancel(id),
-    onSuccess: () => {
-      toast.success('Booking cancelled');
+    onSuccess: (response) => {
+      const refunded = response?.data?.data?.payment?.status === 'REFUNDED';
+      toast.success(refunded ? 'Booking cancelled and payment refunded' : 'Booking cancelled');
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       queryClient.invalidateQueries({ queryKey: ['myBookings'] });
@@ -265,6 +269,14 @@ export default function BookingDetailPage() {
         </div>
       )}
 
+      {isRefunded && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          {isDeclinedRefund
+            ? 'This booking was declined by the tutor and the payment has been refunded.'
+            : 'This booking was cancelled and the payment has been refunded.'}
+        </div>
+      )}
+
       <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(booking.status)}`}>
         {booking.status === 'UNPAID' && <ExclamationTriangleIcon className="w-5 h-5" />}
         {booking.status === 'PENDING' && <ExclamationTriangleIcon className="w-5 h-5" />}
@@ -384,9 +396,13 @@ export default function BookingDetailPage() {
       <div className="flex flex-wrap gap-3">
         {isLearner && (
           <div className="text-gray-700 text-sm mb-2 mt-2">
-            {isPaidBooking
-              ? 'Paid bookings must be cancelled at least one day in advance.'
-              : 'Unpaid bookings can be cancelled any time before payment.'}
+            {isRefunded
+              ? isDeclinedRefund
+                ? 'This booking was declined by the tutor and refunded successfully.'
+                : 'This booking was cancelled and refunded successfully.'
+              : isPaidBooking
+                ? 'Paid bookings must be cancelled at least one day in advance.'
+                : 'Unpaid bookings can be cancelled any time before payment.'}
           </div>
         )}
         {canCancel && (
