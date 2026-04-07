@@ -2,52 +2,29 @@
 
 set -euo pipefail
 
-project_name="tutorconnect"
-env_file=".env"
-
-project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$project_root"
-
-usage() {
-	cat <<'EOF'
-Usage: ./stop-local.sh [options]
-
-Options:
-	--project-name NAME     Docker Compose project name. Default: tutorconnect.
-	--env-file PATH         Env file to use. Default: .env.
-	-h, --help              Show this help text.
-EOF
-}
-
-fail() {
-	printf '%s\n' "$1" >&2
-	exit 1
-}
+PROJECT_NAME="tutorconnect"
+ENV_FILE=".env"
 
 while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--project-name)
-			shift
-			[[ $# -gt 0 ]] || fail '--project-name requires a value.'
-			project_name="$1"
-			;;
-		--env-file)
-			shift
-			[[ $# -gt 0 ]] || fail '--env-file requires a value.'
-			env_file="$1"
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		*)
-			usage >&2
-			fail "Unknown argument: $1"
-			;;
-	esac
-	shift
+  case "$1" in
+    --project-name)
+      PROJECT_NAME="${2:?Missing value for --project-name}"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="${2:?Missing value for --env-file}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
 done
 
-docker compose --env-file "$env_file" -p "$project_name" down
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_ROOT"
 
-printf 'Local Docker environment stopped.\n'
+docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" down
+
+echo "Local Docker environment stopped."

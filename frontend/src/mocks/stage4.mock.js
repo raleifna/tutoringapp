@@ -5,6 +5,7 @@ const SESSION_KEY = 'mock_auth_session_v1';
 const BOOKINGS_KEY = 'mock_stage3_bookings_v1';
 const TUTOR_PROFILES_KEY = 'mock_stage4_tutor_profiles_v1';
 const TUTOR_USER_MAP_KEY = 'mock_stage4_tutor_user_map_v1';
+const MESSAGES_KEY = 'mock_stage4_messages_v1';
 
 const wait = (ms = 280) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -1012,6 +1013,239 @@ const mutateTutorBooking = async (id, updater) => {
   return ok(enrichBooking(booking));
 };
 
+const readConversations = () => readJson(MESSAGES_KEY, []);
+
+const writeConversations = (conversations) => writeJson(MESSAGES_KEY, conversations);
+
+const isSameUser = (a, b) => String(a) === String(b);
+
+const isMessageReadBy = (message, userId) =>
+  Array.isArray(message?.readBy) && message.readBy.some((id) => isSameUser(id, userId));
+
+const getChatUser = (userId) => {
+  const users = getUsers();
+  const user = users.find((item) => isSameUser(item.id, userId));
+  const profile = ensureTutorProfiles().find(
+    (item) => isSameUser(item.userId, userId) || isSameUser(item.user?.id, userId)
+  );
+
+  if (user) {
+    return {
+      ...toPublicUser(user),
+      avatar: user.avatar || profile?.user?.avatar || '',
+    };
+  }
+
+  if (profile?.user) {
+    return {
+      id: profile.user.id || userId,
+      firstName: profile.user.firstName || 'Tutor',
+      lastName: profile.user.lastName || '',
+      email: profile.user.email || '',
+      avatar: profile.user.avatar || '',
+      role: 'TUTOR',
+    };
+  }
+
+  return {
+    id: userId,
+    firstName: 'User',
+    lastName: '',
+    email: '',
+    avatar: '',
+  };
+};
+
+const buildSeedConversations = () => {
+  const now = Date.now();
+  const h = 60 * 60 * 1000;
+  const m = 60 * 1000;
+
+  return [
+    {
+      id: 'mock_convo_1',
+      participantIds: ['mock_seed_learner_1', 'mock_seed_tutor_user_1'],
+      createdAt: new Date(now - 30 * h).toISOString(),
+      updatedAt: new Date(now - 18 * m).toISOString(),
+      messages: [
+        {
+          id: 'mock_msg_1',
+          conversationId: 'mock_convo_1',
+          senderId: 'mock_seed_learner_1',
+          receiverId: 'mock_seed_tutor_user_1',
+          content: 'Hi Emma, can we go over calculus this week?',
+          status: 'READ',
+          readBy: ['mock_seed_learner_1', 'mock_seed_tutor_user_1'],
+          createdAt: new Date(now - 26 * h).toISOString(),
+          updatedAt: new Date(now - 26 * h).toISOString(),
+        },
+        {
+          id: 'mock_msg_2',
+          conversationId: 'mock_convo_1',
+          senderId: 'mock_seed_tutor_user_1',
+          receiverId: 'mock_seed_learner_1',
+          content: 'Sure, send me the topics you want to focus on.',
+          status: 'READ',
+          readBy: ['mock_seed_learner_1', 'mock_seed_tutor_user_1'],
+          createdAt: new Date(now - 24 * h).toISOString(),
+          updatedAt: new Date(now - 24 * h).toISOString(),
+        },
+        {
+          id: 'mock_msg_3',
+          conversationId: 'mock_convo_1',
+          senderId: 'mock_seed_tutor_user_1',
+          receiverId: 'mock_seed_learner_1',
+          content: 'I also have a slot on Thursday night if that helps.',
+          status: 'DELIVERED',
+          readBy: ['mock_seed_tutor_user_1'],
+          createdAt: new Date(now - 18 * m).toISOString(),
+          updatedAt: new Date(now - 18 * m).toISOString(),
+        },
+      ],
+    },
+    {
+      id: 'mock_convo_2',
+      participantIds: ['mock_seed_learner_1', 'mock_seed_tutor_user_2'],
+      createdAt: new Date(now - 12 * h).toISOString(),
+      updatedAt: new Date(now - 3 * h).toISOString(),
+      messages: [
+        {
+          id: 'mock_msg_4',
+          conversationId: 'mock_convo_2',
+          senderId: 'mock_seed_learner_1',
+          receiverId: 'mock_seed_tutor_user_2',
+          content: 'Thanks again for the data visualisation notes.',
+          status: 'READ',
+          readBy: ['mock_seed_learner_1', 'mock_seed_tutor_user_2'],
+          createdAt: new Date(now - 5 * h).toISOString(),
+          updatedAt: new Date(now - 5 * h).toISOString(),
+        },
+        {
+          id: 'mock_msg_5',
+          conversationId: 'mock_convo_2',
+          senderId: 'mock_seed_tutor_user_2',
+          receiverId: 'mock_seed_learner_1',
+          content: 'No worries, happy to help.',
+          status: 'READ',
+          readBy: ['mock_seed_learner_1', 'mock_seed_tutor_user_2'],
+          createdAt: new Date(now - 3 * h).toISOString(),
+          updatedAt: new Date(now - 3 * h).toISOString(),
+        },
+      ],
+    },
+    {
+      id: 'mock_convo_3',
+      participantIds: ['mock_seed_learner_2', 'mock_seed_tutor_user_1'],
+      createdAt: new Date(now - 10 * h).toISOString(),
+      updatedAt: new Date(now - 45 * m).toISOString(),
+      messages: [
+        {
+          id: 'mock_msg_6',
+          conversationId: 'mock_convo_3',
+          senderId: 'mock_seed_learner_2',
+          receiverId: 'mock_seed_tutor_user_1',
+          content: 'I uploaded the worksheet for tomorrow.',
+          status: 'DELIVERED',
+          readBy: ['mock_seed_learner_2'],
+          createdAt: new Date(now - 45 * m).toISOString(),
+          updatedAt: new Date(now - 45 * m).toISOString(),
+        },
+      ],
+    },
+    {
+      id: 'mock_convo_4',
+      participantIds: ['mock_seed_learner_3', 'mock_seed_tutor_user_2'],
+      createdAt: new Date(now - 8 * h).toISOString(),
+      updatedAt: new Date(now - 90 * m).toISOString(),
+      messages: [
+        {
+          id: 'mock_msg_7',
+          conversationId: 'mock_convo_4',
+          senderId: 'mock_seed_tutor_user_2',
+          receiverId: 'mock_seed_learner_3',
+          content: 'Let me know if you want extra Python exercises.',
+          status: 'READ',
+          readBy: ['mock_seed_learner_3', 'mock_seed_tutor_user_2'],
+          createdAt: new Date(now - 90 * m).toISOString(),
+          updatedAt: new Date(now - 90 * m).toISOString(),
+        },
+      ],
+    },
+  ];
+};
+
+const ensureConversations = () => {
+  const current = readConversations();
+  if (Array.isArray(current) && current.length > 0) return current;
+  const seeded = buildSeedConversations();
+  writeConversations(seeded);
+  return seeded;
+};
+
+const sortConversationMessages = (messages = []) =>
+  [...messages].sort(
+    (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+  );
+
+const buildConversationData = (conversation, currentUserId) => {
+  const messages = sortConversationMessages(conversation?.messages || []);
+  const participants = (conversation?.participantIds || []).map((userId) => ({
+    userId,
+    user: getChatUser(userId),
+  }));
+  const unreadCount = messages.filter(
+    (message) =>
+      !isSameUser(message.senderId, currentUserId) && !isMessageReadBy(message, currentUserId)
+  ).length;
+  const lastMessage = messages[messages.length - 1] || null;
+
+  return {
+    id: conversation.id,
+    participants,
+    messages,
+    lastMessage,
+    unreadCount,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt || lastMessage?.createdAt || conversation.createdAt,
+  };
+};
+
+const countUnreadMessages = (conversation, userId) =>
+  sortConversationMessages(conversation?.messages || []).filter(
+    (message) =>
+      !isSameUser(message.senderId, userId) && !isMessageReadBy(message, userId)
+  ).length;
+
+const findConversationByUsers = (conversations, firstUserId, secondUserId) =>
+  conversations.find((conversation) => {
+    const ids = conversation.participantIds || [];
+    return (
+      ids.length === 2 &&
+      ids.some((id) => isSameUser(id, firstUserId)) &&
+      ids.some((id) => isSameUser(id, secondUserId))
+    );
+  });
+
+const paginateMessages = (messages, params = {}) => {
+  const page = parsePage(params?.page, 1);
+  const limit = parseLimit(params?.limit, 50);
+  const total = messages.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const start = Math.max(0, total - safePage * limit);
+  const end = total - (safePage - 1) * limit;
+
+  return {
+    messages: messages.slice(start, end),
+    pagination: {
+      page: safePage,
+      limit,
+      total,
+      totalPages,
+    },
+  };
+};
+
 const normalizeLevel = (value = '') => {
   const level = normalize(value);
   if (!level) return 'all';
@@ -1353,6 +1587,158 @@ export const bookingApi = {
       booking.status = 'ACCEPTED';
       booking.rescheduleReason = data?.reason ? String(data.reason) : '';
     }),
+};
+
+export const messageApi = {
+  getConversations: async () => {
+    await wait(180);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const conversations = ensureConversations()
+      .filter((conversation) => (conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id)))
+      .map((conversation) => buildConversationData(conversation, sessionUser.id))
+      .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+    return ok({ conversations });
+  },
+
+  createConversation: async (userId) => {
+    await wait(180);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+    if (!userId) return fail('User is required');
+    if (isSameUser(userId, sessionUser.id)) return fail('Cannot message yourself');
+
+    const targetUser = getChatUser(userId);
+    if (!targetUser?.id || !targetUser?.email) return fail('User not found', 404);
+
+    const conversations = ensureConversations();
+    let conversation = findConversationByUsers(conversations, sessionUser.id, userId);
+
+    if (!conversation) {
+      const now = new Date().toISOString();
+      conversation = {
+        id: `mock_convo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        participantIds: [sessionUser.id, String(userId)],
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
+      };
+      conversations.unshift(conversation);
+      writeConversations(conversations);
+    }
+
+    return ok(buildConversationData(conversation, sessionUser.id), 'Conversation ready');
+  },
+
+  getMessages: async (conversationId, params = {}) => {
+    await wait(160);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const conversation = ensureConversations().find((item) => isSameUser(item.id, conversationId));
+    if (!conversation) return fail('Conversation not found', 404);
+    if (!(conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id))) {
+      return fail('Forbidden', 403);
+    }
+
+    const messages = sortConversationMessages(conversation.messages || []);
+    if (!params?.page && !params?.limit) {
+      return ok({ messages });
+    }
+
+    return ok(paginateMessages(messages, params));
+  },
+
+  sendMessage: async (conversationId, payload = {}) => {
+    await wait(140);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const content = String(payload?.content || '').trim();
+    if (!content) return fail('Message content is required');
+
+    const conversations = ensureConversations();
+    const index = conversations.findIndex((item) => isSameUser(item.id, conversationId));
+    if (index < 0) return fail('Conversation not found', 404);
+
+    const conversation = conversations[index];
+    if (!(conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id))) {
+      return fail('Forbidden', 403);
+    }
+
+    const receiverId = (conversation.participantIds || []).find((id) => !isSameUser(id, sessionUser.id));
+    if (!receiverId) return fail('Conversation invalid', 400);
+
+    const now = new Date().toISOString();
+    const message = {
+      id: `mock_msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      conversationId: conversation.id,
+      senderId: sessionUser.id,
+      receiverId,
+      content,
+      status: 'SENT',
+      readBy: [sessionUser.id],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    conversation.messages = [...(conversation.messages || []), message];
+    conversation.updatedAt = now;
+    conversations[index] = conversation;
+    writeConversations(conversations);
+
+    return ok(message, 'Message sent');
+  },
+
+  markAsRead: async (conversationId) => {
+    await wait(120);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const conversations = ensureConversations();
+    const index = conversations.findIndex((item) => isSameUser(item.id, conversationId));
+    if (index < 0) return fail('Conversation not found', 404);
+
+    const conversation = conversations[index];
+    if (!(conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id))) {
+      return fail('Forbidden', 403);
+    }
+
+    let changed = 0;
+    conversation.messages = sortConversationMessages(conversation.messages || []).map((message) => {
+      if (isSameUser(message.senderId, sessionUser.id) || isMessageReadBy(message, sessionUser.id)) {
+        return message;
+      }
+      changed += 1;
+      return {
+        ...message,
+        status: 'READ',
+        readBy: [...(message.readBy || []), sessionUser.id],
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    conversations[index] = conversation;
+    if (changed > 0) {
+      writeConversations(conversations);
+    }
+
+    return ok({ count: changed }, 'Messages read');
+  },
+
+  getUnreadCount: async () => {
+    await wait(100);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const count = ensureConversations()
+      .filter((conversation) => (conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id)))
+      .reduce((sum, conversation) => sum + countUnreadMessages(conversation, sessionUser.id), 0);
+
+    return ok({ count });
+  },
 };
 
 export const userApi = {

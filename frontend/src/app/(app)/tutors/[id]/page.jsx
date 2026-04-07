@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
   CalendarDaysIcon,
+  ChatBubbleLeftRightIcon,
   CheckBadgeIcon,
   AcademicCapIcon,
   BriefcaseIcon,
@@ -19,7 +20,7 @@ import {
   MapPinIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 
@@ -192,6 +193,18 @@ export default function TutorDetailPage() {
     },
   });
 
+  const messageMutation = useMutation({
+    mutationFn: () => messageApi.createConversation(tutor.userId),
+    onSuccess: (res) => {
+      router.push(`/messages?conversationId=${res.data.data.id}`);
+    },
+    onError: (err) => {
+      const message =
+        err?.response?.data?.message || err?.message || 'Could not start conversation';
+      toast.error(message);
+    },
+  });
+
   const requireLogin = () => {
     toast('Please log in to book a session.');
     router.push(`/login?next=/tutors/${id}`);
@@ -320,7 +333,7 @@ export default function TutorDetailPage() {
             )}
 
             {!isSelf && (isLearner || isGuest) && (
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -333,6 +346,18 @@ export default function TutorDetailPage() {
                   <CalendarDaysIcon className="w-4 h-4" />
                   {isGuest ? 'Log In to Book' : 'Book a Session'}
                 </button>
+
+                {!isGuest && (
+                  <button
+                    type="button"
+                    onClick={() => messageMutation.mutate()}
+                    disabled={messageMutation.isPending}
+                    className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                    {messageMutation.isPending ? 'Opening' : 'Message Tutor'}
+                  </button>
+                )}
               </div>
             )}
           </div>

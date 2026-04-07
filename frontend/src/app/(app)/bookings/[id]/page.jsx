@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import {
   CalendarDaysIcon,
   ClockIcon,
+  ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
@@ -318,6 +319,16 @@ export default function BookingDetailPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
+        {other?.id && (
+          <Link
+            href={`/messages?userId=${other.id}`}
+            className="btn-secondary gap-2"
+          >
+            <ChatBubbleLeftRightIcon className="w-4 h-4" />
+            Message
+          </Link>
+        )}
+
         <div className='text-gray-700 text-sm mb-2 mt-2'>Please note that your subscription must be cancelled one day in advance.</div>
         {canCancel && (
           <button
