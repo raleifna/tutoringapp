@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const notificationService = require('../services/notificationService');
 
 const bookingInclude = {
   learner: {
@@ -77,6 +78,9 @@ exports.createBooking = async (req, res) => {
     },
     include: bookingInclude,
   });
+
+  // notify tutor
+  await notificationService.notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
 
   res.status(201).json({
     success: true,
@@ -231,6 +235,9 @@ exports.cancelBooking = async (req, res) => {
     include: bookingInclude,
   });
 
+  // notify tutor
+  await notificationService.notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
+
   res.json({ success: true, message: 'Booking cancelled', data: updated });
 };
 
@@ -253,6 +260,9 @@ exports.acceptBooking = async (req, res) => {
     include: bookingInclude,
   });
 
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
+
   res.json({ success: true, message: 'Booking accepted', data: updated });
 };
 
@@ -274,6 +284,9 @@ exports.declineBooking = async (req, res) => {
     },
     include: bookingInclude,
   });
+
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Declined', `A booking has been declined.`, `/bookings/${updated.id}`);
 
   res.json({ success: true, message: 'Booking declined', data: updated });
 };
@@ -299,7 +312,10 @@ exports.rescheduleBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  res.json({ success: true, message: 'Booking rescheduled', data: updated });
+  // notify student
+  await notificationService.notify(booking.learnerId, 'booking', 'Booking Rescheduled', `A booking has been rescheduled.`, `/bookings/${updated.id}`);
+
+   res.json({ success: true, message: 'Booking rescheduled', data: updated });
 };
 
 exports.completeBooking = async (req, res) => {
