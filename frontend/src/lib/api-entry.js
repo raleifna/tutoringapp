@@ -70,6 +70,10 @@ const callWithFallback = async (primaryFn, fallbackFn, ...args) => {
 export const bookingApi = {
   create: stage3BookingSource.create,
   getMyBookings: stage3BookingSource.getMyBookings,
+  pay: (...args) => {
+    const payFn = stage3BookingSource.pay || stage4BookingSource.pay || realBookingApi.pay;
+    return payFn(...args);
+  },
   cancel: stage3BookingSource.cancel,
   getById: (id) => {
     if (STAGE3_API_MODE === STAGE4_API_MODE) {

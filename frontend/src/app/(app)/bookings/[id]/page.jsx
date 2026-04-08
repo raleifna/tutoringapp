@@ -129,10 +129,11 @@ export default function BookingDetailPage() {
   const isRefunded = paymentStatus === 'REFUNDED';
   const isDeclinedRefund = booking?.status === 'DECLINED' && isRefunded;
   const timeDelta = new Date(scheduledAt) - new Date();
+  const isAcceptedBooking = booking?.status === 'ACCEPTED';
   const canCancel =
     isLearner &&
     ['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status) &&
-    (!isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
+    (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
 
   const cancelMutation = useMutation({
     mutationFn: () => bookingApi.cancel(id),
@@ -395,7 +396,11 @@ export default function BookingDetailPage() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <div className='text-gray-700 text-sm mb-2 mt-2'>Please note that your subscription must be cancelled one day in advance.</div>
+        <div className='text-gray-700 text-sm mb-2 mt-2'>
+          {isAcceptedBooking && isPaidBooking
+            ? 'Accepted bookings must be cancelled at least one day in advance.'
+            : 'You can cancel this booking before the tutor confirms it.'}
+        </div>
         {canCancel && (
           <button
             type="button"

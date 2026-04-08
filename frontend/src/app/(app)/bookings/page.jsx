@@ -137,6 +137,19 @@ function BookingsPageContent() {
   });
 
   const bookings = data?.data?.data?.bookings || [];
+  const sortedBookings = [...bookings].sort((a, b) => {
+    const statusPriority = (status) => (status === 'UNPAID' ? 0 : 1);
+    const priorityDiff = statusPriority(a?.status) - statusPriority(b?.status);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const createdAtA = new Date(a?.createdAt || 0).getTime();
+    const createdAtB = new Date(b?.createdAt || 0).getTime();
+    if (createdAtA !== createdAtB) return createdAtB - createdAtA;
+
+    const scheduledAtA = new Date(a?.scheduledAt || 0).getTime();
+    const scheduledAtB = new Date(b?.scheduledAt || 0).getTime();
+    return scheduledAtB - scheduledAtA;
+  });
   const pagination = data?.data?.data?.pagination;
   const totalPages = pagination?.totalPages || 1;
   const currentPage = pagination?.page || page;
@@ -218,7 +231,7 @@ function BookingsPageContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => (
+          {sortedBookings.map((booking) => (
             <BookingCard
               key={booking.id}
               booking={booking}
