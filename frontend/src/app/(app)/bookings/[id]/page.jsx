@@ -86,6 +86,12 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
+const getTutorDetailHref = (booking, fallbackFrom = 'bookings') => {
+  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+  if (!tutorId) return null;
+  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
+};
+
 export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
@@ -123,6 +129,7 @@ export default function BookingDetailPage() {
   const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
+  const tutorDetailHref = !isTutor ? getTutorDetailHref(booking, from || 'bookings') : null;
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
   const isPaidBooking = paymentStatus === 'COMPLETED';
@@ -292,22 +299,46 @@ export default function BookingDetailPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
-        <div className="flex items-center gap-3">
-          <img
-            src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
-            alt={other?.firstName || 'Tutor'}
-            className="w-14 h-14 rounded-full object-cover"
-          />
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide">
-              {isTutor ? 'Learner' : 'Tutor'}
-            </p>
-            <h2 className="font-semibold text-gray-900">
-              {other?.firstName || 'Tutor'} {other?.lastName || ''}
-            </h2>
-            <p className="text-sm text-gray-500">{other?.email || '-'}</p>
+        {tutorDetailHref ? (
+          <div className="flex items-center gap-3">
+            <Link
+              href={tutorDetailHref}
+              className="group rounded-full transition-transform hover:scale-[1.03]"
+            >
+              <img
+                src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+                alt={other?.firstName || 'Tutor'}
+                className="w-14 h-14 rounded-full object-cover ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
+              />
+            </Link>
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide">
+                Tutor
+              </p>
+              <h2 className="font-semibold text-gray-900">
+                {other?.firstName || 'Tutor'} {other?.lastName || ''}
+              </h2>
+              <p className="text-sm text-gray-500">{other?.email || '-'}</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <img
+              src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+              alt={other?.firstName || 'Tutor'}
+              className="w-14 h-14 rounded-full object-cover"
+            />
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide">
+                {isTutor ? 'Learner' : 'Tutor'}
+              </p>
+              <h2 className="font-semibold text-gray-900">
+                {other?.firstName || 'Tutor'} {other?.lastName || ''}
+              </h2>
+              <p className="text-sm text-gray-500">{other?.email || '-'}</p>
+            </div>
+          </div>
+        )}
 
         <hr className="border-gray-100" />
 

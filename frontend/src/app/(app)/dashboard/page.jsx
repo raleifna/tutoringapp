@@ -57,6 +57,12 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
+const getTutorDetailHref = (booking, fallbackFrom = 'dashboard') => {
+  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+  if (!tutorId) return null;
+  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
+};
+
 // Mock notification data - replace with actual API calls
 const mockNotifications = [
   {
@@ -244,33 +250,56 @@ export default function DashboardPage() {
             </div>
           ) : (
             bookings.map((booking) => (
-              <Link
+              <div
                 key={booking.id}
-                href={`/bookings/${booking.id}?from=dashboard`}
                 className="flex items-start gap-3 px-4 py-3 transition-colors active:bg-gray-50"
               >
-                <img
-                  src={getAvatarUrl(
-                    booking.tutorProfile?.user?.avatar,
-                    booking.tutorProfile?.user?.firstName,
-                    booking.tutorProfile?.user?.lastName
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  {getTutorDetailHref(booking, 'dashboard') ? (
+                    <Link
+                      href={getTutorDetailHref(booking, 'dashboard')}
+                      className="group rounded-full transition-transform hover:scale-[1.03]"
+                    >
+                      <img
+                        src={getAvatarUrl(
+                          booking.tutorProfile?.user?.avatar,
+                          booking.tutorProfile?.user?.firstName,
+                          booking.tutorProfile?.user?.lastName
+                        )}
+                        alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
+                      />
+                    </Link>
+                  ) : (
+                    <img
+                      src={getAvatarUrl(
+                        booking.tutorProfile?.user?.avatar,
+                        booking.tutorProfile?.user?.firstName,
+                        booking.tutorProfile?.user?.lastName
+                      )}
+                      alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    />
                   )}
-                  alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {booking.subject || 'Session'}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
-                    {formatDate(booking.scheduledAt)}
-                  </p>
+                  <Link
+                    href={`/bookings/${booking.id}?from=dashboard`}
+                    className="min-w-0 flex-1 rounded-xl p-1 -m-1 transition-colors hover:bg-gray-50"
+                  >
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {booking.subject || 'Session'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
+                      {formatDate(booking.scheduledAt)}
+                    </p>
+                  </Link>
                 </div>
-                <span className={`mt-0.5 shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
-                  {formatBookingStatus(booking.status)}
-                </span>
-              </Link>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className={`mt-0.5 text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
+                    {formatBookingStatus(booking.status)}
+                  </span>
+                </div>
+              </div>
             ))
           )}
         </div>

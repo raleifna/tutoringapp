@@ -277,9 +277,6 @@ export default function TutorDetailPage() {
           {backLabel}
         </Link>
       </div>
-      <Link href={backHref} className="hidden">
-        <span>←</span> {backLabel}
-      </Link>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
         <div className="flex flex-col sm:flex-row gap-5">
