@@ -169,11 +169,11 @@ const LocationCascader = ({ value, updateFilter }) => {
         </svg>
       </div>
       {isOpen && (
-        <div className="absolute z-50 mt-1 bg-white border border-gray-200 shadow-lg rounded-md flex overflow-hidden">
+        <div className="absolute left-0 right-0 z-50 mt-1 flex max-h-[70vh] overflow-auto rounded-md border border-gray-200 bg-white shadow-lg sm:right-auto sm:max-h-none sm:overflow-hidden">
           {getColumns().map((columnOptions, level) => (
             <ul 
               key={level} 
-              className="min-w-[150px] max-h-64 overflow-y-auto border-r border-gray-100 last:border-r-0 py-1"
+              className="min-w-0 flex-1 border-r border-gray-100 py-1 last:border-r-0 sm:min-w-[150px] sm:flex-none sm:max-h-64 sm:overflow-y-auto"
             >
               {columnOptions.map(option => {
                 const isActive = activePath[level]?.value === option.value;
@@ -305,16 +305,16 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen px-4 py-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl px-0 py-2 sm:px-2 sm:py-4">
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
           <h1 className="text-xl font-bold text-gray-900 flex-1">Find Tutors</h1>
           {isFetching && !isLoading && <span className="text-xs text-gray-400">Updating...</span>}
           <button
             type="button"
             onClick={handleBack}
-            className="absolute top-10 right-10 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
           >
             <span>←</span> Back
           </button>
@@ -406,7 +406,7 @@ function SearchPageContent() {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-gray-500">{isLoading ? 'Searching...' : `${totalTutors} tutors found`}</p>
           <button type="button" onClick={clearFilters} className="text-sm text-primary-600 hover:underline">
             Clear filters

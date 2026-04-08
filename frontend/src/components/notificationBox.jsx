@@ -46,9 +46,6 @@ const NotificationBox = ({ currentUserId }) => {
       keepPreviousData: true,
     });
 
-    console.log({currentUserId});
-    console.log(notificationsData);
-    console.log(notificationsData?.data);
     const recentNotifications = notificationsData?.data?.data?.notifications || [];
     const notifications = notificationsData?.data?.data?.notifications || [];
   
@@ -91,7 +88,7 @@ const NotificationBox = ({ currentUserId }) => {
 
   return (
     <>
-        <div className="absolute top-4 right-4">
+        <div className="absolute right-3 top-3 sm:right-4 sm:top-4">
           <button
             onClick={handleNotificationClick}
             className="relative p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
@@ -106,15 +103,15 @@ const NotificationBox = ({ currentUserId }) => {
           
           {/* Notification Dropdown */}
           {isNotificationOpen && (
-            <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+            <div className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-200 bg-white shadow-lg sm:w-80">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-start justify-between gap-2 border-b border-gray-100 p-4">
                 <h3 className="font-semibold text-gray-900">Notifications</h3>
                 <div className="flex items-center gap-2">
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllAsRead}
-                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      className="text-right text-xs font-medium text-primary-600 hover:text-primary-700"
                     >
                       Mark all as read
                     </button>
@@ -139,7 +136,7 @@ const NotificationBox = ({ currentUserId }) => {
                   recentNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${
+                      className={`cursor-pointer border-b border-gray-50 p-3 transition-colors hover:bg-gray-50 ${
                         !notification.read ? 'bg-blue-50/50' : ''
                       }`}
                       onClick={() => handleNotificationAction(notification)}

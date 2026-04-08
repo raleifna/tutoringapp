@@ -138,13 +138,13 @@ export default function ProfilePage() {
   return (
     <div className="relative max-w-2xl mx-auto space-y-6">
       
-      <div className='flex'>
+      <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title flex-1">My Profile</h1>
         <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
           <span>←</span> Back
         </Link>
       </div>
-      <div className="card p-6 flex items-center gap-5">
+      <div className="card flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="relative">
           <img
             src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName)}
@@ -179,13 +179,13 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="border-b border-gray-200 flex gap-1">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px">
         {['profile', 'security'].map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 -mb-px text-sm font-medium capitalize border-b-2 transition-colors ${
+            className={`whitespace-nowrap px-4 py-2.5 -mb-px text-sm font-medium capitalize border-b-2 transition-colors ${
               activeTab === tab
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -209,7 +209,7 @@ export default function ProfilePage() {
       {activeTab === 'profile' && (
         <div className="card p-6">
           <form onSubmit={handleSubmit((data) => updateMutation.mutate(data))} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="label">First Name</label>
                 <input {...register('firstName')} className="input" />
@@ -253,7 +253,7 @@ export default function ProfilePage() {
               {errors.bio && <p className="error-text">{errors.bio.message}</p>}
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={updateMutation.isPending || !isDirty}
