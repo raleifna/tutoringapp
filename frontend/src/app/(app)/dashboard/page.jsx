@@ -46,6 +46,17 @@ const getStatusClass = (status) => {
   return 'bg-gray-100 text-gray-700 border border-gray-200';
 };
 
+const formatBookingStatus = (status) => {
+  if (status === 'UNPAID') return 'Unpaid';
+  if (status === 'PENDING') return 'Pending';
+  if (status === 'ACCEPTED') return 'Accepted';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === 'DECLINED') return 'Declined';
+  if (status === 'RESCHEDULED') return 'Rescheduled';
+  return status || 'Unknown';
+};
+
 // Mock notification data - replace with actual API calls
 const mockNotifications = [
   {
