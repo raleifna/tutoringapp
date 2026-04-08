@@ -149,21 +149,24 @@ function NotificationsPageContent() {
   };
 
   return (
-    <div className="relative space-y-5">
-      <button
-        type="button"
-        onClick={handleBack}
-        className="absolute top-0 right-0 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-      >
-        <span>←</span> Back
-      </button>
-
-      <div className="pl-4">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-        
-        
-        <div className='flex justify-between'>
-          <p className="text-gray-600 mt-1">Stay updated with your tutoring activities</p>
+          <p className="mt-1 text-gray-600">Stay updated with your tutoring activities</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+        >
+          <span>←</span> Back
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">Manage unread items and review activity updates.</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
           <button
               onClick={handleMarkAllAsRead}
               className="btn-secondary btn-sm gap-1.5"
@@ -184,7 +187,7 @@ function NotificationsPageContent() {
       </div>
 
       {/* Header Actions */}
-        <div className="flex gap-1 border-b border-gray-200">
+        <div className="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px">
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -193,7 +196,7 @@ function NotificationsPageContent() {
                 setActiveStatus(tab.value);
                 setPage(1);
               }}
-              className={`flex-1 px-2 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-1 whitespace-nowrap px-3 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
                 activeStatus === tab.value
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'

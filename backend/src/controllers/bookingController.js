@@ -250,13 +250,15 @@ exports.cancelBooking = async (req, res) => {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
 
-  // if is learner,booking is accepted, can't cancel within 24 hours of scheduled time
+  // Learners can cancel before tutor confirmation at any time.
+  // The 24-hour rule only applies after the tutor has accepted the booking.
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
   const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
   const isPaidBooking = booking?.payment?.status === 'COMPLETED';
-  if (isLearner && isPaidBooking && hoursUntilSession < 24) {
-    throw new AppError('Cannot cancel a paid booking within 24 hours of the session', 400);
+  const isAcceptedBooking = booking.status === 'ACCEPTED';
+  if (isLearner && isPaidBooking && isAcceptedBooking && hoursUntilSession < 24) {
+    throw new AppError('Cannot cancel an accepted booking within 24 hours of the session', 400);
   }
 
   const updated = await prisma.booking.update({

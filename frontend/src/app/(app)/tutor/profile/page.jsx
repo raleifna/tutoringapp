@@ -633,7 +633,7 @@ export default function TutorProfilePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Hourly Rate</label>
               <input
@@ -692,7 +692,7 @@ export default function TutorProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Years of Experience</label>
               <input

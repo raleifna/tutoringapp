@@ -88,6 +88,12 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
+const getTutorDetailHref = (booking, fallbackFrom = 'bookings') => {
+  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+  if (!tutorId) return null;
+  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
+};
+
 // export default function BookingsPage() {
 //   return (
 //     <Suspense fallback={<BookingsPageFallback />}>
@@ -137,27 +143,40 @@ function BookingsPageContent() {
   });
 
   const bookings = data?.data?.data?.bookings || [];
+  const sortedBookings = [...bookings].sort((a, b) => {
+    const statusPriority = (status) => (status === 'UNPAID' ? 0 : 1);
+    const priorityDiff = statusPriority(a?.status) - statusPriority(b?.status);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const createdAtA = new Date(a?.createdAt || 0).getTime();
+    const createdAtB = new Date(b?.createdAt || 0).getTime();
+    if (createdAtA !== createdAtB) return createdAtB - createdAtA;
+
+    const scheduledAtA = new Date(a?.scheduledAt || 0).getTime();
+    const scheduledAtB = new Date(b?.scheduledAt || 0).getTime();
+    return scheduledAtB - scheduledAtA;
+  });
   const pagination = data?.data?.data?.pagination;
   const totalPages = pagination?.totalPages || 1;
   const currentPage = pagination?.page || page;
 
   return (
-    <div className="relative space-y-5">
-      <div className="pl-4">
-        <div className='flex'>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900 flex-1">My Bookings</h1>
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-          >
-            <span>←</span> Back
-          </button>
+          <p className="mt-1 text-gray-600">Manage your tutoring sessions</p>
         </div>
-        <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+        >
+          <span>←</span> Back
+        </button>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -166,7 +185,7 @@ function BookingsPageContent() {
               setActiveStatus(tab.value);
               setPage(1);
             }}
-            className={`flex-1 px-2 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 whitespace-nowrap px-3 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
               activeStatus === tab.value
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -218,7 +237,7 @@ function BookingsPageContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => (
+          {sortedBookings.map((booking) => (
             <BookingCard
               key={booking.id}
               booking={booking}
@@ -282,52 +301,65 @@ function BookingCard({ booking, isTutor, detailFrom }) {
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const tutorDetailHref = !isTutor ? getTutorDetailHref(booking, detailFrom || 'bookings') : null;
+  const bookingDetailHref = `/bookings/${booking.id}?from=${encodeURIComponent(detailFrom || 'bookings')}`;
 
   return (
-    <Link
-      href={`/bookings/${booking.id}?from=${encodeURIComponent(detailFrom || 'bookings')}`}
-      className="block bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all"
-    >
-      <div className="flex items-start gap-4">
-        <img
-          src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
-          alt={otherFirstName}
-          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-semibold text-gray-900 text-sm">
-                Session with: {otherFirstName} {otherLastName}
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">{booking?.subject || 'Session'}</p>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(booking?.status)}`}>
-                {formatBookingStatus(booking?.status)}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
-            <div className="flex items-center gap-1">
-              <CalendarDaysIcon className="w-3.5 h-3.5" />
-              {formatDate(booking?.scheduledAt)}
-            </div>
-            <div className="flex items-center gap-1">
-              <ClockIcon className="w-3.5 h-3.5" />
-              {formatDuration(booking?.duration)}
-            </div>
-            <span className="font-medium text-gray-700">
-              {formatCurrency(totalAmount, booking?.currency || 'AUD')}
-            </span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-              {sessionType}
-            </span>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          {tutorDetailHref ? (
+            <Link
+              href={tutorDetailHref}
+              className="group rounded-full transition-transform hover:scale-[1.03]"
+            >
+              <img
+                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+                alt={otherFirstName}
+                className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
+              />
+            </Link>
+          ) : (
+            <img
+              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+              alt={otherFirstName}
+              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900 text-sm">
+              Session with: {otherFirstName} {otherLastName}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">{booking?.subject || 'Session'}</p>
           </div>
         </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(booking?.status)}`}>
+            {formatBookingStatus(booking?.status)}
+          </span>
+        </div>
       </div>
-    </Link>
+
+      <Link
+        href={bookingDetailHref}
+        className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-50"
+      >
+        <div className="flex items-center gap-1">
+          <CalendarDaysIcon className="w-3.5 h-3.5" />
+          {formatDate(booking?.scheduledAt)}
+        </div>
+        <div className="flex items-center gap-1">
+          <ClockIcon className="w-3.5 h-3.5" />
+          {formatDuration(booking?.duration)}
+        </div>
+        <span className="font-medium text-gray-700">
+          {formatCurrency(totalAmount, booking?.currency || 'AUD')}
+        </span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+          {sessionType}
+        </span>
+      </Link>
+    </div>
   );
 }
 

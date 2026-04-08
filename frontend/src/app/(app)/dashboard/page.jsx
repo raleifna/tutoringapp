@@ -16,7 +16,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
-import NotificationBox from '@/components/notificationBox';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -55,6 +54,12 @@ const formatBookingStatus = (status) => {
   if (status === 'DECLINED') return 'Declined';
   if (status === 'RESCHEDULED') return 'Rescheduled';
   return status || 'Unknown';
+};
+
+const getTutorDetailHref = (booking, fallbackFrom = 'dashboard') => {
+  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+  if (!tutorId) return null;
+  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
 };
 
 // Mock notification data - replace with actual API calls
@@ -189,24 +194,23 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* welcome Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none relative flex justify-between">
-        <div>
-          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-          <h1 className="text-xl font-bold">
-            {displayName}
-          </h1>
-          <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-          <button onClick={handleLogout} className="btn-secondary mt-4">
+      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
+        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+        <h1 className="text-xl font-bold">
+          {displayName}
+        </h1>
+        <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
+        <div className="mt-4 flex flex-col gap-2 pr-12 sm:flex-row sm:flex-wrap sm:pr-0">
+          <button onClick={handleLogout} className="btn-secondary">
             Log out
           </button>
-          <Link href="/profile" className="btn-secondary mt-2 ml-2">
+          <Link href="/profile" className="btn-secondary">
             My Profile
           </Link>
         </div>
-        <NotificationBox currentUserId={currentUserId} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {summaryItems.map((item) => (
           <Link key={item.label} href={item.href} className="card p-4 hover:shadow-md transition-shadow">
             <div
@@ -221,7 +225,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-gray-900">Recent Bookings</h2>
           <Link href="/bookings?from=dashboard" className="text-xs text-primary-600 font-medium">
             View all →
@@ -242,33 +246,56 @@ export default function DashboardPage() {
             </div>
           ) : (
             bookings.map((booking) => (
-              <Link
+              <div
                 key={booking.id}
-                href={`/bookings/${booking.id}?from=dashboard`}
-                className="flex items-center gap-3 px-4 py-3 active:bg-gray-50 transition-colors"
+                className="flex items-start gap-3 px-4 py-3 transition-colors active:bg-gray-50"
               >
-                <img
-                  src={getAvatarUrl(
-                    booking.tutorProfile?.user?.avatar,
-                    booking.tutorProfile?.user?.firstName,
-                    booking.tutorProfile?.user?.lastName
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  {getTutorDetailHref(booking, 'dashboard') ? (
+                    <Link
+                      href={getTutorDetailHref(booking, 'dashboard')}
+                      className="group rounded-full transition-transform hover:scale-[1.03]"
+                    >
+                      <img
+                        src={getAvatarUrl(
+                          booking.tutorProfile?.user?.avatar,
+                          booking.tutorProfile?.user?.firstName,
+                          booking.tutorProfile?.user?.lastName
+                        )}
+                        alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
+                      />
+                    </Link>
+                  ) : (
+                    <img
+                      src={getAvatarUrl(
+                        booking.tutorProfile?.user?.avatar,
+                        booking.tutorProfile?.user?.firstName,
+                        booking.tutorProfile?.user?.lastName
+                      )}
+                      alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    />
                   )}
-                  alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {booking.subject || 'Session'}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
-                    {formatDate(booking.scheduledAt)}
-                  </p>
+                  <Link
+                    href={`/bookings/${booking.id}?from=dashboard`}
+                    className="min-w-0 flex-1 rounded-xl p-1 -m-1 transition-colors hover:bg-gray-50"
+                  >
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {booking.subject || 'Session'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
+                      {formatDate(booking.scheduledAt)}
+                    </p>
+                  </Link>
                 </div>
-                <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
-                  {formatBookingStatus(booking.status)}
-                </span>
-              </Link>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className={`mt-0.5 text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
+                    {formatBookingStatus(booking.status)}
+                  </span>
+                </div>
+              </div>
             ))
           )}
         </div>
