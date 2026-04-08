@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import {
+  ArrowLeftIcon,
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
@@ -87,6 +88,7 @@ export default function MessagesPage() {
   const selectedPartner = selectedConversation?.participants?.find(
     (item) => item.userId !== user?.id
   )?.user;
+  const showConversationList = !selectedConversationId;
 
   useEffect(() => {
     const nextId = searchParams.get('conversationId') || '';
@@ -241,15 +243,28 @@ export default function MessagesPage() {
     }, 1200);
   };
 
+  const handleSelectConversation = (conversationId) => {
+    setSelectedConversationId(conversationId);
+    router.replace(`/messages?conversationId=${conversationId}`);
+  };
+
+  const handleBackToList = () => {
+    setSelectedConversationId('');
+    setPartnerTyping(false);
+    router.replace('/messages');
+  };
+
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Messages</h1>
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Messages</h1>
         <p className="mt-1 text-sm text-gray-500">Chat with tutors and learners here.</p>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:grid md:grid-cols-[320px_1fr]">
-        <div className="border-b border-gray-200 md:border-b-0 md:border-r">
+        <div
+          className={`md:block ${showConversationList ? 'block' : 'hidden'} border-b border-gray-200 md:border-b-0 md:border-r`}
+        >
           <div className="border-b border-gray-100 px-5 py-4">
             <h2 className="text-sm font-semibold text-gray-900">All chats</h2>
           </div>
@@ -290,10 +305,7 @@ export default function MessagesPage() {
                   <button
                     key={conversation.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedConversationId(conversation.id);
-                      router.replace(`/messages?conversationId=${conversation.id}`);
-                    }}
+                    onClick={() => handleSelectConversation(conversation.id)}
                     className={`flex w-full items-start gap-3 px-4 py-4 text-left transition ${
                       isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                     }`}
@@ -335,7 +347,7 @@ export default function MessagesPage() {
         </div>
 
         {!selectedConversationId ? (
-          <div className="flex min-h-[320px] items-center justify-center p-10 text-center">
+          <div className="hidden min-h-[320px] items-center justify-center p-10 text-center md:flex">
             <div>
               <ChatBubbleLeftRightIcon className="mx-auto h-12 w-12 text-gray-300" />
               <h2 className="mt-4 text-lg font-semibold text-gray-900">Pick a chat</h2>
@@ -345,9 +357,17 @@ export default function MessagesPage() {
             </div>
           </div>
         ) : (
-          <div className="flex min-h-[520px] flex-col">
-            <div className="border-b border-gray-100 px-5 py-4">
+          <div className="flex h-[calc(100dvh-11.5rem)] min-h-[32rem] flex-col md:h-[calc(100dvh-10rem)] md:min-h-[520px]">
+            <div className="border-b border-gray-100 px-4 py-3 md:px-5 md:py-4">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToList}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-600 md:hidden"
+                  aria-label="Back to chats"
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                </button>
                 <img
                   src={getAvatarUrl(
                     selectedPartner?.avatar,
@@ -366,7 +386,7 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4">
+            <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-3 md:p-4">
               {messagesLoading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 4 }).map((_, index) => (
@@ -400,7 +420,7 @@ export default function MessagesPage() {
                       className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
+                        className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm md:max-w-[75%] md:px-4 md:py-3 ${
                           isMine
                             ? 'rounded-br-sm bg-blue-600 text-white'
                             : 'rounded-bl-sm bg-white text-gray-900 border border-gray-200'
@@ -429,7 +449,7 @@ export default function MessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="border-t border-gray-100 p-4">
+            <div className="border-t border-gray-100 bg-white p-3 md:p-4">
               <div className="flex items-end gap-2">
                 <textarea
                   value={messageInput}
@@ -447,16 +467,18 @@ export default function MessagesPage() {
                   }}
                   placeholder="Type a message..."
                   rows={2}
-                  className="input min-h-[48px] flex-1 resize-none"
+                  className="input min-h-[48px] flex-1 resize-none px-3 py-2.5 md:px-4 md:py-3"
                 />
                 <button
                   type="button"
                   onClick={handleSend}
                   disabled={!messageInput.trim() || sendMutation.isPending}
-                  className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+                  className="btn-primary inline-flex h-12 shrink-0 items-center gap-2 px-3 md:px-4 disabled:opacity-50"
                 >
                   <PaperAirplaneIcon className="h-4 w-4" />
-                  {sendMutation.isPending ? 'Sending' : 'Send'}
+                  <span className="hidden sm:inline">
+                    {sendMutation.isPending ? 'Sending' : 'Send'}
+                  </span>
                 </button>
               </div>
             </div>

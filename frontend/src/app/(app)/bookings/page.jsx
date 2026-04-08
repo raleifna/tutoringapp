@@ -142,22 +142,22 @@ function BookingsPageContent() {
   const currentPage = pagination?.page || page;
 
   return (
-    <div className="relative space-y-5">
-      <div className="pl-4">
-        <div className='flex'>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900 flex-1">My Bookings</h1>
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-          >
-            <span>←</span> Back
-          </button>
+          <p className="mt-1 text-gray-600">Manage your tutoring sessions</p>
         </div>
-        <p className="text-gray-600 mt-1">Manage your tutoring sessions</p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+        >
+          <span>←</span> Back
+        </button>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -166,7 +166,7 @@ function BookingsPageContent() {
               setActiveStatus(tab.value);
               setPage(1);
             }}
-            className={`flex-1 px-2 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 whitespace-nowrap px-3 py-2.5 -mb-px text-center text-sm font-medium border-b-2 transition-colors ${
               activeStatus === tab.value
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'

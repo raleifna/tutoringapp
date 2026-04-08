@@ -198,17 +198,19 @@ export default function TutorDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
+      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
         <h1 className="text-xl font-bold">{displayName}</h1>
         <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <button onClick={handleLogout} className="btn-secondary mt-4">
-          Log out
-        </button>
         <NotificationBox currentUserId={currentUserId} />
+        <div className="mt-4 pr-12 sm:pr-0">
+          <button onClick={handleLogout} className="btn-secondary">
+            Log out
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -229,7 +231,7 @@ export default function TutorDashboardPage() {
       </div>
 
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-gray-900">Pending Requests</h2>
           <Link
             href="/tutor/requests"
@@ -254,7 +256,7 @@ export default function TutorDashboardPage() {
                 <Link
                   key={booking.id}
                   href={`/bookings/${booking.id}?from=tutor-dashboard`}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
                     src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
@@ -269,7 +271,7 @@ export default function TutorDashboardPage() {
                       {booking.subject} · {formatDate(booking.scheduledAt)}
                     </p>
                   </div>
-                  <span className="text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
+                  <span className="mt-0.5 shrink-0 rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700">
                     Pending
                   </span>
                 </Link>
@@ -280,7 +282,7 @@ export default function TutorDashboardPage() {
       </div>
 
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-gray-900">Upcoming Sessions</h2>
           <Link
             href="/bookings?from=tutor-dashboard"
@@ -305,7 +307,7 @@ export default function TutorDashboardPage() {
                 <Link
                   key={booking.id}
                   href={`/bookings/${booking.id}?from=tutor-dashboard`}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
                     src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
@@ -321,7 +323,7 @@ export default function TutorDashboardPage() {
                       {formatDuration(booking.duration)}
                     </p>
                   </div>
-                  <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                  <span className="mt-0.5 shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
                     Confirmed
                   </span>
                 </Link>
