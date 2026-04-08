@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+import NotificationBox from '@/components/notificationBox';
 
 const formatCurrency = (amount) => {
   const value = Number(amount || 0);
@@ -46,13 +47,15 @@ const getBookingStatusStyle = (status) => {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => adminApi.getDashboard(),
     refetchInterval: 60000,
   });
+
+  const currentUserId = user?.id || '';
 
   const dashboard = data?.data?.data || {};
   const overview = dashboard?.overview || {};
@@ -96,13 +99,18 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
-        <h1 className="text-xl font-bold">Admin Dashboard</h1>
-        <p className="text-primary-200 text-sm mt-1">Platform overview and key metrics</p>
-        <button onClick={handleLogout} className="btn-secondary mt-4">
-          Log out
-        </button>
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none flex justify-between">
+
+        <div>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>
+          <h1 className="text-xl font-bold">Admin Dashboard</h1>
+          <p className="text-primary-200 text-sm mt-1">Platform overview and key metrics</p>
+          <button onClick={handleLogout} className="btn-secondary mt-4">
+            Log out
+          </button>
+        </div>
+
+        <NotificationBox currentUserId={currentUserId} />
       </div>
 
       {isError ? (
