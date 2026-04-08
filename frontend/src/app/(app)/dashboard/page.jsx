@@ -189,21 +189,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* welcome Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none relative">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">
-          {displayName}
-        </h1>
-        <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-        
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none relative flex justify-between">
+        <div>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">
+            {displayName}
+          </h1>
+          <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
+          <button onClick={handleLogout} className="btn-secondary mt-4">
+            Log out
+          </button>
+          <Link href="/profile" className="btn-secondary mt-2 ml-2">
+            My Profile
+          </Link>
+        </div>
         <NotificationBox currentUserId={currentUserId} />
-        
-        <button onClick={handleLogout} className="btn-secondary mt-4">
-          Log out
-        </button>
-        <Link href="/profile" className="btn-secondary mt-2 ml-2">
-          My Profile
-        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
