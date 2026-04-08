@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import {
   CalendarDaysIcon,
   ClockIcon,
+  ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
@@ -394,17 +395,7 @@ export default function BookingDetailPage() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        {isLearner && (
-          <div className="text-gray-700 text-sm mb-2 mt-2">
-            {isRefunded
-              ? isDeclinedRefund
-                ? 'This booking was declined by the tutor and refunded successfully.'
-                : 'This booking was cancelled and refunded successfully.'
-              : isPaidBooking
-                ? 'Paid bookings must be cancelled at least one day in advance.'
-                : 'Unpaid bookings can be cancelled any time before payment.'}
-          </div>
-        )}
+        <div className='text-gray-700 text-sm mb-2 mt-2'>Please note that your subscription must be cancelled one day in advance.</div>
         {canCancel && (
           <button
             type="button"

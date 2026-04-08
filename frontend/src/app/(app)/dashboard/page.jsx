@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import {
   MagnifyingGlassIcon,
   CalendarDaysIcon,
+  ChatBubbleLeftRightIcon,
   ClockIcon,
   CheckCircleIcon,
   StarIcon,
@@ -292,6 +293,19 @@ export default function DashboardPage() {
             <div>
               <div className="text-sm font-semibold text-gray-900">My Bookings</div>
               <div className="text-xs text-gray-500">View session details</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/messages"
+            className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+              <ChatBubbleLeftRightIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Messages</div>
+              <div className="text-xs text-gray-500">Open your chats</div>
             </div>
           </Link>
 

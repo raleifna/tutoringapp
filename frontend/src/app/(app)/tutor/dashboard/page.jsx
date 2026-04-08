@@ -11,6 +11,7 @@ import {
   StarIcon,
   ClockIcon,
   CheckCircleIcon,
+  ChatBubbleLeftRightIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
@@ -345,6 +346,12 @@ export default function TutorDashboardPage() {
             color: 'bg-green-600',
           },
           {
+            label: 'Messages',
+            desc: 'Open learner chats',
+            href: '/messages',
+            color: 'bg-blue-600',
+          },
+          {
             label: 'View as Learner',
             desc: 'See your public profile',
             href: viewAsLearnerNavHref,
@@ -362,7 +369,11 @@ export default function TutorDashboardPage() {
                 item.color
               )}
             >
-              <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
+              {item.label === 'Messages' ? (
+                <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+              ) : (
+                <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
+              )}
             </div>
             <h3 className="font-semibold text-gray-900 text-sm">{item.label}</h3>
             <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>

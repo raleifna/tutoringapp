@@ -29,6 +29,13 @@ const ok = (data = null, message = 'OK') => ({
   },
 });
 
+const authOk = (data = null, message = 'OK') => ({
+  data: {
+    message,
+    ...(data || {}),
+  },
+});
+
 const fail = (message, status = 400) =>
   Promise.reject({
     response: {
@@ -335,7 +342,7 @@ export const authApi = {
       createdAt: Date.now(),
     });
 
-    return ok({
+    return authOk({
       user: toPublicUser(user),
       accessToken,
       refreshToken,
@@ -355,7 +362,7 @@ export const authApi = {
     await wait(220);
     const user = getSessionUser();
     if (!user) return fail('Unauthorized', 401);
-    return ok(toPublicUser(user));
+    return authOk({ user: toPublicUser(user) });
   },
 
   changePassword: async ({ currentPassword, newPassword }) => {

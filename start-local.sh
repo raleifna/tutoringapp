@@ -2,232 +2,196 @@
 
 set -euo pipefail
 
-force_seed=0
-skip_seed=0
-run_smoke_test=0
-project_name="tutorconnect"
-env_file=".env"
+FORCE_SEED=false
+SKIP_SEED=false
+RUN_SMOKE_TEST=false
+PROJECT_NAME="tutorconnect"
+ENV_FILE=".env"
 
-project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$project_root"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force-seed)
+      FORCE_SEED=true
+      shift
+      ;;
+    --skip-seed)
+      SKIP_SEED=true
+      shift
+      ;;
+    --run-smoke-test)
+      RUN_SMOKE_TEST=true
+      shift
+      ;;
+    --project-name)
+      PROJECT_NAME="${2:?Missing value for --project-name}"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="${2:?Missing value for --env-file}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_ROOT"
 
 write_step() {
-	printf '==> %s\n' "$1"
-}
-
-fail() {
-	printf '%s\n' "$1" >&2
-	exit 1
-}
-
-usage() {
-	cat <<'EOF'
-Usage: ./start-local.sh [options]
-
-Options:
-	--force-seed            Always seed demo data after startup.
-	--skip-seed             Skip seeding demo data.
-	--run-smoke-test        Run the backend smoke test after startup.
-	--project-name NAME     Docker Compose project name. Default: tutorconnect.
-	--env-file PATH         Env file to use. Default: .env.
-	-h, --help              Show this help text.
-EOF
+  echo "==> $1"
 }
 
 ensure_command() {
-	local name="$1"
-	local hint="$2"
+  local name="$1"
+  local hint="$2"
 
-	if ! command -v "$name" >/dev/null 2>&1; then
-		fail "$name not found. $hint"
-	fi
+  if ! command -v "$name" >/dev/null 2>&1; then
+    echo "$name not found. $hint" >&2
+    exit 1
+  fi
 }
 
 ensure_root_env() {
-	local env_file_name="$1"
-	local env_path="$project_root/$env_file_name"
-	local env_example="$project_root/.env.example"
+  local env_file_name="$1"
+  local env_file="$PROJECT_ROOT/$env_file_name"
+  local env_example="$PROJECT_ROOT/.env.example"
 
-	if [[ ! -f "$env_path" ]]; then
-		if [[ ! -f "$env_example" ]]; then
-			fail 'Missing .env and .env.example.'
-		fi
+  if [[ ! -f "$env_file" ]]; then
+    if [[ ! -f "$env_example" ]]; then
+      echo "Missing .env and .env.example." >&2
+      exit 1
+    fi
 
-		cp "$env_example" "$env_path"
-		printf 'Created %s from .env.example\n' "$env_file_name"
-	fi
+    cp "$env_example" "$env_file"
+    echo "Created $env_file_name from .env.example"
+  fi
 
-	printf '%s\n' "$env_path"
-}
-
-trim_whitespace() {
-	local value="$1"
-
-	value="${value#"${value%%[![:space:]]*}"}"
-	value="${value%"${value##*[![:space:]]}"}"
-	printf '%s' "$value"
-}
-
-strip_matching_quotes() {
-	local value="$1"
-	local first_char
-	local last_char
-
-	if [[ ${#value} -lt 2 ]]; then
-		printf '%s' "$value"
-		return
-	fi
-
-	first_char="${value:0:1}"
-	last_char="${value:${#value}-1:1}"
-
-	if [[ "$first_char" == '"' && "$last_char" == '"' ]]; then
-		value="${value:1:${#value}-2}"
-	elif [[ "$first_char" == "'" && "$last_char" == "'" ]]; then
-		value="${value:1:${#value}-2}"
-	fi
-
-	printf '%s' "$value"
+  printf '%s\n' "$env_file"
 }
 
 get_env_value() {
-	local env_path="$1"
-	local name="$2"
-	local default_value="$3"
-	local line
-	local value
+  local env_file_path="$1"
+  local name="$2"
+  local default_value="$3"
 
-	if [[ ! -f "$env_path" ]]; then
-		printf '%s\n' "$default_value"
-		return
-	fi
+  if [[ ! -f "$env_file_path" ]]; then
+    printf '%s\n' "$default_value"
+    return
+  fi
 
-	line="$(grep -E "^[[:space:]]*${name}[[:space:]]*=" "$env_path" | head -n 1 || true)"
-	if [[ -z "$line" ]]; then
-		printf '%s\n' "$default_value"
-		return
-	fi
+  local match
+  match="$(grep -E "^[[:space:]]*${name}[[:space:]]*=" "$env_file_path" | head -n 1 || true)"
+  if [[ -z "$match" ]]; then
+    printf '%s\n' "$default_value"
+    return
+  fi
 
-	line="${line%$'\r'}"
-	value="${line#*=}"
-	value="$(trim_whitespace "$value")"
-	value="$(strip_matching_quotes "$value")"
-	printf '%s\n' "$value"
+  match="${match#*=}"
+  match="${match%\"}"
+  match="${match#\"}"
+  match="${match%\'}"
+  match="${match#\'}"
+  printf '%s\n' "$match"
 }
 
 invoke_compose() {
-	docker compose --env-file "$env_file" -p "$project_name" "$@"
+  docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" "$@"
 }
 
 invoke_backend_command() {
-	docker compose --env-file "$env_file" -p "$project_name" exec -T backend "$@"
+  docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T backend "$@"
+}
+
+backend_has_script() {
+  local script_name="$1"
+
+  node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.exit(pkg.scripts && pkg.scripts[process.argv[2]] ? 0 : 1);' \
+    "$PROJECT_ROOT/backend/package.json" "$script_name"
 }
 
 wait_for_url() {
-	local url="$1"
-	local timeout_seconds="${2:-180}"
-	local elapsed=0
-	local status_code
+  local url="$1"
+  local timeout_seconds="${2:-180}"
+  local elapsed=0
 
-	while (( elapsed < timeout_seconds )); do
-		status_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "$url" || true)"
-		if [[ "$status_code" =~ ^[234][0-9][0-9]$ ]]; then
-			return
-		fi
+  while [[ "$elapsed" -lt "$timeout_seconds" ]]; do
+    local status_code
+    status_code="$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)"
+    if [[ "$status_code" =~ ^[234][0-9][0-9]$ ]]; then
+      return
+    fi
 
-		sleep 2
-		elapsed=$((elapsed + 2))
-	done
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
 
-	fail "Timed out waiting for $url"
+  echo "Timed out waiting for $url" >&2
+  exit 1
 }
 
 get_user_count() {
-	local script
-	local output
+  local script
+  script='const { PrismaClient } = require("@prisma/client"); const prisma = new PrismaClient(); prisma.user.count().then((count) => { console.log(count); }).catch((error) => { console.error(error); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });'
 
-	script='const { PrismaClient } = require("@prisma/client"); const prisma = new PrismaClient(); prisma.user.count().then((count) => { console.log(count); }).catch((error) => { console.error(error); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });'
-	output="$(docker compose --env-file "$env_file" -p "$project_name" exec -T backend node -e "$script")" || fail 'Failed to inspect database state.'
-	printf '%s\n' "$output" | tail -n 1 | tr -d '\r'
+  local output
+  output="$(docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T backend node -e "$script")"
+  printf '%s\n' "$output" | tail -n 1 | tr -d '[:space:]'
 }
 
 sync_database_schema() {
-	write_step 'Synchronizing Prisma schema with the database'
-	invoke_backend_command pnpm exec prisma db push --accept-data-loss
+  write_step "Synchronizing Prisma schema with the database"
+  invoke_backend_command pnpm exec prisma db push --accept-data-loss
 }
 
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--force-seed)
-			force_seed=1
-			;;
-		--skip-seed)
-			skip_seed=1
-			;;
-		--run-smoke-test)
-			run_smoke_test=1
-			;;
-		--project-name)
-			shift
-			[[ $# -gt 0 ]] || fail '--project-name requires a value.'
-			project_name="$1"
-			;;
-		--env-file)
-			shift
-			[[ $# -gt 0 ]] || fail '--env-file requires a value.'
-			env_file="$1"
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		*)
-			usage >&2
-			fail "Unknown argument: $1"
-			;;
-	esac
-	shift
-done
+ensure_command docker "Install Docker Desktop and make sure the daemon is running."
+ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
+BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
+GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8080")"
 
-ensure_command docker 'Install Docker Desktop and make sure the daemon is running.'
-ensure_command curl 'curl is required to check service health endpoints.'
-
-env_file_path="$(ensure_root_env "$env_file")"
-backend_host_port="$(get_env_value "$env_file_path" 'BACKEND_HOST_PORT' '5050')"
-gateway_host_port="$(get_env_value "$env_file_path" 'NGINX_HOST_PORT' '8080')"
-
-write_step 'Building and starting the local full-stack Docker environment'
+write_step "Building and starting the local full-stack Docker environment"
 invoke_compose up --build -d
 
-write_step 'Waiting for backend and unified gateway health checks'
-wait_for_url "http://localhost:${backend_host_port}/health"
-wait_for_url "http://localhost:${gateway_host_port}/api/v1/health"
+write_step "Waiting for backend and unified gateway health checks"
+wait_for_url "http://localhost:${BACKEND_HOST_PORT}/health"
+wait_for_url "http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
 
 sync_database_schema
 
-if (( skip_seed == 0 )); then
-	should_seed=$force_seed
+if [[ "$SKIP_SEED" != "true" ]]; then
+  SHOULD_SEED="$FORCE_SEED"
 
-	if (( should_seed == 0 )); then
-		user_count="$(get_user_count)"
-		if [[ "$user_count" == '0' ]]; then
-			should_seed=1
-		else
-			printf 'Seed skipped: detected %s existing users.\n' "$user_count"
-		fi
-	fi
+  if [[ "$SHOULD_SEED" != "true" ]]; then
+    USER_COUNT="$(get_user_count)"
+    if [[ "$USER_COUNT" == "0" ]]; then
+      SHOULD_SEED=true
+    else
+      echo "Seed skipped: detected ${USER_COUNT} existing users."
+    fi
+  fi
 
-	if (( should_seed == 1 )); then
-		write_step 'Seeding demo accounts and subjects'
-		invoke_backend_command pnpm run db:seed
-	fi
+  if [[ "$SHOULD_SEED" == "true" ]]; then
+    if backend_has_script "db:seed"; then
+      write_step "Seeding demo accounts and subjects"
+      invoke_backend_command pnpm run db:seed
+    else
+      echo "Seed skipped: backend/package.json does not define db:seed."
+    fi
+  fi
 fi
 
-if (( run_smoke_test == 1 )); then
-	write_step 'Running backend smoke test'
-	invoke_backend_command node scripts/api-mock-smoke.js
+if [[ "$RUN_SMOKE_TEST" == "true" ]]; then
+  if [[ -f "$PROJECT_ROOT/backend/scripts/api-mock-smoke.js" ]]; then
+    write_step "Running backend smoke test"
+    invoke_backend_command node scripts/api-mock-smoke.js
+  else
+    echo "Smoke test skipped: backend/scripts/api-mock-smoke.js not found."
+  fi
 fi
 
-printf '\nLocal environment is ready.\n'
-printf 'Frontend: http://localhost:%s\n' "$gateway_host_port"
-printf 'Backend:  http://localhost:%s/api/v1/health\n' "$gateway_host_port"
+echo
+echo "Local environment is ready."
+echo "Frontend: http://localhost:${GATEWAY_HOST_PORT}"
+echo "Backend:  http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
