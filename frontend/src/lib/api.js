@@ -164,6 +164,9 @@ export const bookingApi = {
     getById: (id) => {
         return api.get(`/bookings/${id}`);
     },
+    pay: (id) => {
+        return api.patch(`/bookings/${id}/payment/pay`);
+    },
     cancel: (id, reason) => {
         return api.post(`/bookings/${id}/cancel`, { reason });
     },

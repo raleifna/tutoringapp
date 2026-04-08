@@ -37,12 +37,75 @@ const formatDate = (dateTime) => {
 };
 
 const getStatusClass = (status) => {
+  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
   if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
   if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
   if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
   if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
   if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
   return 'bg-gray-100 text-gray-700 border border-gray-200';
+};
+
+// Mock notification data - replace with actual API calls
+const mockNotifications = [
+  {
+    id: 1,
+    type: 'booking',
+    title: 'New Booking Request',
+    message: 'John Smith requested a Math session for tomorrow',
+    timestamp: new Date(Date.now() - 300000), // 5 minutes ago
+    read: false,
+    link: '/tutor/requests'
+  },
+  {
+    id: 2,
+    type: 'booking',
+    title: 'Booking Confirmed',
+    message: 'Your Science session with Dr. Brown has been confirmed',
+    timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
+    read: false,
+    link: '/bookings'
+  },
+  {
+    id: 3,
+    type: 'system',
+    title: 'System Update',
+    message: 'New features available! Check out the updated dashboard',
+    timestamp: new Date(Date.now() - 3600000), // 1 hour ago
+    read: true,
+    link: '/dashboard'
+  },
+  {
+    id: 4,
+    type: 'message',
+    title: 'New Message',
+    message: 'You have a new message from your tutor',
+    timestamp: new Date(Date.now() - 7200000), // 2 hours ago
+    read: true,
+    link: '/messages'
+  },
+  {
+    id: 5,
+    type: 'booking',
+    title: 'Session Reminder',
+    message: 'Your English session starts in 1 hour',
+    timestamp: new Date(Date.now() - 86400000), // 1 day ago
+    read: true,
+    link: '/bookings'
+  }
+];
+
+const formatTimeAgo = (timestamp) => {
+  const now = new Date();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 };
 
 export default function DashboardPage() {
@@ -65,6 +128,7 @@ export default function DashboardPage() {
   const bookings = bookingsData?.data?.data?.bookings || [];
   const totalBookings = bookingsData?.data?.data?.pagination?.total || 0;
   const completedCount = bookings.filter((item) => item.status === 'COMPLETED').length;
+  const unpaidCount = bookings.filter((item) => item.status === 'UNPAID').length;
   const pendingCount = bookings.filter((item) => item.status === 'PENDING').length;
   const upcomingCount = bookings.filter((item) => item.status === 'ACCEPTED').length;
 
@@ -82,6 +146,13 @@ export default function DashboardPage() {
       icon: CheckCircleIcon,
       color: 'bg-green-100 text-green-600',
       href: '/bookings?from=dashboard&status=COMPLETED',
+    },
+    {
+      label: 'Unpaid',
+      value: unpaidCount,
+      icon: ClockIcon,
+      color: 'bg-orange-100 text-orange-600',
+      href: '/bookings?from=dashboard&status=UNPAID',
     },
     {
       label: 'Pending',
@@ -184,7 +255,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
-                  {(booking.status || '').toLowerCase()}
+                  {formatBookingStatus(booking.status)}
                 </span>
               </Link>
             ))
