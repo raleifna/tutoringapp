@@ -16,8 +16,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
-import NotificationBox from '../../../../components/notificationBox';
-
 
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
@@ -202,7 +200,6 @@ export default function TutorDashboardPage() {
         <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
         <h1 className="text-xl font-bold">{displayName}</h1>
         <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <NotificationBox currentUserId={currentUserId} />
         <div className="mt-4 pr-12 sm:pr-0">
           <button onClick={handleLogout} className="btn-secondary">
             Log out

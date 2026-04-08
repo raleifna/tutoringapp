@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { messageApi } from '../../lib/api-entry';
 import { useAuthStore, useMessageStore } from '../../lib/store';
+import NotificationBox from '@/components/notificationBox';
 
 const isGuestBrowsePath = (pathname = '') =>
   pathname === '/search' || pathname.startsWith('/tutors/');
@@ -72,6 +73,7 @@ export default function AppLayout({ children }) {
   const unreadCount = useMessageStore((state) => state.unreadCount);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
+  const currentUserId = user?.id || '';
 
   useEffect(() => {
     setMounted(true);
@@ -139,8 +141,10 @@ export default function AppLayout({ children }) {
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+
           <h1 className="text-base font-semibold text-gray-900">{pageTitle}</h1>
 
+          <div className='flex justify-between items-center gap-2'>
           {navItems.length > 0 && (
             <nav className="hidden items-center gap-2 md:flex">
               {navItems.map((item) => {
@@ -169,8 +173,12 @@ export default function AppLayout({ children }) {
                   </Link>
                 );
               })}
+
+
             </nav>
           )}
+            <NotificationBox currentUserId={currentUserId} />
+          </div>
         </div>
       </header>
 

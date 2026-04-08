@@ -46,7 +46,7 @@ const getBookingStatusStyle = (status) => {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-dashboard'],

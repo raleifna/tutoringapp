@@ -16,7 +16,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
-import NotificationBox from '@/components/notificationBox';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -201,9 +200,6 @@ export default function DashboardPage() {
           {displayName}
         </h1>
         <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-        
-        <NotificationBox currentUserId={currentUserId} />
-
         <div className="mt-4 flex flex-col gap-2 pr-12 sm:flex-row sm:flex-wrap sm:pr-0">
           <button onClick={handleLogout} className="btn-secondary">
             Log out

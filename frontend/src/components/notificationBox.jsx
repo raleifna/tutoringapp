@@ -88,12 +88,15 @@ const NotificationBox = ({ currentUserId }) => {
 
   return (
     <>
-        <div className="absolute right-3 top-3 sm:right-4 sm:top-4">
+      <div className='relative'>
+        <div className="top-0 right-0">
           <button
             onClick={handleNotificationClick}
-            className="relative p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            className={`relative p-2 rounded-full transition-colors ${
+              isNotificationOpen ? 'bg-primary-50  text-primary-700 font-semibold border border-primary-50' : 'bg-white hover:bg-gray-100  text-gray-500 hover:text-gray-900 border border-gray-100'
+            }`}
           >
-            <BellIcon className="w-5 h-5 text-white" />
+            <BellIcon className="w-5 h-5 " />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -189,6 +192,8 @@ const NotificationBox = ({ currentUserId }) => {
             </div>
           )}
         </div>
+
+      </div>
     
     </>
   );
