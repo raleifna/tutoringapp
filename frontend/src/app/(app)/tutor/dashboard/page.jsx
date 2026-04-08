@@ -198,13 +198,17 @@ export default function TutorDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">{displayName}</h1>
-        <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <button onClick={handleLogout} className="btn-secondary mt-4">
-          Log out
-        </button>
+
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none flex justify-between">
+        <div>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">{displayName}</h1>
+          <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+          <button onClick={handleLogout} className="btn-secondary mt-4">
+            Log out
+          </button>
+        </div>
+
         <NotificationBox currentUserId={currentUserId} />
       </div>
 

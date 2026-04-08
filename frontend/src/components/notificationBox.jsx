@@ -91,7 +91,8 @@ const NotificationBox = ({ currentUserId }) => {
 
   return (
     <>
-        <div className="absolute top-4 right-4">
+      <div className='relative'>
+        <div className="absolute top-0 right-0">
           <button
             onClick={handleNotificationClick}
             className="relative p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
@@ -192,6 +193,8 @@ const NotificationBox = ({ currentUserId }) => {
             </div>
           )}
         </div>
+
+      </div>
     
     </>
   );
