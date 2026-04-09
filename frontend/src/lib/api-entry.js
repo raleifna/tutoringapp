@@ -47,6 +47,8 @@ export const tutorApi = {
   updateApplication: stage4TutorSource.updateApplication,
   updateProfile: stage4TutorSource.updateProfile,
   updateAvailability: stage4TutorSource.updateAvailability,
+  updateCurrentWeekAvailability: stage4TutorSource.updateCurrentWeekAvailability,
+  clearCurrentWeekAvailability: stage4TutorSource.clearCurrentWeekAvailability,
   addSubject: stage4TutorSource.addSubject,
   removeSubject: stage4TutorSource.removeSubject,
 };

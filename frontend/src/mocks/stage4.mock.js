@@ -426,6 +426,9 @@ const createEmptyTutorProfile = (user) => {
     education: educationSummary,
     languages: [],
     availability: [],
+    currentWeekAvailabilityOverride: [],
+    currentWeekEffectiveAvailability: [],
+    hasCurrentWeekAvailabilityOverride: false,
     subjects: [],
     certifications,
     latestReviewAction: hasSubmissionData
@@ -1281,6 +1284,13 @@ export const tutorApi = {
     if (sessionUser.role !== 'TUTOR') return fail('Tutor access required', 403);
 
     const profile = ensureTutorProfileForUser(sessionUser);
+    profile.currentWeekAvailabilityOverride = Array.isArray(profile.currentWeekAvailabilityOverride)
+      ? profile.currentWeekAvailabilityOverride
+      : [];
+    profile.currentWeekEffectiveAvailability = profile.hasCurrentWeekAvailabilityOverride
+      ? [...profile.currentWeekAvailabilityOverride]
+      : [...(profile.availability || [])];
+    profile.hasCurrentWeekAvailabilityOverride = Boolean(profile.hasCurrentWeekAvailabilityOverride);
     return ok(profile);
   },
 
@@ -1365,6 +1375,71 @@ export const tutorApi = {
 
     writeTutorProfiles(profiles);
     return ok(clone(profiles[index]), 'Availability updated');
+  },
+
+  updateCurrentWeekAvailability: async (payload = []) => {
+    await wait();
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+    if (sessionUser.role !== 'TUTOR') return fail('Tutor access required', 403);
+
+    const profiles = ensureTutorProfiles();
+    const profile = ensureTutorProfileForUser(sessionUser);
+    const index = profiles.findIndex((item) => item.id === profile.id);
+    if (index < 0) return fail('Tutor profile not found', 404);
+
+    const rawSlots = Array.isArray(payload) ? payload : payload?.availability;
+    const slots = Array.isArray(rawSlots) ? rawSlots : [];
+
+    profiles[index].currentWeekAvailabilityOverride = slots
+      .map((slot) => ({
+        dayOfWeek: Number(slot?.dayOfWeek),
+        startTime: String(slot?.startTime || ''),
+        endTime: String(slot?.endTime || ''),
+      }))
+      .filter(
+        (slot) =>
+          Number.isInteger(slot.dayOfWeek) &&
+          slot.dayOfWeek >= 0 &&
+          slot.dayOfWeek <= 6 &&
+          slot.startTime &&
+          slot.endTime
+      );
+    profiles[index].hasCurrentWeekAvailabilityOverride = true;
+    profiles[index].currentWeekEffectiveAvailability = [
+      ...profiles[index].currentWeekAvailabilityOverride,
+    ];
+    profiles[index].updatedAt = new Date().toISOString();
+
+    writeTutorProfiles(profiles);
+
+    return ok(
+      {
+        currentWeekAvailabilityOverride: clone(profiles[index].currentWeekAvailabilityOverride),
+        hasCurrentWeekAvailabilityOverride: true,
+      },
+      'This week availability updated'
+    );
+  },
+
+  clearCurrentWeekAvailability: async () => {
+    await wait();
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+    if (sessionUser.role !== 'TUTOR') return fail('Tutor access required', 403);
+
+    const profiles = ensureTutorProfiles();
+    const profile = ensureTutorProfileForUser(sessionUser);
+    const index = profiles.findIndex((item) => item.id === profile.id);
+    if (index < 0) return fail('Tutor profile not found', 404);
+
+    profiles[index].currentWeekAvailabilityOverride = [];
+    profiles[index].currentWeekEffectiveAvailability = [...(profiles[index].availability || [])];
+    profiles[index].hasCurrentWeekAvailabilityOverride = false;
+    profiles[index].updatedAt = new Date().toISOString();
+
+    writeTutorProfiles(profiles);
+    return ok(null, 'Current week availability override cleared');
   },
 
   addSubject: async (subjectId, data = {}) => {
