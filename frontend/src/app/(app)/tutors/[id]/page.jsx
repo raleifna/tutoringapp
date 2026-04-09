@@ -77,14 +77,21 @@ export default function TutorDetailPage() {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const from = searchParams.get('from');
+  const returnTo = searchParams.get('returnTo') || '';
   const searchFrom = (searchParams.get('searchFrom') || '').toLowerCase();
   const isFromTutorDashboard = from === 'tutor-dashboard';
-  const backHref = isFromTutorDashboard
+  const fallbackBackHref = isFromTutorDashboard
     ? '/tutor/dashboard'
     : searchFrom
       ? `/search?from=${encodeURIComponent(searchFrom)}`
       : '/search';
+  const backHref = returnTo || fallbackBackHref;
   const backLabel = 'Back';
+  const showBackButton = Boolean(returnTo || isFromTutorDashboard || searchFrom || from);
+  const tutorDetailHref = (() => {
+    const params = searchParams.toString();
+    return params ? `/tutors/${id}?${params}` : `/tutors/${id}`;
+  })();
 
   // Stage 2 priority #1
   const {
@@ -196,7 +203,10 @@ export default function TutorDetailPage() {
   const messageMutation = useMutation({
     mutationFn: () => messageApi.createConversation(tutor.userId),
     onSuccess: (res) => {
-      router.push(`/messages?conversationId=${res.data.data.id}`);
+      const nextParams = new URLSearchParams();
+      nextParams.set('conversationId', res.data.data.id);
+      nextParams.set('returnTo', tutorDetailHref);
+      router.push(`/messages?${nextParams.toString()}`);
     },
     onError: (err) => {
       const message =
@@ -247,9 +257,11 @@ export default function TutorDetailPage() {
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          <Link href={backHref} className="text-sm text-primary-600 hover:underline">
-            {backLabel}
-          </Link>
+          {showBackButton && (
+            <Link href={backHref} className="text-sm text-primary-600 hover:underline">
+              {backLabel}
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -259,24 +271,28 @@ export default function TutorDetailPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
         <p className="text-gray-600 mb-3">Tutor not found.</p>
-        <Link href={backHref} className="btn-primary btn-sm">
-          {backLabel}
-        </Link>
+        {showBackButton && (
+          <Link href={backHref} className="btn-primary btn-sm">
+            {backLabel}
+          </Link>
+        )}
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <div className="flex justify-end">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          {backLabel}
-        </Link>
-      </div>
+      {showBackButton && (
+        <div className="flex justify-end">
+          <Link
+            href={backHref}
+            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            {backLabel}
+          </Link>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
         <div className="flex flex-col sm:flex-row gap-5">

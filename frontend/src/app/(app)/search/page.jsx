@@ -13,7 +13,6 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { subjectApi, tutorApi } from '../../../lib/api-entry';
-import { useAuthStore } from '../../../lib/store';
 
 const SESSION_TYPES = [
   { value: '', label: 'Any type' },
@@ -28,6 +27,24 @@ const SORT_OPTIONS = [
   { value: 'rate_desc', label: 'Price high to low' },
   { value: 'experience', label: 'Most experienced' },
 ];
+
+const SORT_VALUES = new Set(SORT_OPTIONS.map((item) => item.value));
+const SESSION_TYPE_VALUES = new Set(SESSION_TYPES.map((item) => item.value));
+
+const getPageNumber = (value) => {
+  const next = Number.parseInt(String(value || '1'), 10);
+  return Number.isFinite(next) && next > 0 ? next : 1;
+};
+
+const getInitialSort = (value) => {
+  const next = String(value || 'rating');
+  return SORT_VALUES.has(next) ? next : 'rating';
+};
+
+const getInitialSessionType = (value) => {
+  const next = String(value || '').toUpperCase();
+  return SESSION_TYPE_VALUES.has(next) ? next : '';
+};
 
 export const locationOptions = [
   {
@@ -212,17 +229,28 @@ export default function SearchPage() {
 function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuthStore();
   const from = (searchParams.get('from') || '').toLowerCase();
+  const showBackButton = Boolean(from);
 
   const [filters, setFilters] = useState({
     subject: searchParams.get('subject') || '',
-    location: '',
-    sessionType: '',
-    sort: 'rating',
-    page: 1,
+    location: searchParams.get('location') || '',
+    sessionType: getInitialSessionType(searchParams.get('sessionType')),
+    sort: getInitialSort(searchParams.get('sort')),
+    page: getPageNumber(searchParams.get('page')),
     limit: 10,
   });
+
+  useEffect(() => {
+    setFilters({
+      subject: searchParams.get('subject') || '',
+      location: searchParams.get('location') || '',
+      sessionType: getInitialSessionType(searchParams.get('sessionType')),
+      sort: getInitialSort(searchParams.get('sort')),
+      page: getPageNumber(searchParams.get('page')),
+      limit: 10,
+    });
+  }, [searchParams]);
 
   // Stage 2 priority #1: category list
   const { data: categoriesData } = useQuery({
@@ -290,15 +318,18 @@ function SearchPageContent() {
     'tutor-requests': '/tutor/requests',
   };
 
-  const fallbackBackHref =
-    fallbackBackHrefMap[from] ||
-    (user?.role === 'TUTOR'
-      ? '/tutor/dashboard'
-      : user?.role === 'ADMIN' || user?.role === 'SYSTEM_ADMIN'
-        ? '/admin/dashboard'
-        : user
-          ? '/dashboard'
-          : '/');
+  const fallbackBackHref = fallbackBackHrefMap[from] || '/';
+  const currentSearchHref = (() => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (filters.subject) params.set('subject', filters.subject);
+    if (filters.location) params.set('location', filters.location);
+    if (filters.sessionType) params.set('sessionType', filters.sessionType);
+    if (filters.sort && filters.sort !== 'rating') params.set('sort', filters.sort);
+    if (filters.page > 1) params.set('page', String(filters.page));
+    const query = params.toString();
+    return query ? `/search?${query}` : '/search';
+  })();
 
   const handleBack = () => {
     router.push(fallbackBackHref);
@@ -311,13 +342,15 @@ function SearchPageContent() {
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
           <h1 className="text-xl font-bold text-gray-900 flex-1">Find Tutors</h1>
           {isFetching && !isLoading && <span className="text-xs text-gray-400">Updating...</span>}
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-          >
-            <span>←</span> Back
-          </button>
+          {showBackButton && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+            >
+              <span>←</span> Back
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -449,7 +482,9 @@ function SearchPageContent() {
 
         {!isLoading &&
           !isError &&
-          tutors.map((tutor) => <TutorCard key={tutor.id} tutor={tutor} searchFrom={from} />)}
+          tutors.map((tutor) => (
+            <TutorCard key={tutor.id} tutor={tutor} returnToHref={currentSearchHref} />
+          ))}
       </div>
 
       {!isLoading && !isError && totalPages > 1 && (
@@ -493,7 +528,7 @@ function SearchFallback() {
   );
 }
 
-function TutorCard({ tutor, searchFrom }) {
+function TutorCard({ tutor, returnToHref }) {
   const name = `${tutor?.user?.firstName || ''} ${tutor?.user?.lastName || ''}`.trim() || 'Tutor';
   const avatar =
     tutor?.user?.avatar ||
@@ -506,13 +541,13 @@ function TutorCard({ tutor, searchFrom }) {
     .slice(0, 3);
   const hourlyRate = tutor?.hourlyRate || 0;
 
-  const params = new URLSearchParams();
-  params.set('from', 'search');
-  if (searchFrom) params.set('searchFrom', searchFrom);
+  const detailHref = returnToHref
+    ? `/tutors/${tutor.id}?returnTo=${encodeURIComponent(returnToHref)}`
+    : `/tutors/${tutor.id}`;
 
   return (
     <Link
-      href={`/tutors/${tutor.id}?${params.toString()}`}
+      href={detailHref}
       className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-primary-300"
     >
       <div className="flex gap-3">

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -61,9 +61,22 @@ const formatPaymentStatus = (status) => {
 export default function BookingPaymentPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
+  const returnTo = searchParams.get('returnTo') || '';
+  const showBackButton = Boolean(returnTo);
+  const paymentSuccessHref = (() => {
+    if (!returnTo) return `/bookings/${id}?payment=success`;
+
+    const [pathname, queryString = ''] = returnTo.split('?');
+    const params = new URLSearchParams(queryString);
+    params.set('payment', 'success');
+    const query = params.toString();
+
+    return query ? `${pathname}?${query}` : pathname;
+  })();
 
   const {
     data,
@@ -91,7 +104,7 @@ export default function BookingPaymentPage() {
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      router.push(`/bookings/${id}?payment=success`);
+      router.push(paymentSuccessHref);
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to process payment');
@@ -133,9 +146,11 @@ export default function BookingPaymentPage() {
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          <Link href={`/bookings/${id}`} className="btn-secondary btn-sm">
-            Back
-          </Link>
+          {showBackButton && (
+            <Link href={returnTo} className="btn-secondary btn-sm">
+              Back
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -148,9 +163,11 @@ export default function BookingPaymentPage() {
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Order Detail</p>
           <h1 className="text-2xl font-bold text-gray-900">Confirm Payment</h1>
         </div>
-        <Link href={`/bookings/${id}`} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-          <span>←</span> Back
-        </Link>
+        {showBackButton && (
+          <Link href={returnTo} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+            <span>←</span> Back
+          </Link>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
@@ -209,7 +226,7 @@ export default function BookingPaymentPage() {
           </div>
         ) : (
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Link href={`/bookings/${id}`} className="btn-secondary text-center">
+            <Link href={showBackButton ? returnTo : `/bookings/${id}`} className="btn-secondary text-center">
               Cancel
             </Link>
             <button

@@ -252,7 +252,7 @@ export default function TutorDashboardPage() {
               return (
                 <Link
                   key={booking.id}
-                  href={`/bookings/${booking.id}?from=tutor-dashboard`}
+                  href={`/bookings/${booking.id}?returnTo=${encodeURIComponent('/tutor/dashboard')}&from=tutor-dashboard`}
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
@@ -303,7 +303,7 @@ export default function TutorDashboardPage() {
               return (
                 <Link
                   key={booking.id}
-                  href={`/bookings/${booking.id}?from=tutor-dashboard`}
+                  href={`/bookings/${booking.id}?returnTo=${encodeURIComponent('/tutor/dashboard')}&from=tutor-dashboard`}
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img

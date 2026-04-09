@@ -86,12 +86,6 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
-const getTutorDetailHref = (booking, fallbackFrom = 'bookings') => {
-  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
-  if (!tutorId) return null;
-  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
-};
-
 export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
@@ -101,7 +95,9 @@ export default function BookingDetailPage() {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   const from = (searchParams.get('from') || '').toLowerCase();
+  const returnTo = searchParams.get('returnTo') || '';
   const paymentResult = (searchParams.get('payment') || '').toLowerCase();
+  const showBackButton = Boolean(returnTo || from);
   const backConfigMap = {
     'tutor-requests': { href: '/tutor/requests', label: 'Back' },
     'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
@@ -109,9 +105,9 @@ export default function BookingDetailPage() {
     search: { href: '/search', label: 'Back' },
     bookings: { href: '/bookings', label: 'Back' },
   };
-  const backConfig = backConfigMap[from] || backConfigMap.bookings;
-  const backHref = backConfig.href;
-  const backLabel = backConfig.label;
+  const backConfig = backConfigMap[from] || null;
+  const backHref = returnTo || backConfig?.href || '/bookings';
+  const backLabel = backConfig?.label || 'Back';
 
   const {
     data,
@@ -129,7 +125,25 @@ export default function BookingDetailPage() {
   const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
-  const tutorDetailHref = !isTutor ? getTutorDetailHref(booking, from || 'bookings') : null;
+  const bookingDetailHref = (() => {
+    const params = new URLSearchParams();
+    if (returnTo) params.set('returnTo', returnTo);
+    if (from) params.set('from', from);
+    if (paymentResult) params.set('payment', paymentResult);
+    const query = params.toString();
+    return query ? `/bookings/${id}?${query}` : `/bookings/${id}`;
+  })();
+  const tutorDetailHref = (() => {
+    if (isTutor) return null;
+    const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+    if (!tutorId) return null;
+
+    const params = new URLSearchParams();
+    params.set('returnTo', bookingDetailHref);
+    const query = params.toString();
+
+    return query ? `/tutors/${tutorId}?${query}` : `/tutors/${tutorId}`;
+  })();
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
   const isPaidBooking = paymentStatus === 'COMPLETED';
@@ -217,9 +231,11 @@ export default function BookingDetailPage() {
       <div className="max-w-2xl mx-auto text-center py-14">
         <p className="text-gray-700 font-medium mb-1">Invalid booking link</p>
         <p className="text-gray-500 text-sm mb-4">Booking ID is missing.</p>
-        <Link href={backHref} className="btn-primary btn-sm">
-          {backLabel}
-        </Link>
+        {showBackButton && (
+          <Link href={backHref} className="btn-primary btn-sm">
+            {backLabel}
+          </Link>
+        )}
       </div>
     );
   }
@@ -247,9 +263,11 @@ export default function BookingDetailPage() {
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          <Link href={backHref} className="btn-secondary btn-sm">
-            {backLabel}
-          </Link>
+          {showBackButton && (
+            <Link href={backHref} className="btn-secondary btn-sm">
+              {backLabel}
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -260,9 +278,11 @@ export default function BookingDetailPage() {
       <div className="max-w-2xl mx-auto text-center py-14">
         <p className="text-gray-700 font-medium mb-1">Booking not found</p>
         <p className="text-gray-500 text-sm mb-3">This booking may have been removed or is unavailable.</p>
-        <Link href={backHref} className="btn-primary btn-sm">
-          {backLabel}
-        </Link>
+        {showBackButton && (
+          <Link href={backHref} className="btn-primary btn-sm">
+            {backLabel}
+          </Link>
+        )}
       </div>
     );
   }
@@ -293,9 +313,11 @@ export default function BookingDetailPage() {
         {booking.status === 'COMPLETED' && <CheckCircleIcon className="w-5 h-5" />}
         {booking.status === 'CANCELLED' && <XCircleIcon className="w-5 h-5" />}
         Booking Status: <strong className="flex-1">{formatBookingStatus(booking.status)}</strong>
-        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-          <span>←</span> {backLabel}
-        </Link>
+        {showBackButton && (
+          <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
+            <span>←</span> {backLabel}
+          </Link>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
@@ -410,7 +432,7 @@ export default function BookingDetailPage() {
               {isLearner && (
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <Link
-                    href={`/bookings/${id}/payment`}
+                    href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
                     className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
                   >
                     <CheckCircleIcon className="w-4 h-4" />

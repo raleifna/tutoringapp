@@ -29,6 +29,11 @@ const getInitialStatus = (value) => {
   return STATUS_VALUES.has(next) ? next : 'PENDING';
 };
 
+const getPageNumber = (value) => {
+  const next = Number.parseInt(String(value || '1'), 10);
+  return Number.isFinite(next) && next > 0 ? next : 1;
+};
+
 const cn = (...classes) => {
   return classes.filter(Boolean).join(' ');
 };
@@ -84,17 +89,25 @@ export default function TutorRequestsPage() {
 function TutorRequestsContent() {
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
+  const pageParam = searchParams.get('page');
   const [activeStatus, setActiveStatus] = useState(() =>
     getInitialStatus(statusParam)
   );
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => getPageNumber(pageParam));
   const queryClient = useQueryClient();
+  const currentRequestsHref = (() => {
+    const params = new URLSearchParams();
+    if (activeStatus) params.set('status', activeStatus);
+    if (page > 1) params.set('page', String(page));
+    const query = params.toString();
+    return query ? `/tutor/requests?${query}` : '/tutor/requests';
+  })();
 
   useEffect(() => {
     const next = getInitialStatus(statusParam);
     setActiveStatus(next);
-    setPage(1);
-  }, [statusParam]);
+    setPage(getPageNumber(pageParam));
+  }, [pageParam, statusParam]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tutor-requests', activeStatus, page],
@@ -142,9 +155,6 @@ function TutorRequestsContent() {
       <div className="pl-4">
         <div className='flex'>
           <h1 className="text-2xl font-bold text-gray-900 flex-1">Booking Requests</h1>
-          <Link href="/tutor/dashboard" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-            <span>←</span> Back
-          </Link>
         </div>
         <p className="text-gray-600 mt-1">Manage session requests from learners</p>
       </div>
@@ -279,7 +289,7 @@ function TutorRequestsContent() {
                     </button>
                   )}
                   <Link
-                    href={`/bookings/${booking.id}?from=tutor-requests`}
+                    href={`/bookings/${booking.id}?returnTo=${encodeURIComponent(currentRequestsHref)}&from=tutor-requests`}
                     className="btn-secondary btn-sm ml-auto"
                   >
                     View Details

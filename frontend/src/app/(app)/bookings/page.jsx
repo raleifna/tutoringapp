@@ -25,6 +25,11 @@ const getInitialStatus = (value) => {
   return STATUS_VALUES.has(next) ? next : '';
 };
 
+const getPageNumber = (value) => {
+  const next = Number.parseInt(String(value || '1'), 10);
+  return Number.isFinite(next) && next > 0 ? next : 1;
+};
+
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
   const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
@@ -88,12 +93,6 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
-const getTutorDetailHref = (booking, fallbackFrom = 'bookings') => {
-  const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
-  if (!tutorId) return null;
-  return `/tutors/${tutorId}?from=${encodeURIComponent(fallbackFrom)}`;
-};
-
 // export default function BookingsPage() {
 //   return (
 //     <Suspense fallback={<BookingsPageFallback />}>
@@ -106,12 +105,14 @@ function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
+  const pageParam = searchParams.get('page');
   const fromParam = (searchParams.get('from') || '').toLowerCase();
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => getPageNumber(pageParam));
   const isTutor = user?.role === 'TUTOR';
+  const showBackButton = Boolean(fromParam);
   const fallbackBackHrefMap = {
     home: '/',
     search: '/search',
@@ -120,13 +121,12 @@ function BookingsPageContent() {
     'tutor-dashboard': '/tutor/dashboard',
     'tutor-requests': '/tutor/requests',
   };
-  const fallbackBackHref =
-    fallbackBackHrefMap[fromParam] || (isTutor ? '/tutor/dashboard' : '/dashboard');
+  const fallbackBackHref = fallbackBackHrefMap[fromParam] || '/';
 
   useEffect(() => {
     setActiveStatus(getInitialStatus(statusParam));
-    setPage(1);
-  }, [statusParam]);
+    setPage(getPageNumber(pageParam));
+  }, [pageParam, statusParam]);
 
   const handleBack = () => {
     router.push(fallbackBackHref);
@@ -159,6 +159,14 @@ function BookingsPageContent() {
   const pagination = data?.data?.data?.pagination;
   const totalPages = pagination?.totalPages || 1;
   const currentPage = pagination?.page || page;
+  const currentBookingsHref = (() => {
+    const params = new URLSearchParams();
+    if (fromParam) params.set('from', fromParam);
+    if (activeStatus) params.set('status', activeStatus);
+    if (page > 1) params.set('page', String(page));
+    const query = params.toString();
+    return query ? `/bookings?${query}` : '/bookings';
+  })();
 
   return (
     <div className="space-y-5">
@@ -167,13 +175,15 @@ function BookingsPageContent() {
           <h1 className="text-2xl font-bold text-gray-900 flex-1">My Bookings</h1>
           <p className="mt-1 text-gray-600">Manage your tutoring sessions</p>
         </div>
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-        >
-          <span>←</span> Back
-        </button>
+        {showBackButton && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+          >
+            <span>←</span> Back
+          </button>
+        )}
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px">
@@ -242,7 +252,7 @@ function BookingsPageContent() {
               key={booking.id}
               booking={booking}
               isTutor={isTutor}
-              detailFrom={fromParam || 'bookings'}
+              returnTo={currentBookingsHref}
             />
           ))}
         </div>
@@ -293,7 +303,7 @@ function BookingsPageFallback() {
   );
 }
 
-function BookingCard({ booking, isTutor, detailFrom }) {
+function BookingCard({ booking, isTutor, returnTo }) {
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor || {};
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
   const otherLastName = other?.lastName || '';
@@ -301,8 +311,16 @@ function BookingCard({ booking, isTutor, detailFrom }) {
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
-  const tutorDetailHref = !isTutor ? getTutorDetailHref(booking, detailFrom || 'bookings') : null;
-  const bookingDetailHref = `/bookings/${booking.id}?from=${encodeURIComponent(detailFrom || 'bookings')}`;
+  const bookingDetailHref = returnTo
+    ? `/bookings/${booking.id}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/bookings/${booking.id}`;
+  const tutorDetailHref = (() => {
+    if (isTutor) return null;
+    const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+    if (!tutorId) return null;
+    if (!returnTo) return `/tutors/${tutorId}`;
+    return `/tutors/${tutorId}?returnTo=${encodeURIComponent(returnTo)}`;
+  })();
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all">

@@ -1,7 +1,6 @@
 // src/app/(app)/profile/page.jsx - User Profile Edit Page
 'use client';
 
-import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -56,12 +55,6 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const backHref =
-    user?.role === 'TUTOR'
-      ? '/tutor/dashboard'
-      : user?.role === 'ADMIN' || user?.role === 'SYSTEM_ADMIN'
-        ? '/admin/dashboard'
-        : '/dashboard';
 
   const {
     register,
@@ -137,12 +130,8 @@ export default function ProfilePage() {
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-6">
-      
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title flex-1">My Profile</h1>
-        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-          <span>←</span> Back
-        </Link>
       </div>
       <div className="card flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="relative">

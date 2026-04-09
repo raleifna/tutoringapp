@@ -87,6 +87,7 @@ function NotificationsPageContent() {
   const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
   const [page, setPage] = useState(1);
+  const showBackButton = Boolean(fromParam);
   
   const fallbackBackHrefMap = {
     home: '/',
@@ -95,7 +96,7 @@ function NotificationsPageContent() {
     search: '/search',
     profile: '/profile',
   };
-  const fallbackBackHref = fallbackBackHrefMap[fromParam] || '/dashboard';
+  const fallbackBackHref = fallbackBackHrefMap[fromParam] || '/';
 
   useEffect(() => {
     setActiveStatus(getInitialStatus(statusParam));
@@ -155,13 +156,15 @@ function NotificationsPageContent() {
         <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
           <p className="mt-1 text-gray-600">Stay updated with your tutoring activities</p>
         </div>
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-        >
-          <span>←</span> Back
-        </button>
+        {showBackButton && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
+          >
+            <span>←</span> Back
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">

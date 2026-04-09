@@ -59,6 +59,7 @@ export default function MessagesPage() {
   const [messageInput, setMessageInput] = useState('');
   const [partnerTyping, setPartnerTyping] = useState(false);
   const requestedUserId = searchParams.get('userId') || '';
+  const returnTo = searchParams.get('returnTo') || '';
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -89,6 +90,21 @@ export default function MessagesPage() {
     (item) => item.userId !== user?.id
   )?.user;
   const showConversationList = !selectedConversationId;
+  const showReturnButton = Boolean(user?.id && returnTo);
+
+  const buildMessagesHref = (conversationId) => {
+    const params = new URLSearchParams();
+
+    if (conversationId) {
+      params.set('conversationId', conversationId);
+    }
+    if (returnTo) {
+      params.set('returnTo', returnTo);
+    }
+
+    const query = params.toString();
+    return query ? `/messages?${query}` : '/messages';
+  };
 
   useEffect(() => {
     const nextId = searchParams.get('conversationId') || '';
@@ -107,7 +123,7 @@ export default function MessagesPage() {
         const conversationId = res?.data?.data?.id || '';
         if (!conversationId) return;
         setSelectedConversationId(conversationId);
-        router.replace(`/messages?conversationId=${conversationId}`);
+        router.replace(buildMessagesHref(conversationId));
         queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
       })
       .catch(() => {});
@@ -115,7 +131,7 @@ export default function MessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryClient, requestedUserId, router, selectedConversationId, user?.id]);
+  }, [queryClient, requestedUserId, returnTo, router, selectedConversationId, user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,10 +261,14 @@ export default function MessagesPage() {
 
   const handleSelectConversation = (conversationId) => {
     setSelectedConversationId(conversationId);
-    router.replace(`/messages?conversationId=${conversationId}`);
+    router.replace(buildMessagesHref(conversationId));
   };
 
   const handleBackToList = () => {
+    if (showReturnButton) {
+      router.push(returnTo);
+      return;
+    }
     setSelectedConversationId('');
     setPartnerTyping(false);
     router.replace('/messages');
@@ -256,9 +276,21 @@ export default function MessagesPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Messages</h1>
-        <p className="mt-1 text-sm text-gray-500">Chat with tutors and learners here.</p>
+      <div className="mb-4 flex flex-wrap items-start gap-3 md:mb-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Messages</h1>
+          <p className="mt-1 text-sm text-gray-500">Chat with tutors and learners here.</p>
+        </div>
+        {showReturnButton && (
+          <button
+            type="button"
+            onClick={() => router.push(returnTo)}
+            className="hidden items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 md:inline-flex"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back
+          </button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:grid md:grid-cols-[320px_1fr]">
