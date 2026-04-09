@@ -2,6 +2,8 @@ const express = require('express');
 const {
     register,
     login,
+    verifyEmail,
+    resendVerification,
     refreshToken,
     logout,
     getMe,
@@ -13,6 +15,8 @@ const router = express.Router();
 
 router.post('/register', upload.array('verificationFiles', 5), register);
 router.post('/login', login);
+router.get('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerification);
 router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
 

@@ -31,6 +31,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_this_too}
       EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-TutorConnect <no-reply@example.com>}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
       ALLOW_TRYCLOUDFLARE_CORS: ${ALLOW_TRYCLOUDFLARE_CORS:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:8080}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
