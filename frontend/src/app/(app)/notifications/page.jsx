@@ -175,14 +175,14 @@ function NotificationsPageContent() {
               <CheckCircleIcon className="w-4 h-4" />
               Mark All as Read
           </button>
-          <button
+          {/* <button
               onClick={async () => { await notificationApi.addTestsData(); refetch(); }}
               className="btn-secondary btn-sm gap-1.5"
               disabled={isFetching}
           >
               <CheckCircleIcon className="w-4 h-4" />
               Add 20 Test Data
-          </button>
+          </button> */}
         </div>
       </div>
 
