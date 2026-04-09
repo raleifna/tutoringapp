@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+import BackButton from '../../../../components/BackButton';
 
 const PERIODS = [7, 30, 90];
 
@@ -98,9 +99,7 @@ function AdminAnalyticsContent() {
 
   return (
     <div className="relative space-y-5">
-      <Link href="/admin/dashboard" className="absolute top-1 right-2 z-10 inline-flex items-center gap-1.5 text-sm text-white hover:text-white/80">
-        <span>←</span> Back
-      </Link>
+      <BackButton href="/admin/dashboard" variant="inverse" className="absolute top-1 right-2 z-10" />
 
       <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-5 text-white -mx-4 -mt-4 px-8 pt-6 rounded-t-none">
         <p className="text-primary-200 text-xs font-medium mb-0.5">Admin Panel</p>

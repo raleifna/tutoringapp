@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
+import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
@@ -176,13 +177,9 @@ function BookingsPageContent() {
           <p className="mt-1 text-gray-600">Manage your tutoring sessions</p>
         </div>
         {showBackButton && (
-          <button
-            type="button"
+          <BackButton
             onClick={handleBack}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-          >
-            <span>←</span> Back
-          </button>
+          />
         )}
       </div>
 
@@ -304,6 +301,7 @@ function BookingsPageFallback() {
 }
 
 function BookingCard({ booking, isTutor, returnTo }) {
+  const router = useRouter();
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor || {};
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
   const otherLastName = other?.lastName || '';
@@ -323,12 +321,24 @@ function BookingCard({ booking, isTutor, returnTo }) {
   })();
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all">
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(bookingDetailHref)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          router.push(bookingDetailHref);
+        }
+      }}
+      className="cursor-pointer bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-primary-100 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-4">
           {tutorDetailHref ? (
             <Link
               href={tutorDetailHref}
+              onClick={(event) => event.stopPropagation()}
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
@@ -358,10 +368,7 @@ function BookingCard({ booking, isTutor, returnTo }) {
         </div>
       </div>
 
-      <Link
-        href={bookingDetailHref}
-        className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-50"
-      >
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-50">
         <div className="flex items-center gap-1">
           <CalendarDaysIcon className="w-3.5 h-3.5" />
           {formatDate(booking?.scheduledAt)}
@@ -376,7 +383,7 @@ function BookingCard({ booking, isTutor, returnTo }) {
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
           {sessionType}
         </span>
-      </Link>
+      </div>
     </div>
   );
 }

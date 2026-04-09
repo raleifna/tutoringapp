@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '../../../lib/store';
 import toast from 'react-hot-toast';
 import { notificationApi } from '../../../lib/api';
+import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
@@ -157,13 +158,9 @@ function NotificationsPageContent() {
           <p className="mt-1 text-gray-600">Stay updated with your tutoring activities</p>
         </div>
         {showBackButton && (
-          <button
-            type="button"
+          <BackButton
             onClick={handleBack}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-          >
-            <span>←</span> Back
-          </button>
+          />
         )}
       </div>
 

@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
+import BackButton from '../../../../components/BackButton';
 
 const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
@@ -232,9 +233,7 @@ export default function BookingDetailPage() {
         <p className="text-gray-700 font-medium mb-1">Invalid booking link</p>
         <p className="text-gray-500 text-sm mb-4">Booking ID is missing.</p>
         {showBackButton && (
-          <Link href={backHref} className="btn-primary btn-sm">
-            {backLabel}
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
         )}
       </div>
     );
@@ -264,9 +263,7 @@ export default function BookingDetailPage() {
             Retry
           </button>
           {showBackButton && (
-            <Link href={backHref} className="btn-secondary btn-sm">
-              {backLabel}
-            </Link>
+            <BackButton href={backHref} label={backLabel} />
           )}
         </div>
       </div>
@@ -279,9 +276,7 @@ export default function BookingDetailPage() {
         <p className="text-gray-700 font-medium mb-1">Booking not found</p>
         <p className="text-gray-500 text-sm mb-3">This booking may have been removed or is unavailable.</p>
         {showBackButton && (
-          <Link href={backHref} className="btn-primary btn-sm">
-            {backLabel}
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
         )}
       </div>
     );
@@ -314,9 +309,7 @@ export default function BookingDetailPage() {
         {booking.status === 'CANCELLED' && <XCircleIcon className="w-5 h-5" />}
         Booking Status: <strong className="flex-1">{formatBookingStatus(booking.status)}</strong>
         {showBackButton && (
-          <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-            <span>←</span> {backLabel}
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
         )}
       </div>
 

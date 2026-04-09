@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import {
-  ArrowLeftIcon,
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
 import { useAuthStore, useMessageStore } from '../../../lib/store';
+import BackButton from '../../../components/BackButton';
 
 let socket = null;
 
@@ -282,14 +282,10 @@ export default function MessagesPage() {
           <p className="mt-1 text-sm text-gray-500">Chat with tutors and learners here.</p>
         </div>
         {showReturnButton && (
-          <button
-            type="button"
+          <BackButton
             onClick={() => router.push(returnTo)}
-            className="hidden items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 md:inline-flex"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-            Back
-          </button>
+            className="hidden md:inline-flex"
+          />
         )}
       </div>
 
@@ -392,14 +388,13 @@ export default function MessagesPage() {
           <div className="flex h-[calc(100dvh-11.5rem)] min-h-[32rem] flex-col md:h-[calc(100dvh-10rem)] md:min-h-[520px]">
             <div className="border-b border-gray-100 px-4 py-3 md:px-5 md:py-4">
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
+                <BackButton
                   onClick={handleBackToList}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-600 md:hidden"
-                  aria-label="Back to chats"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </button>
+                  className="md:hidden"
+                  label="Back to chats"
+                  variant="icon"
+                  iconOnly
+                />
                 <img
                   src={getAvatarUrl(
                     selectedPartner?.avatar,

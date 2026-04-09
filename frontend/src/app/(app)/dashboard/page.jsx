@@ -126,7 +126,7 @@ const formatTimeAgo = (timestamp) => {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, accessToken, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
 
@@ -135,10 +135,14 @@ export default function DashboardPage() {
   }, []);
 
   const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
-  const { data: bookingsData, isLoading } = useQuery({
+  const {
+    data: bookingsData,
+    isLoading,
+    isFetching,
+  } = useQuery({
     queryKey: ['myBookings', 'dashboard', currentUserId],
     queryFn: () => bookingApi.getMyBookings({ limit: 5 }),
-    enabled: !!currentUserId,
+    enabled: mounted && !!accessToken && !!currentUserId,
   });
 
   const bookings = bookingsData?.data?.data?.bookings || [];
@@ -200,13 +204,10 @@ export default function DashboardPage() {
           {displayName}
         </h1>
         <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-        <div className="mt-4 flex flex-col gap-2 pr-12 sm:flex-row sm:flex-wrap sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary">
+        <div className="mt-4 flex flex-wrap gap-2 pr-12 sm:pr-0">
+          <button onClick={handleLogout} className="btn-secondary btn-sm rounded-full px-4">
             Log out
           </button>
-          <Link href="/profile" className="btn-secondary">
-            My Profile
-          </Link>
         </div>
       </div>
 
@@ -218,7 +219,9 @@ export default function DashboardPage() {
             >
               <item.icon className="w-5 h-5" />
             </div>
-            <div className="text-2xl font-bold text-gray-900">{isLoading ? '-' : item.value}</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {isLoading && !bookingsData ? '-' : item.value}
+            </div>
             <div className="text-xs text-gray-500 mt-0.5">{item.label}</div>
           </Link>
         ))}
@@ -233,7 +236,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="divide-y divide-gray-50">
-          {isLoading ? (
+          {isLoading && !bookingsData ? (
             <div className="py-8 px-4 text-sm text-gray-500">Loading bookings...</div>
           ) : bookings.length === 0 ? (
             <div className="py-10 text-center text-gray-500 px-4">
@@ -304,6 +307,10 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {isFetching && bookingsData && (
+        <p className="text-xs text-gray-400 text-center">Refreshing dashboard...</p>
+      )}
 
       <div className="card p-5">
         <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>

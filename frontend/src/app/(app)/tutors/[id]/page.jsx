@@ -10,7 +10,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeftIcon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   CheckBadgeIcon,
@@ -23,6 +22,7 @@ import {
 import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
+import BackButton from '../../../../components/BackButton';
 
 const bookingSchema = z.object({
   subjectId: z.string().min(1, 'Please select a subject'),
@@ -258,9 +258,7 @@ export default function TutorDetailPage() {
             Retry
           </button>
           {showBackButton && (
-            <Link href={backHref} className="text-sm text-primary-600 hover:underline">
-              {backLabel}
-            </Link>
+            <BackButton href={backHref} label={backLabel} />
           )}
         </div>
       </div>
@@ -272,9 +270,7 @@ export default function TutorDetailPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
         <p className="text-gray-600 mb-3">Tutor not found.</p>
         {showBackButton && (
-          <Link href={backHref} className="btn-primary btn-sm">
-            {backLabel}
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
         )}
       </div>
     );
@@ -284,13 +280,7 @@ export default function TutorDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
       {showBackButton && (
         <div className="flex justify-end">
-          <Link
-            href={backHref}
-            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-            {backLabel}
-          </Link>
+          <BackButton href={backHref} label={backLabel} />
         </div>
       )}
 

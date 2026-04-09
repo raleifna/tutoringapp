@@ -13,6 +13,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { subjectApi, tutorApi } from '../../../lib/api-entry';
+import BackButton from '../../../components/BackButton';
 
 const SESSION_TYPES = [
   { value: '', label: 'Any type' },
@@ -342,15 +343,11 @@ function SearchPageContent() {
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
           <h1 className="text-xl font-bold text-gray-900 flex-1">Find Tutors</h1>
           {isFetching && !isLoading && <span className="text-xs text-gray-400">Updating...</span>}
-          {showBackButton && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600"
-            >
-              <span>←</span> Back
-            </button>
-          )}
+        {showBackButton && (
+          <BackButton
+            onClick={handleBack}
+          />
+        )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

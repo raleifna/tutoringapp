@@ -73,6 +73,8 @@ const formatIpAddress = (value) => {
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const authLoading = useAuthStore((state) => state.isLoading);
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -97,9 +99,9 @@ export default function AppLayout({ children }) {
   }, [mounted, isGuestPath, accessToken, router]);
 
   useEffect(() => {
-    if (!mounted || !accessToken) return;
+    if (!mounted || !accessToken || user || isGuestPath) return;
     initializeAuth().catch(() => {});
-  }, [mounted, accessToken, initializeAuth]);
+  }, [mounted, accessToken, user, isGuestPath, initializeAuth]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -134,6 +136,14 @@ export default function AppLayout({ children }) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
         Redirecting to login...
+      </div>
+    );
+  }
+
+  if (accessToken && !user && !isGuestPath) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
+        {authLoading ? 'Loading account...' : 'Loading dashboard...'}
       </div>
     );
   }
