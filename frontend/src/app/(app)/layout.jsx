@@ -65,15 +65,22 @@ const pageTitles = {
   '/tutor/profile': 'Tutor Profile',
 };
 
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const unreadCount = useMessageStore((state) => state.unreadCount);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+  const currentIpAddress = formatIpAddress(user?.ipAddress);
 
   useEffect(() => {
     setMounted(true);
@@ -88,6 +95,11 @@ export default function AppLayout({ children }) {
 
     router.replace('/login');
   }, [mounted, isGuestPath, accessToken, router]);
+
+  useEffect(() => {
+    if (!mounted || !accessToken) return;
+    initializeAuth().catch(() => {});
+  }, [mounted, accessToken, initializeAuth]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -140,9 +152,15 @@ export default function AppLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-
-          <h1 className="text-base font-semibold text-gray-900">{pageTitle}</h1>
+        <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
+            {currentIpAddress && (
+              <p className="truncate text-xs text-gray-500">
+                Current IP: <span className="font-medium text-gray-700">{currentIpAddress}</span>
+              </p>
+            )}
+          </div>
 
           <div className='flex justify-between items-center gap-2'>
           {navItems.length > 0 && (

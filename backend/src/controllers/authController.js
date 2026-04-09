@@ -29,6 +29,31 @@ const toUploadedFileItems = (files = []) =>
         uploadedAt: new Date().toISOString(),
     }));
 
+const normalizeIpAddress = (value) => {
+    const rawValue = Array.isArray(value) ? value[0] : value;
+    const candidate = String(rawValue || '')
+        .split(',')[0]
+        .trim();
+
+    if (!candidate || candidate.toLowerCase() === 'unknown') {
+        return null;
+    }
+
+    if (candidate === '::1') {
+        return '127.0.0.1';
+    }
+
+    return candidate.replace(/^::ffff:/i, '');
+};
+
+const getRequestIpAddress = (req) =>
+    normalizeIpAddress(
+        req.headers['x-forwarded-for'] ||
+            req.headers['x-real-ip'] ||
+            req.ip ||
+            req.socket?.remoteAddress
+    );
+
 const authUserSelect = {
     id: true,
     email: true,
@@ -36,6 +61,11 @@ const authUserSelect = {
     lastName: true,
     role: true,
     status: true,
+    avatar: true,
+    phone: true,
+    bio: true,
+    createdAt: true,
+    lastLoginAt: true,
     isEmailVerified: true,
     tutorProfile: {
         select: {
@@ -51,13 +81,19 @@ const authUserSelectWithPassword = {
     password: true,
 };
 
-const serializeAuthUser = (user) => ({
+const serializeAuthUser = (user, ipAddress = null) => ({
     id: user.id,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
     status: user.status,
+    avatar: user.avatar || null,
+    phone: user.phone || null,
+    bio: user.bio || null,
+    createdAt: user.createdAt || null,
+    lastLoginAt: user.lastLoginAt || null,
+    ipAddress,
     isEmailVerified: Boolean(user.isEmailVerified),
     tutorProfileId: user.tutorProfile?.id || null,
     tutorProfile: user.tutorProfile
@@ -187,8 +223,9 @@ async function register(req, res) {
 
 async function login(req, res) {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
         return res.status(400).json({
             success: false,
             message: 'Email and password are required.',
@@ -196,7 +233,7 @@ async function login(req, res) {
     }
 
     const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         select: authUserSelectWithPassword,
     });
 
@@ -207,12 +244,22 @@ async function login(req, res) {
         });
     }
 
+    const authenticatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            lastLoginAt: new Date(),
+        },
+        select: authUserSelect,
+    });
+
+    const ipAddress = getRequestIpAddress(req);
+
     return res.status(200).json({
         success: true,
         message: 'Login successful.',
         accessToken: `demo-token-${user.id}`,
         refreshToken: `demo-refresh-${user.id}`,
-        user: serializeAuthUser(user),
+        user: serializeAuthUser(authenticatedUser, ipAddress),
     });
 }
 
@@ -283,7 +330,7 @@ async function getMe(req, res) {
 
     return res.status(200).json({
         success: true,
-        user: serializeAuthUser(user),
+        user: serializeAuthUser(user, getRequestIpAddress(req)),
     });
 }
 
