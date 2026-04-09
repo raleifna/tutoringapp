@@ -7,6 +7,7 @@ import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroi
 import toast from 'react-hot-toast';
 import { bookingApi } from '../../../../../lib/api-entry';
 import { useAuthStore } from '../../../../../lib/store';
+import BackButton from '../../../../../components/BackButton';
 
 const formatDate = (dateTime) => {
   if (!dateTime) return '-';
@@ -147,9 +148,7 @@ export default function BookingPaymentPage() {
             Retry
           </button>
           {showBackButton && (
-            <Link href={returnTo} className="btn-secondary btn-sm">
-              Back
-            </Link>
+            <BackButton href={returnTo} />
           )}
         </div>
       </div>
@@ -164,9 +163,7 @@ export default function BookingPaymentPage() {
           <h1 className="text-2xl font-bold text-gray-900">Confirm Payment</h1>
         </div>
         {showBackButton && (
-          <Link href={returnTo} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600">
-            <span>←</span> Back
-          </Link>
+          <BackButton href={returnTo} />
         )}
       </div>
 

@@ -3,7 +3,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -87,6 +87,7 @@ export default function TutorRequestsPage() {
 }
 
 function TutorRequestsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
   const pageParam = searchParams.get('page');
@@ -206,8 +207,21 @@ function TutorRequestsContent() {
         <div className="space-y-3">
           {bookings.map((booking) => {
             const learner = booking.learner;
+            const detailHref = `/bookings/${booking.id}?returnTo=${encodeURIComponent(currentRequestsHref)}&from=tutor-requests`;
             return (
-              <div key={booking.id} className="card p-5">
+              <div
+                key={booking.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(detailHref)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    router.push(detailHref);
+                  }
+                }}
+                className="card cursor-pointer p-5 transition-all hover:border-primary-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
                 <div className="flex items-start gap-4">
                   <img
                     src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
@@ -262,7 +276,10 @@ function TutorRequestsContent() {
                     <>
                       <button
                         type="button"
-                        onClick={() => acceptMutation.mutate(booking.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          acceptMutation.mutate(booking.id);
+                        }}
                         disabled={acceptMutation.isPending}
                         className="btn-primary btn-sm gap-1.5 flex-1"
                       >
@@ -270,7 +287,10 @@ function TutorRequestsContent() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => declineMutation.mutate(booking.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          declineMutation.mutate(booking.id);
+                        }}
                         disabled={declineMutation.isPending}
                         className="btn-danger btn-sm gap-1.5 flex-1"
                       >
@@ -281,7 +301,10 @@ function TutorRequestsContent() {
                   {booking.status === 'ACCEPTED' && (
                     <button
                       type="button"
-                      onClick={() => completeMutation.mutate(booking.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        completeMutation.mutate(booking.id);
+                      }}
                       disabled={completeMutation.isPending}
                       className="btn-primary btn-sm gap-1.5"
                     >
@@ -289,7 +312,8 @@ function TutorRequestsContent() {
                     </button>
                   )}
                   <Link
-                    href={`/bookings/${booking.id}?returnTo=${encodeURIComponent(currentRequestsHref)}&from=tutor-requests`}
+                    href={detailHref}
+                    onClick={(event) => event.stopPropagation()}
                     className="btn-secondary btn-sm ml-auto"
                   >
                     View Details
