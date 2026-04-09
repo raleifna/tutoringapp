@@ -74,6 +74,7 @@ function RegisterContent() {
   const [registered, setRegistered] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [registeredRole, setRegisteredRole] = useState('LEARNER');
+  const [verificationUrl, setVerificationUrl] = useState('');
   const [verificationFiles, setVerificationFiles] = useState([]);
   const [verificationFileError, setVerificationFileError] = useState('');
 
@@ -170,9 +171,10 @@ function RegisterContent() {
 
     setIsLoading(true);
     try {
-      await authApi.register(payload);
+      const response = await authApi.register(payload);
       setRegisteredEmail(rawData.email);
       setRegisteredRole(rawData.role);
+      setVerificationUrl(response?.data?.verificationUrl || '');
       setRegistered(true);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -200,6 +202,15 @@ function RegisterContent() {
             Go to Login
           </Link>
 
+          {verificationUrl ? (
+            <a
+              href={verificationUrl}
+              className="mt-3 inline-flex items-center justify-center rounded-xl border border-primary-200 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-50"
+            >
+              Open Verification Link
+            </a>
+          ) : null}
+
           <p className="text-sm text-gray-500 mt-4">
             Didn't receive it?{' '}
             <button
@@ -209,7 +220,8 @@ function RegisterContent() {
               onClick={async () => {
                 setIsResending(true);
                 try {
-                  await authApi.resendVerification({ email: registeredEmail });
+                  const response = await authApi.resendVerification({ email: registeredEmail });
+                  setVerificationUrl(response?.data?.verificationUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
                   toast.error(getErrorMessage(error));

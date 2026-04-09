@@ -18,6 +18,7 @@ function VerifyEmailContent() {
   const [status, setStatus] = useState('loading'); // loading | success | error
   const [message, setMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [verificationUrl, setVerificationUrl] = useState('');
   const hasRequestedRef = useRef(false);
 
   useEffect(() => {
@@ -121,7 +122,8 @@ function VerifyEmailContent() {
                   if (!email) return;
                   setIsResending(true);
                   try {
-                    await authApi.resendVerification({ email });
+                    const response = await authApi.resendVerification({ email });
+                    setVerificationUrl(response?.data?.verificationUrl || '');
                     toast.success('Verification email resent');
                   } catch (error) {
                     toast.error(error?.response?.data?.message || 'Resend failed');
@@ -132,6 +134,14 @@ function VerifyEmailContent() {
               >
                 {isResending ? 'Sending...' : 'Resend verification email'}
               </button>
+              {verificationUrl ? (
+                <a
+                  href={verificationUrl}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-primary-200 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-50"
+                >
+                  Open Verification Link
+                </a>
+              ) : null}
             </div>
           </>
         )}

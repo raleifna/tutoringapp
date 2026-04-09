@@ -36,7 +36,7 @@ api.interceptors.response.use(
         // Skip refresh logic for auth endpoints — 401 there means invalid credentials,
         // not an expired session. Let the caller's catch block handle it directly.
         const requestUrl = originalRequest?.url || '';
-        const isAuthEndpoint = /\/auth\/(login|register|verify-email|refresh-token)/.test(requestUrl);
+        const isAuthEndpoint = /\/auth\/(login|register|verify-email|resend-verification|refresh-token)/.test(requestUrl);
 
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
             originalRequest._retry = true;
@@ -261,4 +261,3 @@ export const notificationApi = {
         return api.post('/notifications/test');
     },
 };
-

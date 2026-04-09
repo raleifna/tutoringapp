@@ -1,4 +1,7 @@
+const crypto = require('crypto');
+
 const { prisma } = require('../config/database');
+const { sendVerificationEmail } = require('../services/emailService');
 
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
@@ -69,6 +72,18 @@ const serializeAuthUser = (user) => ({
         : null,
 });
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
+const createEmailVerificationToken = () => crypto.randomBytes(32).toString('hex');
+
+const createEmailVerificationExpiry = () => {
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    return expiresAt;
+};
+
+const isEmailVerificationRequired = () => String(process.env.EMAIL_VERIFICATION_REQUIRED || 'true') !== 'false';
+
 async function register(req, res) {
     const {
         email,
@@ -85,11 +100,13 @@ async function register(req, res) {
         tutorSupportingNotes,
     } = req.body;
 
-    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const normalizedFirstName = String(firstName || '').trim();
     const normalizedLastName = String(lastName || '').trim();
     const normalizedRole = String(role || 'LEARNER').trim().toUpperCase();
     const uploadedVerificationFiles = Array.isArray(req.files) ? req.files : [];
+    const emailVerificationToken = createEmailVerificationToken();
+    const emailVerificationExpiry = createEmailVerificationExpiry();
 
     if (!normalizedEmail || !password || !normalizedFirstName || !normalizedLastName) {
         return res.status(400).json({
@@ -144,6 +161,9 @@ async function register(req, res) {
             firstName: normalizedFirstName,
             lastName: normalizedLastName,
             role: normalizedRole,
+            isEmailVerified: false,
+            emailVerificationToken,
+            emailVerificationExpiry,
             ...(normalizedRole === 'LEARNER'
                 ? {
                       learnerProfile: {
@@ -178,15 +198,24 @@ async function register(req, res) {
         select: authUserSelect,
     });
 
+    const emailResult = await sendVerificationEmail({
+        email: normalizedEmail,
+        firstName: normalizedFirstName,
+        token: emailVerificationToken,
+    });
+
     return res.status(201).json({
         success: true,
-        message: 'Register successful.',
+        message: 'Registration successful. Please check your email to verify your account.',
         user: serializeAuthUser(user),
+        verificationDelivery: emailResult.deliveryMethod,
+        ...(emailResult.verificationUrl ? { verificationUrl: emailResult.verificationUrl } : {}),
     });
 }
 
 async function login(req, res) {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     if (!email || !password) {
         return res.status(400).json({
@@ -196,7 +225,7 @@ async function login(req, res) {
     }
 
     const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         select: authUserSelectWithPassword,
     });
 
@@ -207,12 +236,133 @@ async function login(req, res) {
         });
     }
 
+    if (isEmailVerificationRequired() && !user.isEmailVerified) {
+        return res.status(403).json({
+            success: false,
+            message: 'Please verify your email before logging in.',
+        });
+    }
+
     return res.status(200).json({
         success: true,
         message: 'Login successful.',
         accessToken: `demo-token-${user.id}`,
         refreshToken: `demo-refresh-${user.id}`,
         user: serializeAuthUser(user),
+    });
+}
+
+async function verifyEmail(req, res) {
+    const token = String(req.query.token || req.body?.token || '').trim();
+
+    if (!token) {
+        return res.status(400).json({
+            success: false,
+            message: 'Verification token is required.',
+        });
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { emailVerificationToken: token },
+        select: {
+            id: true,
+            emailVerificationExpiry: true,
+            isEmailVerified: true,
+        },
+    });
+
+    if (!user) {
+        return res.status(400).json({
+            success: false,
+            message: 'This verification link is invalid or has expired.',
+        });
+    }
+
+    if (user.isEmailVerified) {
+        return res.status(200).json({
+            success: true,
+            message: 'Email is already verified.',
+        });
+    }
+
+    if (!user.emailVerificationExpiry || user.emailVerificationExpiry.getTime() < Date.now()) {
+        return res.status(400).json({
+            success: false,
+            message: 'This verification link is invalid or has expired.',
+        });
+    }
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            isEmailVerified: true,
+            emailVerificationToken: null,
+            emailVerificationExpiry: null,
+        },
+    });
+
+    return res.status(200).json({
+        success: true,
+        message: 'Email verified successfully.',
+    });
+}
+
+async function resendVerification(req, res) {
+    const normalizedEmail = normalizeEmail(req.body?.email);
+
+    if (!normalizedEmail) {
+        return res.status(400).json({
+            success: false,
+            message: 'Email is required.',
+        });
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: {
+            id: true,
+            email: true,
+            firstName: true,
+            isEmailVerified: true,
+        },
+    });
+
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: 'No account found for this email.',
+        });
+    }
+
+    if (user.isEmailVerified) {
+        return res.status(400).json({
+            success: false,
+            message: 'This email is already verified.',
+        });
+    }
+
+    const emailVerificationToken = createEmailVerificationToken();
+    const emailVerificationExpiry = createEmailVerificationExpiry();
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            emailVerificationToken,
+            emailVerificationExpiry,
+        },
+    });
+
+    const emailResult = await sendVerificationEmail({
+        email: user.email,
+        firstName: user.firstName,
+        token: emailVerificationToken,
+    });
+
+    return res.status(200).json({
+        success: true,
+        message: 'Verification email resent.',
+        verificationDelivery: emailResult.deliveryMethod,
+        ...(emailResult.verificationUrl ? { verificationUrl: emailResult.verificationUrl } : {}),
     });
 }
 
@@ -290,6 +440,8 @@ async function getMe(req, res) {
 module.exports = {
     register,
     login,
+    verifyEmail,
+    resendVerification,
     refreshToken,
     logout,
     getMe,
