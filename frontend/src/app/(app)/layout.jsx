@@ -65,17 +65,30 @@ const pageTitles = {
   '/tutor/profile': 'Tutor Profile',
 };
 
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+};
+
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const authLoading = useAuthStore((state) => state.isLoading);
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const ensureClientIpContext = useAuthStore((state) => state.ensureClientIpContext);
   const unreadCount = useMessageStore((state) => state.unreadCount);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+  const currentIpAddress = formatIpAddress(user?.ipAddress);
+  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
 
   useEffect(() => {
     setMounted(true);
@@ -95,6 +108,11 @@ export default function AppLayout({ children }) {
     if (!mounted || !accessToken || user || isGuestPath) return;
     initializeAuth().catch(() => {});
   }, [mounted, accessToken, user, isGuestPath, initializeAuth]);
+
+  useEffect(() => {
+    if (!mounted || !accessToken || !user || isGuestPath) return;
+    ensureClientIpContext().catch(() => {});
+  }, [mounted, accessToken, user, isGuestPath, ensureClientIpContext]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -155,9 +173,18 @@ export default function AppLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-
-          <h1 className="text-base font-semibold text-gray-900">{pageTitle}</h1>
+        <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
+            {currentIpAddress && (
+              <p className="truncate text-xs text-gray-500">
+                Current IP: <span className="font-medium text-gray-700">{currentIpAddress}</span>
+                {currentLocationLabel && (
+                  <span className="text-gray-500"> · {currentLocationLabel}</span>
+                )}
+              </p>
+            )}
+          </div>
 
           <div className='flex justify-between items-center gap-2'>
           {navItems.length > 0 && (

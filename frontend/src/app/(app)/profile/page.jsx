@@ -48,6 +48,16 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+};
+
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -55,6 +65,8 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const currentIpAddress = formatIpAddress(user?.ipAddress);
+  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
 
   const {
     register,
@@ -164,7 +176,19 @@ export default function ProfilePage() {
             {user?.firstName} {user?.lastName}
           </h2>
           <p className="text-sm text-gray-500">{user?.email}</p>
-          <span className="badge bg-primary-50 text-primary-700 text-xs mt-1">{user?.role}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="badge bg-primary-50 text-primary-700 text-xs">{user?.role}</span>
+            {currentIpAddress && (
+              <span className="badge bg-gray-100 text-gray-700 text-xs">
+                Current IP: {currentIpAddress}
+              </span>
+            )}
+            {currentLocationLabel && (
+              <span className="badge bg-gray-100 text-gray-700 text-xs">
+                Region: {currentLocationLabel}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

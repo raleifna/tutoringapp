@@ -50,6 +50,7 @@ const makeToken = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const filePlaceholderUrl = (fileName = 'verification-file') =>
   `data:text/plain;charset=utf-8,${encodeURIComponent(`Mock verification file: ${fileName}`)}`;
+const MOCK_IP_ADDRESS = '127.0.0.1';
 
 const toVerificationFileMeta = (files = []) => {
   if (!Array.isArray(files)) return [];
@@ -199,6 +200,11 @@ const toPublicUser = (user) => {
   return rest;
 };
 
+const toAuthUser = (user) => ({
+  ...toPublicUser(user),
+  ipAddress: MOCK_IP_ADDRESS,
+});
+
 const parseRegisterPayload = (payload) => {
   if (typeof FormData !== 'undefined' && payload instanceof FormData) {
     const verificationFiles = payload.getAll('verificationFiles');
@@ -343,7 +349,7 @@ export const authApi = {
     });
 
     return authOk({
-      user: toPublicUser(user),
+      user: toAuthUser(user),
       accessToken,
       refreshToken,
     });
@@ -362,7 +368,7 @@ export const authApi = {
     await wait(220);
     const user = getSessionUser();
     if (!user) return fail('Unauthorized', 401);
-    return authOk({ user: toPublicUser(user) });
+    return authOk({ user: toAuthUser(user) });
   },
 
   changePassword: async ({ currentPassword, newPassword }) => {
