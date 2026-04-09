@@ -279,6 +279,16 @@ async function login(req, res) {
         });
     }
 
+    const authenticatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            lastLoginAt: new Date(),
+        },
+        select: authUserSelect,
+    });
+
+    const ipAddress = getRequestIpAddress(req);
+
     return res.status(200).json({
         success: true,
         message: 'Login successful.',
