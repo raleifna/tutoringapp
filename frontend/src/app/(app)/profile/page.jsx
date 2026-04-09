@@ -53,6 +53,11 @@ const formatIpAddress = (value) => {
   return ipAddress || null;
 };
 
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+};
+
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -61,6 +66,7 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const currentIpAddress = formatIpAddress(user?.ipAddress);
+  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
 
   const {
     register,
@@ -175,6 +181,11 @@ export default function ProfilePage() {
             {currentIpAddress && (
               <span className="badge bg-gray-100 text-gray-700 text-xs">
                 Current IP: {currentIpAddress}
+              </span>
+            )}
+            {currentLocationLabel && (
+              <span className="badge bg-gray-100 text-gray-700 text-xs">
+                Region: {currentLocationLabel}
               </span>
             )}
           </div>

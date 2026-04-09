@@ -70,19 +70,25 @@ const formatIpAddress = (value) => {
   return ipAddress || null;
 };
 
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+};
+
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const authLoading = useAuthStore((state) => state.isLoading);
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const ensureClientIpContext = useAuthStore((state) => state.ensureClientIpContext);
   const unreadCount = useMessageStore((state) => state.unreadCount);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
   const currentIpAddress = formatIpAddress(user?.ipAddress);
+  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
 
   useEffect(() => {
     setMounted(true);
@@ -102,6 +108,11 @@ export default function AppLayout({ children }) {
     if (!mounted || !accessToken || user || isGuestPath) return;
     initializeAuth().catch(() => {});
   }, [mounted, accessToken, user, isGuestPath, initializeAuth]);
+
+  useEffect(() => {
+    if (!mounted || !accessToken || !user || isGuestPath) return;
+    ensureClientIpContext().catch(() => {});
+  }, [mounted, accessToken, user, isGuestPath, ensureClientIpContext]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -168,6 +179,9 @@ export default function AppLayout({ children }) {
             {currentIpAddress && (
               <p className="truncate text-xs text-gray-500">
                 Current IP: <span className="font-medium text-gray-700">{currentIpAddress}</span>
+                {currentLocationLabel && (
+                  <span className="text-gray-500"> · {currentLocationLabel}</span>
+                )}
               </p>
             )}
           </div>
