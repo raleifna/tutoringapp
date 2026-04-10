@@ -413,9 +413,6 @@ export default function BookingDetailPage() {
                   <h3 className="text-3xl font-bold tracking-tight text-gray-900">
                     {formatCurrency(totalAmount, booking.currency || 'AUD')}
                   </h3>
-                  <span className="mb-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700">
-                    Unpaid
-                  </span>
                 </div>
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
                   Complete payment to send this booking to the tutor for confirmation.
