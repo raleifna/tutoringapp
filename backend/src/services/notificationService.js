@@ -1,11 +1,6 @@
-// services/notificationService.js
-
 const { prisma } = require('../config/database');
 
-class NotificationService {
-
-  // create notification
-  async notify(receiverId, type, title, message, link) {
+export async function notify(receiverId, type, title, message, link) {
     await prisma.notification.create({
       data: {
         userId: receiverId,
@@ -17,9 +12,8 @@ class NotificationService {
         link
       }
     });
-  }
-
-  async notifyAdmin(type, title, message, link) {
+}
+export async function notifyAdmin(type, title, message, link) {
     const admins = await prisma.user.findMany({ role: 'admin' });
     const notifications = admins.map(admin => ({
       userId: admin.id,
@@ -34,6 +28,4 @@ class NotificationService {
       data: notifications
     });
   }
-}
 
-module.exports = new NotificationService();
