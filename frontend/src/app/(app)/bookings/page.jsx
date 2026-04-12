@@ -63,14 +63,6 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
-// export default function BookingsPage() {
-//   return (
-//     <Suspense fallback={<BookingsPageFallback />}>
-//       <BookingsPageContent />
-//     </Suspense>
-//   );
-// }
-
 function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

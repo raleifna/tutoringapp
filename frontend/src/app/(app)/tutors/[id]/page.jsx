@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
+import { BOOKING_DURATIONS } from '../../../../lib/tutor-options';
 import { useAuthStore } from '../../../../lib/store';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import BackButton from '../../../../components/BackButton';
@@ -32,8 +33,6 @@ const bookingSchema = z.object({
   duration: z.coerce.number().min(30).max(360),
   notes: z.string().optional(),
 });
-
-const DURATIONS = [30, 60, 90, 120, 150, 180];
 
 const WEEKDAY_LABELS = [
   'Sunday',
@@ -592,7 +591,7 @@ export default function TutorDetailPage() {
               <div>
                 <label className="label">Duration (minutes)</label>
                 <select {...register('duration')} className="input">
-                  {DURATIONS.map((duration) => (
+                  {BOOKING_DURATIONS.map((duration) => (
                     <option key={duration} value={duration}>
                       {duration} minutes
                     </option>
