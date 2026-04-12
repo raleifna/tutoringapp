@@ -9,18 +9,13 @@ import {
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
 import { useAuthStore, useMessageStore } from '../../../lib/store';
 import BackButton from '../../../components/BackButton';
 
 let socket = null;
 
 const IS_MOCK_CHAT = process.env.NEXT_PUBLIC_STAGE4_API_MODE === 'mock';
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
 
 const formatTime = (value) => {
   if (!value) return '';
@@ -343,7 +338,8 @@ export default function MessagesPage() {
                         src={getAvatarUrl(
                           partner?.avatar,
                           partner?.firstName,
-                          partner?.lastName
+                          partner?.lastName,
+                          { fallbackName: 'User' }
                         )}
                         alt={partner?.firstName || 'User'}
                         className="h-10 w-10 rounded-full object-cover"
@@ -399,7 +395,8 @@ export default function MessagesPage() {
                   src={getAvatarUrl(
                     selectedPartner?.avatar,
                     selectedPartner?.firstName,
-                    selectedPartner?.lastName
+                    selectedPartner?.lastName,
+                    { fallbackName: 'User' }
                   )}
                   alt={selectedPartner?.firstName || 'User'}
                   className="h-10 w-10 rounded-full object-cover"

@@ -20,6 +20,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
 import { useAuthStore } from '../../../../lib/store';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import BackButton from '../../../../components/BackButton';
@@ -48,12 +49,6 @@ const getTutorName = (tutor) => {
   const firstName = tutor?.user?.firstName || '';
   const lastName = tutor?.user?.lastName || '';
   return `${firstName} ${lastName}`.trim() || 'Tutor';
-};
-
-const getAvatarUrl = (tutor) => {
-  if (tutor?.user?.avatar) return tutor.user.avatar;
-  const name = getTutorName(tutor);
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 const formatRating = (rating) => {
@@ -287,7 +282,9 @@ export default function TutorDetailPage() {
       <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
         <div className="flex flex-col sm:flex-row gap-5">
           <img
-            src={getAvatarUrl(tutor)}
+            src={getAvatarUrl(tutor?.user?.avatar, tutor?.user?.firstName, tutor?.user?.lastName, {
+              fallbackName: 'Tutor',
+            })}
             alt={getTutorName(tutor)}
             className="w-24 h-24 rounded-full object-cover border border-gray-100"
           />

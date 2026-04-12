@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { notificationApi } from '../lib/api-entry';
+import { formatTimeAgo } from '../lib/formatters';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
@@ -11,25 +12,6 @@ import {
   XMarkIcon,
   EyeIcon,
 } from '@heroicons/react/24/outline';
-
-const formatTimeAgo = (timestamp) => {
-  // timestamp is string, convert to Date object
-  if (typeof timestamp === 'string') {
-    timestamp = new Date(timestamp);
-  }
-
-  const now = new Date();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
-};
-
 
 const NotificationBox = ({ currentUserId }) => {
 

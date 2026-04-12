@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
 import { formatCurrency, formatDateTimeWithYear as formatDate } from '../../../lib/formatters';
 import { useAuthStore } from '../../../lib/store';
 import BackButton from '../../../components/BackButton';
@@ -30,12 +31,6 @@ const getInitialStatus = (value) => {
 const getPageNumber = (value) => {
   const next = Number.parseInt(String(value || '1'), 10);
   return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 const formatDuration = (minutes) => {
@@ -316,14 +311,14 @@ function BookingCard({ booking, isTutor, returnTo }) {
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
-                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
                 alt={otherFirstName}
                 className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
               />
             </Link>
           ) : (
             <img
-              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
               alt={otherFirstName}
               className="w-12 h-12 rounded-full object-cover flex-shrink-0"
             />

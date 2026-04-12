@@ -16,13 +16,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
-import { formatShortDateTime as formatDate } from '../../../lib/formatters';
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
+import { getAvatarUrl } from '../../../lib/avatar';
+import { formatShortDateTime as formatDate, formatTimeAgo } from '../../../lib/formatters';
 
 const getStatusClass = (status) => {
   if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
@@ -99,19 +94,6 @@ const mockNotifications = [
     link: '/bookings'
   }
 ];
-
-const formatTimeAgo = (timestamp) => {
-  const now = new Date();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
-};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -255,7 +237,8 @@ export default function DashboardPage() {
                           src={getAvatarUrl(
                             booking.tutorProfile?.user?.avatar,
                             booking.tutorProfile?.user?.firstName,
-                            booking.tutorProfile?.user?.lastName
+                            booking.tutorProfile?.user?.lastName,
+                            { fallbackName: 'Tutor' }
                           )}
                           alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                           className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
@@ -266,7 +249,8 @@ export default function DashboardPage() {
                         src={getAvatarUrl(
                           booking.tutorProfile?.user?.avatar,
                           booking.tutorProfile?.user?.firstName,
-                          booking.tutorProfile?.user?.lastName
+                          booking.tutorProfile?.user?.lastName,
+                          { fallbackName: 'Tutor' }
                         )}
                         alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                         className="w-10 h-10 rounded-full object-cover flex-shrink-0"

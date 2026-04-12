@@ -15,6 +15,7 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 
@@ -27,19 +28,6 @@ const formatDuration = (minutes) => {
   if (!value) return '0 mins';
   if (value % 60 === 0) return `${value / 60} hr`;
   return `${value} mins`;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 export default function TutorDashboardPage() {
@@ -231,7 +219,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
@@ -282,7 +273,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />

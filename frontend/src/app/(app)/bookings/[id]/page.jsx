@@ -18,6 +18,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatDateTimeWithYear as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
@@ -26,12 +27,6 @@ const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
   reason: z.string().optional(),
 });
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
 
 const formatDuration = (minutes) => {
   const value = Number(minutes || 0);
@@ -295,7 +290,7 @@ export default function BookingDetailPage() {
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
-                src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+                src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName, { fallbackName: 'Tutor' })}
                 alt={other?.firstName || 'Tutor'}
                 className="w-14 h-14 rounded-full object-cover ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
               />
@@ -313,7 +308,7 @@ export default function BookingDetailPage() {
         ) : (
           <div className="flex items-center gap-3">
             <img
-              src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+              src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName, { fallbackName: 'Tutor' })}
               alt={other?.firstName || 'Tutor'}
               className="w-14 h-14 rounded-full object-cover"
             />

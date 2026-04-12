@@ -13,6 +13,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatDateTimeWithYear as formatDate } from '../../../../lib/formatters';
 
 const STATUS_TABS = [
@@ -44,12 +45,6 @@ const formatDuration = (minutes) => {
   if (!value) return '0 mins';
   if (value % 60 === 0) return `${value / 60} hr`;
   return `${value} mins`;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 export default function TutorRequestsPage() {
@@ -198,7 +193,7 @@ function TutorRequestsContent() {
               >
                 <div className="flex items-start gap-4">
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, { fallbackName: 'Learner' })}
                     alt={learner?.firstName || 'Learner'}
                     className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                   />

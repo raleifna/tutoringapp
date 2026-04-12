@@ -14,6 +14,7 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
@@ -25,12 +26,6 @@ const STATUS_TABS = [
 ];
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
 
 const formatBytes = (value) => {
   const size = Number(value) || 0;
@@ -218,7 +213,8 @@ function AdminTutorsContent() {
                     src={getAvatarUrl(
                       tutor.user?.avatar,
                       tutor.user?.firstName,
-                      tutor.user?.lastName
+                      tutor.user?.lastName,
+                      { fallbackName: 'Tutor' }
                     )}
                     alt={tutor.user?.firstName || 'Tutor'}
                     className="w-14 h-14 rounded-full object-cover flex-shrink-0"
