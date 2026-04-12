@@ -16,6 +16,7 @@ import { adminApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const ROLES = ['', 'LEARNER', 'TUTOR', 'ADMIN', 'SYSTEM_ADMIN'];
@@ -26,8 +27,6 @@ const STATUS_ACTIONS = {
   SUSPENDED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
   DEACTIVATED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
 };
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const getRoleBadgeClass = (role) => {
   if (role === 'LEARNER') return 'bg-blue-50 text-blue-700';

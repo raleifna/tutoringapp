@@ -8,11 +8,10 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/api-entry';
 import { formatCurrency } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const PERIODS = [7, 30, 90];
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 function MetricList({ items, formatter, emptyLabel, tone = 'bg-primary-600' }) {
   if (!items.length) {

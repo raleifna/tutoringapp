@@ -15,8 +15,9 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
-import { formatCurrency, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const OPERATION_TABS = [
@@ -27,15 +28,6 @@ const OPERATION_TABS = [
 
 const BOOKING_STATUSES = ['', 'UNPAID', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'RESCHEDULED'];
 const EMPTY_SUBJECT_FORM = { name: '', category: '', description: '' };
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
 
 const getBookingStatusColor = (status) => {
   if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';

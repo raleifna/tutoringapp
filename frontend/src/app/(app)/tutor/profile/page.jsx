@@ -10,6 +10,7 @@ import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
 import { TUTOR_SESSION_TYPES } from '../../../../lib/tutor-options';
+import { cn } from '../../../../lib/utils';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -59,10 +60,6 @@ const getApplicationNotes = (items) => {
         .map((item) => item.text)
         .join('\n')
     : '';
-};
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
 };
 
 export default function TutorProfilePage() {

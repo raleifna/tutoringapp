@@ -16,7 +16,7 @@ import {
 import { useAuthStore } from '../../../lib/store';
 import { formatTimeAgo } from '../../../lib/formatters';
 import toast from 'react-hot-toast';
-import { notificationApi } from '../../../lib/api';
+import { notificationApi } from '../../../lib/api-entry';
 import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [

@@ -17,6 +17,7 @@ import { adminApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const STATUS_TABS = [
@@ -24,8 +25,6 @@ const STATUS_TABS = [
   { value: 'ACTIVE', label: 'Approved' },
   { value: 'SUSPENDED', label: 'Needs Changes' },
 ];
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const formatBytes = (value) => {
   const size = Number(value) || 0;

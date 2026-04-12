@@ -72,3 +72,10 @@ export function formatTimeAgo(value) {
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
 }
+
+export function formatDuration(minutes) {
+  const value = Number(minutes || 0);
+  if (!value) return '0 mins';
+  if (value % 60 === 0) return `${value / 60} hr`;
+  return `${value} mins`;
+}
