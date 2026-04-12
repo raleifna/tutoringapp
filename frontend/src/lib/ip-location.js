@@ -1,4 +1,6 @@
 const CLIENT_IP_LOOKUP_URL = 'https://api.country.is/?fields=city,subdivision';
+const CLIENT_IP_LOOKUP_TIMEOUT_MS = 4000;
+const PRIVATE_IPV6_PREFIXES = ['fc', 'fd', 'fe80:'];
 
 export const normalizeIpAddress = (value) => {
   const candidate = String(value || '').split(',')[0].trim();
@@ -26,14 +28,18 @@ const isPrivateIpv4Address = (value) => {
   );
 };
 
+const isPrivateIpv6Address = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  return normalized === '::1' || PRIVATE_IPV6_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+
 export const isPrivateIpAddress = (value) => {
   const ipAddress = normalizeIpAddress(value);
   if (!ipAddress) return false;
   if (ipAddress === 'localhost') return true;
 
   if (ipAddress.includes(':')) {
-    const normalized = ipAddress.toLowerCase();
-    return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:');
+    return isPrivateIpv6Address(ipAddress);
   }
 
   return isPrivateIpv4Address(ipAddress);
@@ -98,11 +104,24 @@ export const preserveClientIpContext = (user, previousUser) => {
   });
 };
 
+const toClientIpContext = (payload = {}) => {
+  const ipAddress = normalizeIpAddress(payload.ip);
+
+  return {
+    ipAddress,
+    ipLocationLabel: buildIpLocationLabel(payload) || getFallbackIpLocationLabel(ipAddress),
+    ipCity: payload.city || null,
+    ipRegion: payload.subdivision || payload.region || null,
+    ipCountry: formatCountryLabel(payload.country_name || payload.country || null),
+    ipLocationSource: 'client',
+  };
+};
+
 export const fetchClientIpContext = async () => {
   if (typeof window === 'undefined') return null;
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+  const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_IP_LOOKUP_TIMEOUT_MS);
 
   try {
     const response = await fetch(CLIENT_IP_LOOKUP_URL, {
@@ -118,16 +137,7 @@ export const fetchClientIpContext = async () => {
     }
 
     const payload = await response.json();
-    const ipAddress = normalizeIpAddress(payload.ip);
-
-    return {
-      ipAddress,
-      ipLocationLabel: buildIpLocationLabel(payload) || getFallbackIpLocationLabel(ipAddress),
-      ipCity: payload.city || null,
-      ipRegion: payload.subdivision || payload.region || null,
-      ipCountry: formatCountryLabel(payload.country_name || payload.country || null),
-      ipLocationSource: 'client',
-    };
+    return toClientIpContext(payload);
   } finally {
     window.clearTimeout(timeoutId);
   }
