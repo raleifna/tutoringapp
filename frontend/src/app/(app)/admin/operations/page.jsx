@@ -15,6 +15,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
+import { formatCurrency, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 
@@ -28,28 +29,6 @@ const BOOKING_STATUSES = ['', 'UNPAID', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CAN
 const EMPTY_SUBJECT_FORM = { name: '', category: '', description: '' };
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: currency || 'AUD',
-    maximumFractionDigits: 2,
-  }).format(value);
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
 
 const formatDuration = (minutes) => {
   const value = Number(minutes || 0);

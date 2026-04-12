@@ -16,23 +16,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
+import { formatShortDateTime as formatDate } from '../../../lib/formatters';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
   const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 };
 
 const getStatusClass = (status) => {

@@ -13,6 +13,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 
@@ -26,18 +27,6 @@ const STATUS_ACTIONS = {
 };
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;

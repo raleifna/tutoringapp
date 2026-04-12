@@ -6,21 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { bookingApi } from '../../../../../lib/api-entry';
+import { formatCurrency, formatDateTimeWithYear as formatDate } from '../../../../../lib/formatters';
 import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
 
 const formatDuration = (minutes) => {
   const value = Number(minutes || 0);
@@ -29,19 +17,6 @@ const formatDuration = (minutes) => {
   return `${value} mins`;
 };
 
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
 
 const getPaymentStatusClass = (status) => {
   if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
+import { formatCurrency, formatDateTimeWithYear as formatDate } from '../../../lib/formatters';
 import { useAuthStore } from '../../../lib/store';
 import BackButton from '../../../components/BackButton';
 
@@ -37,19 +38,6 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
 const formatDuration = (minutes) => {
   const value = Number(minutes || 0);
   if (!value) return '0 mins';
@@ -57,20 +45,6 @@ const formatDuration = (minutes) => {
     return `${value / 60} hr`;
   }
   return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
 };
 
 const getBookingStatusClass = (status) => {
