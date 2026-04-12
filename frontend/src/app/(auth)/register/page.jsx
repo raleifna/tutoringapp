@@ -6,64 +6,16 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '../../../lib/api-entry';
-
-const MAX_VERIFICATION_FILES = 5;
-const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
-
-const registerSchema = z
-  .object({
-    firstName: z.string().min(2, 'First name must be at least 2 characters'),
-    lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-    email: z.string().email('Invalid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Must contain an uppercase letter')
-      .regex(/[a-z]/, 'Must contain a lowercase letter')
-      .regex(/[0-9]/, 'Must contain a number'),
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
-    role: z.enum(['LEARNER', 'TUTOR']),
-    isMinor: z.boolean().optional(),
-    parentName: z.string().optional(),
-    parentEmail: z.union([z.literal(''), z.string().email('Invalid parent email')]).optional(),
-    parentPhone: z.string().optional(),
-    tutorEducationSummary: z.string().optional(),
-    tutorExperienceYears: z.string().optional(),
-    tutorSupportingNotes: z.string().optional(),
-    agreeToTerms: z.boolean().refine((v) => v === true, 'You must agree to the terms'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
-  .superRefine((data, ctx) => {
-    if (data.role === 'LEARNER' && data.isMinor && !data.parentName?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Parent/guardian name is required for minors',
-        path: ['parentName'],
-      });
-    }
-
-    if (data.role === 'TUTOR' && !data.tutorEducationSummary?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Education summary is required for tutors',
-        path: ['tutorEducationSummary'],
-      });
-    }
-  });
-
-const getErrorMessage = (error) => {
-  const message = error?.response?.data?.message;
-  if (Array.isArray(message)) return message[0];
-  return message || 'Registration failed';
-};
+import {
+  buildRegisterPayload,
+  getRegisterDefaultValues,
+  getRegisterErrorMessage,
+  registerSchema,
+  validateVerificationFiles,
+} from '../../../lib/register-form';
 
 function RegisterContent() {
   const searchParams = useSearchParams();
@@ -78,7 +30,6 @@ function RegisterContent() {
   const [verificationFiles, setVerificationFiles] = useState([]);
   const [verificationFileError, setVerificationFileError] = useState('');
 
-  const defaultRole = searchParams.get('role') === 'TUTOR' ? 'TUTOR' : 'LEARNER';
   const {
     register,
     handleSubmit,
@@ -87,7 +38,7 @@ function RegisterContent() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: defaultRole, agreeToTerms: false, isMinor: false },
+    defaultValues: getRegisterDefaultValues(searchParams.get('role')),
   });
 
   const selectedRole = watch('role');
@@ -103,23 +54,10 @@ function RegisterContent() {
 
   const handleVerificationFilesChange = (event) => {
     const files = Array.from(event.target.files || []);
-
-    if (files.length > MAX_VERIFICATION_FILES) {
+    const errorMessage = validateVerificationFiles(files);
+    if (errorMessage) {
       setVerificationFiles([]);
-      setVerificationFileError(`Upload up to ${MAX_VERIFICATION_FILES} files`);
-      return;
-    }
-
-    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-      setVerificationFiles([]);
-      setVerificationFileError('Each file must be 5MB or smaller');
-      return;
-    }
-
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-      setVerificationFiles([]);
-      setVerificationFileError('Total file size must stay within 25MB');
+      setVerificationFileError(errorMessage);
       return;
     }
 
@@ -128,46 +66,12 @@ function RegisterContent() {
   };
 
   const onSubmit = async (values) => {
-    const { confirmPassword, agreeToTerms, ...rawData } = values;
+    const { payload, rawData } = buildRegisterPayload(values, verificationFiles);
 
     if (rawData.role === 'TUTOR' && verificationFiles.length === 0) {
       setVerificationFileError('Please upload at least one verification file');
       return;
     }
-
-    const payload =
-      rawData.role === 'TUTOR'
-        ? (() => {
-            const formData = new FormData();
-            [
-              ['firstName', rawData.firstName],
-              ['lastName', rawData.lastName],
-              ['email', rawData.email],
-              ['password', rawData.password],
-              ['role', rawData.role],
-              ['tutorEducationSummary', rawData.tutorEducationSummary],
-              ['tutorExperienceYears', rawData.tutorExperienceYears],
-              ['tutorSupportingNotes', rawData.tutorSupportingNotes],
-            ].forEach(([key, value]) => {
-              if (value !== undefined && value !== null && value !== '') {
-                formData.append(key, value);
-              }
-            });
-
-            verificationFiles.forEach((file) => formData.append('verificationFiles', file));
-            return formData;
-          })()
-        : {
-            firstName: rawData.firstName,
-            lastName: rawData.lastName,
-            email: rawData.email,
-            password: rawData.password,
-            role: rawData.role,
-            isMinor: rawData.isMinor,
-            parentName: rawData.parentName,
-            parentEmail: rawData.parentEmail,
-            parentPhone: rawData.parentPhone,
-          };
 
     setIsLoading(true);
     try {
@@ -177,7 +81,7 @@ function RegisterContent() {
       setVerificationUrl(response?.data?.verificationUrl || '');
       setRegistered(true);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(getRegisterErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +128,7 @@ function RegisterContent() {
                   setVerificationUrl(response?.data?.verificationUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
-                  toast.error(getErrorMessage(error));
+                  toast.error(getRegisterErrorMessage(error));
                 } finally {
                   setIsResending(false);
                 }
