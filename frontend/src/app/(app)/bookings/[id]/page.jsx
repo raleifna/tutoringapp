@@ -17,7 +17,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../../lib/api-entry';
+import { bookingApi, paymentApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 
@@ -87,6 +87,15 @@ const formatBookingStatus = (status) => {
   return status || 'Unknown';
 };
 
+const formatSavedMethod = (paymentMethod) => {
+  if (!paymentMethod?.last4) return 'No payment method saved';
+
+  const brand = String(paymentMethod.brand || 'card');
+  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
+
+  return `${label} ending in ${paymentMethod.last4}`;
+};
+
 export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
@@ -126,6 +135,12 @@ export default function BookingDetailPage() {
   const booking = data?.data?.data;
   const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
+
+  const savedMethodQuery = useQuery({
+    queryKey: ['savedPaymentMethod', currentUserId],
+    queryFn: () => paymentApi.getSavedMethod(),
+    enabled: !!currentUserId && !!isLearner,
+  });
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const bookingDetailHref = (() => {
     const params = new URLSearchParams();
@@ -148,6 +163,7 @@ export default function BookingDetailPage() {
   })();
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
+  const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
   const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
   const isRefunded = paymentStatus === 'REFUNDED';
   const isProcessingPayment = paymentStatus === 'PROCESSING';
@@ -418,10 +434,17 @@ export default function BookingDetailPage() {
                     {formatCurrency(totalAmount, booking.currency || 'AUD')}
                   </h3>
                 </div>
+                {savedMethod && !isFailedPayment && (
+                  <div className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700">
+                    Saved method: {formatSavedMethod(savedMethod)}
+                  </div>
+                )}
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
                   {isFailedPayment
                     ? 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
-                    : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
+                    : savedMethod
+                      ? `We will charge your saved ${formatSavedMethod(savedMethod)} automatically if the tutor accepts this booking.`
+                      : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
                 </p>
               </div>
 
@@ -432,7 +455,7 @@ export default function BookingDetailPage() {
                     className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
                   >
                     <CheckCircleIcon className="w-4 h-4" />
-                    {isFailedPayment ? 'Update Payment Method' : 'Set Up Payment Method'}
+                    {isFailedPayment || savedMethod ? 'Update Payment Method' : 'Set Up Payment Method'}
                   </Link>
                   <p className="text-xs text-gray-500 sm:text-right">
                     Stripe test mode is used here. No real payment will be charged.

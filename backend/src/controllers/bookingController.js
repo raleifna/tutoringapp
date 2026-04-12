@@ -321,7 +321,10 @@ exports.acceptBooking = async (req, res) => {
   });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
-  if (!booking.learner?.stripeCustomerId || !booking.learner?.stripeDefaultPaymentMethodId) {
+  const selectedPaymentMethodId =
+    booking.payment?.stripePaymentMethodId || booking.learner?.stripeDefaultPaymentMethodId;
+
+  if (!booking.learner?.stripeCustomerId || !selectedPaymentMethodId) {
     throw new AppError('Learner must save a payment method before this booking can be accepted', 400);
   }
 
@@ -334,7 +337,7 @@ exports.acceptBooking = async (req, res) => {
       amount: Math.round(Number(booking.totalAmount || 0) * 100),
       currency: String(booking.currency || booking.payment?.currency || 'AUD').toLowerCase(),
       customer: booking.learner.stripeCustomerId,
-      payment_method: booking.learner.stripeDefaultPaymentMethodId,
+      payment_method: selectedPaymentMethodId,
       confirm: true,
       off_session: true,
       metadata: {
@@ -367,7 +370,7 @@ exports.acceptBooking = async (req, res) => {
             update: {
               status: paymentStatus,
               stripeCustomerId: booking.learner.stripeCustomerId,
-              stripePaymentMethodId: booking.learner.stripeDefaultPaymentMethodId,
+              stripePaymentMethodId: selectedPaymentMethodId,
               stripePaymentIntentId: paymentIntent?.id || booking.payment.stripePaymentIntentId,
               processedAt: new Date(),
               paidAt: paymentStatus === 'PAID' ? new Date() : null,
@@ -382,7 +385,7 @@ exports.acceptBooking = async (req, res) => {
               currency: booking.currency || 'AUD',
               status: paymentStatus,
               stripeCustomerId: booking.learner.stripeCustomerId,
-              stripePaymentMethodId: booking.learner.stripeDefaultPaymentMethodId,
+              stripePaymentMethodId: selectedPaymentMethodId,
               stripePaymentIntentId: paymentIntent?.id || null,
               processedAt: new Date(),
               paidAt: paymentStatus === 'PAID' ? new Date() : null,

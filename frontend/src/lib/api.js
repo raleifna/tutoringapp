@@ -185,11 +185,27 @@ export const bookingApi = {
 };
 
 export const paymentApi = {
+    getSavedMethod: () => {
+        return api.get('/payments/method');
+    },
+    setDefaultMethod: (paymentMethodId) => {
+        return api.patch('/payments/method/default', { paymentMethodId });
+    },
+    deleteSavedMethod: () => {
+        return api.delete('/payments/method');
+    },
+    deleteMethod: (paymentMethodId) => {
+        return api.delete(`/payments/method/${paymentMethodId}`);
+    },
     createSetupIntent: () => {
         return api.post('/payments/setup-intent');
     },
-    completeSetupIntent: (setupIntentId) => {
-        return api.post('/payments/complete-setup-intent', { setupIntentId });
+    completeSetupIntent: (payload) => {
+        const data = typeof payload === 'string' ? { setupIntentId: payload } : payload;
+        return api.post('/payments/complete-setup-intent', data);
+    },
+    useSavedMethodForBooking: (bookingId) => {
+        return api.post(`/payments/bookings/${bookingId}/use-saved-method`);
     },
 };
 

@@ -82,11 +82,21 @@ const formatPaymentStatus = (status) => {
   return 'Pending';
 };
 
-function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, onSaved }) {
+const formatSavedMethod = (paymentMethod) => {
+  if (!paymentMethod?.last4) return 'No payment method saved';
+
+  const brand = String(paymentMethod.brand || 'card');
+  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
+
+  return `${label} ending in ${paymentMethod.last4}`;
+};
+
+function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFuture, onSaved }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLabel = saveForFuture ? 'Save and Use Card' : 'Use This Card';
 
   const successHref = useMemo(() => {
     if (!returnTo) return `/bookings/${bookingId}?paymentMethod=saved`;
@@ -134,14 +144,18 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, onSaved }) 
     const confirmedSetupIntentId = result.setupIntent?.id || clientSecret.split('_secret')[0];
 
     try {
-      await paymentApi.completeSetupIntent(confirmedSetupIntentId);
+      await paymentApi.completeSetupIntent({
+        setupIntentId: confirmedSetupIntentId,
+        bookingId,
+        saveAsDefault: saveForFuture,
+      });
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Payment method was confirmed, but we could not save it yet');
       setIsSubmitting(false);
       return;
     }
 
-    toast.success('Payment method saved');
+    toast.success(saveForFuture ? 'Payment method saved' : 'Card selected for this booking');
     onSaved?.();
     router.push(successHref);
   };
@@ -161,7 +175,7 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, onSaved }) 
           className="btn-primary gap-2"
         >
           <CheckCircleIcon className="w-4 h-4" />
-          {isSubmitting ? 'Saving...' : 'Save Payment Method'}
+          {isSubmitting ? 'Confirming...' : submitLabel}
         </button>
       </div>
     </form>
@@ -170,6 +184,7 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, onSaved }) 
 
 export default function BookingPaymentPage() {
   const { id } = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -177,6 +192,8 @@ export default function BookingPaymentPage() {
   const returnTo = searchParams.get('returnTo') || '';
   const showBackButton = Boolean(returnTo);
   const [setupIntentData, setSetupIntentData] = useState(null);
+  const [setupMode, setSetupMode] = useState('saved');
+  const [saveForFuture, setSaveForFuture] = useState(false);
 
   const {
     data,
@@ -192,10 +209,29 @@ export default function BookingPaymentPage() {
 
   const booking = data?.data?.data;
   const paymentStatus = booking?.payment?.status || 'PENDING';
+  const savedMethodQuery = useQuery({
+    queryKey: ['savedPaymentMethod', currentUserId],
+    queryFn: () => paymentApi.getSavedMethod(),
+    enabled: !!currentUserId && user?.role === 'LEARNER',
+  });
+  const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
   const canUpdatePaymentMethod =
     user?.role === 'LEARNER' &&
     ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
     ['PENDING', 'FAILED'].includes(paymentStatus);
+
+  const useSavedMethodMutation = useMutation({
+    mutationFn: () => paymentApi.useSavedMethodForBooking(id),
+    onSuccess: async () => {
+      toast.success('Saved payment method selected for this booking');
+      await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+      await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+      router.push(returnTo || `/bookings/${id}?paymentMethod=saved`);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Could not use saved payment method');
+    },
+  });
 
   const setupIntentMutation = useMutation({
     mutationFn: () => paymentApi.createSetupIntent(),
@@ -209,16 +245,27 @@ export default function BookingPaymentPage() {
   });
 
   useEffect(() => {
-    if (!canUpdatePaymentMethod) return;
+    if (!canUpdatePaymentMethod || setupMode !== 'new') return;
     if (setupIntentData?.clientSecret) return;
     if (setupIntentMutation.isPending) return;
     setupIntentMutation.mutate();
   }, [
     canUpdatePaymentMethod,
+    setupMode,
     setupIntentData,
     setupIntentMutation.isPending,
     setupIntentMutation.mutate,
   ]);
+
+  useEffect(() => {
+    if (savedMethod) {
+      setSetupMode('saved');
+      setSaveForFuture(false);
+    } else {
+      setSetupMode('new');
+      setSaveForFuture(true);
+    }
+  }, [savedMethod?.id]);
 
   if (!currentUserId) {
     return (
@@ -333,6 +380,38 @@ export default function BookingPaymentPage() {
           </p>
         </div>
 
+        {savedMethod && canUpdatePaymentMethod && (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Saved Method</p>
+                <p className="font-semibold text-gray-900">{formatSavedMethod(savedMethod)}</p>
+                {savedMethod?.expMonth && savedMethod?.expYear ? (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Expires {String(savedMethod.expMonth).padStart(2, '0')}/{savedMethod.expYear}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSetupMode('saved')}
+                  className={`btn-secondary ${setupMode === 'saved' ? 'ring-2 ring-primary-200 border-primary-300 text-primary-700' : ''}`}
+                >
+                  Use Saved Method
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSetupMode('new')}
+                  className={`btn-secondary ${setupMode === 'new' ? 'ring-2 ring-primary-200 border-primary-300 text-primary-700' : ''}`}
+                >
+                  Add New Method
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!stripePromise && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
             Stripe publishable key is missing. Please check your environment variables.
@@ -340,23 +419,60 @@ export default function BookingPaymentPage() {
         )}
 
         {canUpdatePaymentMethod ? (
-          setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
+          savedMethod && setupMode === 'saved' ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm text-emerald-800 mb-3">
+                This booking will use your saved {formatSavedMethod(savedMethod)} after the tutor accepts it.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => useSavedMethodMutation.mutate()}
+                  disabled={useSavedMethodMutation.isPending}
+                  className="btn-primary gap-2"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {useSavedMethodMutation.isPending ? 'Confirming...' : 'Confirm Saved Method'}
+                </button>
+              </div>
+            </div>
+          ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
               Preparing Stripe payment form...
             </div>
           ) : setupIntentData?.clientSecret && stripePromise && elementsOptions ? (
-            <Elements stripe={stripePromise} options={elementsOptions}>
-              <SetupPaymentMethodForm
-                bookingId={booking.id}
-                clientSecret={setupIntentData.clientSecret}
-                returnTo={returnTo}
-                onSaved={() => {
-                  queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-                  queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-                  queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-                }}
-              />
-            </Elements>
+            <div className="space-y-4">
+              {savedMethod && (
+                <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={saveForFuture}
+                    onChange={(event) => setSaveForFuture(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>
+                    <span className="font-medium text-gray-900">Save this card for future use?</span>
+                    <span className="block text-xs text-gray-500 mt-1">
+                      If you leave this unticked, we will only use the new card for this booking.
+                    </span>
+                  </span>
+                </label>
+              )}
+              <Elements stripe={stripePromise} options={elementsOptions}>
+                <SetupPaymentMethodForm
+                  bookingId={booking.id}
+                  clientSecret={setupIntentData.clientSecret}
+                  returnTo={returnTo}
+                  saveForFuture={saveForFuture}
+                  onSaved={() => {
+                    queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+                    queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+                    queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+                    queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
+                  }}
+                />
+              </Elements>
+            </div>
           ) : (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
               We could not prepare Stripe setup. Please try again.
