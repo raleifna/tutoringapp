@@ -99,6 +99,7 @@ export default function BookingDetailPage() {
   const returnTo = searchParams.get('returnTo') || '';
   const paymentResult = (searchParams.get('payment') || '').toLowerCase();
   const showBackButton = Boolean(returnTo || from);
+  const paymentMethodResult = (searchParams.get('paymentMethod') || '').toLowerCase();
   const backConfigMap = {
     'tutor-requests': { href: '/tutor/requests', label: 'Back' },
     'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
@@ -147,14 +148,19 @@ export default function BookingDetailPage() {
   })();
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
-  const isPaidBooking = paymentStatus === 'COMPLETED';
+  const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
   const isRefunded = paymentStatus === 'REFUNDED';
-  const isDeclinedRefund = booking?.status === 'DECLINED' && isRefunded;
+  const isProcessingPayment = paymentStatus === 'PROCESSING';
+  const isFailedPayment = paymentStatus === 'FAILED';
   const timeDelta = new Date(scheduledAt) - new Date();
   const isAcceptedBooking = booking?.status === 'ACCEPTED';
+  const canSetupPaymentMethod =
+    isLearner &&
+    booking?.status === 'PENDING' &&
+    ['PENDING', 'FAILED'].includes(paymentStatus);
   const canCancel =
     isLearner &&
-    ['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status) &&
+    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
     (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
 
   const cancelMutation = useMutation({
@@ -287,17 +293,15 @@ export default function BookingDetailPage() {
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-5">
-      {paymentResult === 'success' && (
+      {paymentMethodResult === 'saved' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          Payment successful. Your booking has been sent to the tutor for confirmation.
+          Payment method saved. We will charge it automatically once the tutor accepts this booking.
         </div>
       )}
 
-      {isRefunded && (
+      {paymentResult === 'success' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {isDeclinedRefund
-            ? 'This booking was declined by the tutor and the payment has been refunded.'
-            : 'This booking was cancelled and the payment has been refunded.'}
+          Payment successful. Your booking has been sent to the tutor for confirmation.
         </div>
       )}
 
@@ -401,13 +405,13 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {booking.status === 'UNPAID' && (
+      {canSetupPaymentMethod && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
                 <p className="text-xs text-sky-700 uppercase tracking-[0.18em] font-semibold">
-                  Checkout
+                  Payment Method
                 </p>
                 <div className="flex items-end gap-3">
                   <h3 className="text-3xl font-bold tracking-tight text-gray-900">
@@ -415,7 +419,9 @@ export default function BookingDetailPage() {
                   </h3>
                 </div>
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
-                  Complete payment to send this booking to the tutor for confirmation.
+                  {isFailedPayment
+                    ? 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
+                    : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
                 </p>
               </div>
 
@@ -426,15 +432,27 @@ export default function BookingDetailPage() {
                     className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
                   >
                     <CheckCircleIcon className="w-4 h-4" />
-                    Pay Now
+                    {isFailedPayment ? 'Update Payment Method' : 'Set Up Payment Method'}
                   </Link>
                   <p className="text-xs text-gray-500 sm:text-right">
-                    No real payment will be charged in this demo.
+                    Stripe test mode is used here. No real payment will be charged.
                   </p>
                 </div>
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {isLearner && booking.status === 'ACCEPTED' && isProcessingPayment && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Payment is currently processing for this accepted booking.
+        </div>
+      )}
+
+      {isLearner && booking.status === 'DECLINED' && isRefunded && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          Refunded
         </div>
       )}
 

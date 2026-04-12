@@ -184,6 +184,15 @@ export const bookingApi = {
     },
 };
 
+export const paymentApi = {
+    createSetupIntent: () => {
+        return api.post('/payments/setup-intent');
+    },
+    completeSetupIntent: (setupIntentId) => {
+        return api.post('/payments/complete-setup-intent', { setupIntentId });
+    },
+};
+
 export const messageApi = {
     getConversations: () => {
         return api.get('/messages/conversations');

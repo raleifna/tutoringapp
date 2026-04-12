@@ -78,10 +78,18 @@ enum SubscriptionStatus {
 
 enum PaymentStatus {
   PENDING
+  PROCESSING
+  PAID
   COMPLETED
   FAILED
+  CREDITED
   REFUNDED
   CANCELLED
+}
+
+enum CreditTransactionType {
+  CREDIT
+  DEBIT
 }
 
 // ==================== USER ====================
@@ -104,6 +112,8 @@ model User {
   emailVerificationToken   String?   @unique
   emailVerificationExpiry  DateTime?
   preferredMeetingTool     MeetingTool?
+  stripeCustomerId         String?   @unique
+  stripeDefaultPaymentMethodId String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   lastLoginAt   DateTime?
@@ -121,6 +131,7 @@ model User {
   adminActions    AdminAction[]    @relation("AdminActioner")
   adminTargeted   AdminAction[]    @relation("AdminTarget")
   notifications Notification[] @relation("Notification")
+  creditTransactions CreditTransaction[]
 
   @@index([email])
   @@index([role])
@@ -293,6 +304,7 @@ model Booking {
   tutorProfile  TutorProfile           @relation("TutorBookings", fields: [tutorId], references: [id])
   payment       Payment?
   statusHistory BookingStatusHistory[]
+  creditTransactions CreditTransaction[]
 
   @@index([learnerId])
   @@index([tutorId])
@@ -393,6 +405,10 @@ model Payment {
   status          PaymentStatus @default(PENDING)
   stripePaymentId String?
   stripeSessionId String?
+  stripeCustomerId String?
+  stripePaymentMethodId String?
+  stripeSetupIntentId String?
+  stripePaymentIntentId String?
   description     String?
   // Platform fee / commission
   platformFeePercent Decimal?   @db.Decimal(5, 2)  // e.g. 15.00 for 15%
@@ -400,6 +416,11 @@ model Payment {
   tutorPayoutAmount  Decimal?   @db.Decimal(10, 2) // amount sent to tutor
   payoutStatus       String?    @default("PENDING")  // PENDING, PAID, FAILED
   payoutAt           DateTime?
+  processedAt     DateTime?
+  paidAt          DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+  creditApplied   Decimal?      @db.Decimal(10, 2)
   refundAmount    Decimal?      @db.Decimal(10, 2)
   refundedAt      DateTime?
   createdAt       DateTime      @default(now())
@@ -409,7 +430,28 @@ model Payment {
   booking Booking? @relation(fields: [bookingId], references: [id])
 
   @@index([userId])
+  @@index([status])
+  @@index([stripePaymentIntentId])
+  @@index([stripeSetupIntentId])
   @@map("payments")
+}
+
+model CreditTransaction {
+  id        String                @id @default(uuid())
+  userId    String
+  bookingId String?
+  amount    Decimal               @db.Decimal(10, 2)
+  currency  String                @default("AUD")
+  type      CreditTransactionType
+  reason    String?
+  createdAt DateTime              @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([bookingId])
+  @@map("credit_transactions")
 }
 
 // ==================== ADMIN ====================
@@ -458,6 +500,3 @@ model Notification {
   @@index([userId])
   @@map("notifications")
 }
-
-
-

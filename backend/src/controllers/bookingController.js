@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { getStripe } = require('../config/stripe');
 const { AppError } = require('../middleware/errorHandler');
 const notificationService = require('../services/notificationService');
 
@@ -14,6 +15,8 @@ const bookingInclude = {
   payment: true,
   statusHistory: { orderBy: { createdAt: 'desc' } },
 };
+
+const isPaidPaymentStatus = (status) => ['PAID', 'COMPLETED'].includes(String(status || '').toUpperCase());
 
 exports.createBooking = async (req, res) => {
   const {
@@ -69,8 +72,9 @@ exports.createBooking = async (req, res) => {
       sessionType: sessionType || 'ONLINE',
       hourlyRate: rate,
       totalAmount,
+      currency: tutorProfile.currency || 'AUD',
       notes,
-      status: 'UNPAID',
+      status: 'PENDING',
       recurringType: recurringType || 'ONE_OFF',
       meetingTool: meetingTool || tutorProfile.preferredMeetingTool || null,
       payment: {
@@ -83,7 +87,7 @@ exports.createBooking = async (req, res) => {
         },
       },
       statusHistory: {
-        create: { status: 'UNPAID' },
+        create: { status: 'PENDING' },
       },
     },
     include: bookingInclude,
@@ -150,10 +154,8 @@ exports.getTutorBookings = async (req, res) => {
     tutorId: tutorProfile.id,
     OR: [
       {
-        payment: {
-          is: {
-            status: 'COMPLETED',
-          },
+        status: {
+          not: 'CANCELLED',
         },
       },
       {
@@ -210,9 +212,8 @@ exports.getBooking = async (req, res) => {
   const isTutor = tutorProfile && booking.tutorId === tutorProfile.id;
   const isTutorVisible =
     isTutor &&
-    (booking?.payment?.status === 'COMPLETED' ||
-      (booking?.status === 'CANCELLED' &&
-        booking?.statusHistory?.some((entry) => entry.status === 'ACCEPTED')));
+    (booking?.status !== 'CANCELLED' ||
+      booking?.statusHistory?.some((entry) => entry.status === 'ACCEPTED'));
   const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SYSTEM_ADMIN';
 
   if (!isLearner && !isTutorVisible && !isAdmin) {
@@ -255,7 +256,7 @@ exports.cancelBooking = async (req, res) => {
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
   const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
-  const isPaidBooking = booking?.payment?.status === 'COMPLETED';
+  const isPaidBooking = isPaidPaymentStatus(booking?.payment?.status);
   const isAcceptedBooking = booking.status === 'ACCEPTED';
   if (isLearner && isPaidBooking && isAcceptedBooking && hoursUntilSession < 24) {
     throw new AppError('Cannot cancel an accepted booking within 24 hours of the session', 400);
@@ -266,7 +267,7 @@ exports.cancelBooking = async (req, res) => {
     data: {
       status: 'CANCELLED',
       cancellationReason: reason,
-      ...(booking?.payment?.status === 'COMPLETED'
+      ...(isPaidPaymentStatus(booking?.payment?.status)
         ? {
             payment: {
               update: {
@@ -296,7 +297,7 @@ exports.cancelBooking = async (req, res) => {
   res.json({
     success: true,
     message:
-      booking?.payment?.status === 'COMPLETED'
+      isPaidPaymentStatus(booking?.payment?.status)
         ? 'Booking cancelled and payment refunded'
         : booking?.payment
           ? 'Booking cancelled'
@@ -307,17 +308,53 @@ exports.cancelBooking = async (req, res) => {
 
 exports.acceptBooking = async (req, res) => {
   const { meetingLink } = req.body;
+  const stripe = getStripe();
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
 
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
-    include: { payment: true },
+    include: {
+      payment: true,
+      learner: true,
+    },
   });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
-  if (!booking.payment || booking.payment.status !== 'COMPLETED') {
-    throw new AppError('Booking must be paid before it can be accepted', 400);
+  if (!booking.learner?.stripeCustomerId || !booking.learner?.stripeDefaultPaymentMethodId) {
+    throw new AppError('Learner must save a payment method before this booking can be accepted', 400);
+  }
+
+  let paymentStatus = 'PROCESSING';
+  let paymentIntent = null;
+  let failureReason = null;
+
+  try {
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(Number(booking.totalAmount || 0) * 100),
+      currency: String(booking.currency || booking.payment?.currency || 'AUD').toLowerCase(),
+      customer: booking.learner.stripeCustomerId,
+      payment_method: booking.learner.stripeDefaultPaymentMethodId,
+      confirm: true,
+      off_session: true,
+      metadata: {
+        bookingId: booking.id,
+        learnerId: booking.learnerId,
+        tutorProfileId: tutorProfile.id,
+      },
+    });
+
+    if (paymentIntent.status === 'succeeded') {
+      paymentStatus = 'PAID';
+    } else if (paymentIntent.status === 'requires_payment_method') {
+      paymentStatus = 'FAILED';
+      failureReason = 'Payment method was declined';
+    }
+  } catch (error) {
+    paymentIntent = error?.raw?.payment_intent || null;
+    paymentStatus = 'FAILED';
+    failureReason =
+      error?.raw?.message || error?.message || 'Stripe payment could not be processed';
   }
 
   const updated = await prisma.booking.update({
@@ -325,15 +362,73 @@ exports.acceptBooking = async (req, res) => {
     data: {
       status: 'ACCEPTED',
       meetingLink,
+      payment: booking.payment
+        ? {
+            update: {
+              status: paymentStatus,
+              stripeCustomerId: booking.learner.stripeCustomerId,
+              stripePaymentMethodId: booking.learner.stripeDefaultPaymentMethodId,
+              stripePaymentIntentId: paymentIntent?.id || booking.payment.stripePaymentIntentId,
+              processedAt: new Date(),
+              paidAt: paymentStatus === 'PAID' ? new Date() : null,
+              failedAt: paymentStatus === 'FAILED' ? new Date() : null,
+              failureReason,
+            },
+          }
+        : {
+            create: {
+              userId: booking.learnerId,
+              amount: booking.totalAmount,
+              currency: booking.currency || 'AUD',
+              status: paymentStatus,
+              stripeCustomerId: booking.learner.stripeCustomerId,
+              stripePaymentMethodId: booking.learner.stripeDefaultPaymentMethodId,
+              stripePaymentIntentId: paymentIntent?.id || null,
+              processedAt: new Date(),
+              paidAt: paymentStatus === 'PAID' ? new Date() : null,
+              failedAt: paymentStatus === 'FAILED' ? new Date() : null,
+              failureReason,
+              description: `${booking.subject} session payment`,
+            },
+          },
       statusHistory: { create: { status: 'ACCEPTED' } },
     },
     include: bookingInclude,
   });
 
   // notify student
-  await notificationService.notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
+  await notificationService.notify(
+    booking.learnerId,
+    'booking',
+    'Booking Accepted',
+    paymentStatus === 'FAILED'
+      ? 'Your booking was accepted, but the payment could not be completed. Please update your payment method.'
+      : paymentStatus === 'PAID'
+        ? 'Your booking was accepted and payment has been confirmed.'
+        : 'Your booking was accepted and payment is now being processed.',
+    `/bookings/${updated.id}`
+  );
 
-  res.json({ success: true, message: 'Booking accepted', data: updated });
+  if (paymentStatus === 'FAILED') {
+    await notificationService.notify(
+      booking.learnerId,
+      'payment',
+      'Payment Failed',
+      failureReason || 'Please update your payment method and try again.',
+      `/bookings/${updated.id}/payment?returnTo=${encodeURIComponent(`/bookings/${updated.id}`)}`
+    );
+  }
+
+  res.json({
+    success: true,
+    message:
+      paymentStatus === 'FAILED'
+        ? 'Booking accepted, but payment failed'
+        : paymentStatus === 'PAID'
+          ? 'Booking accepted and payment confirmed'
+          : 'Booking accepted and payment is processing',
+    data: updated,
+  });
 };
 
 exports.declineBooking = async (req, res) => {
@@ -353,7 +448,7 @@ exports.declineBooking = async (req, res) => {
     data: {
       status: 'DECLINED',
       declineReason: reason,
-      ...(booking?.payment?.status === 'COMPLETED'
+      ...(isPaidPaymentStatus(booking?.payment?.status)
         ? {
             payment: {
               update: {
@@ -375,7 +470,7 @@ exports.declineBooking = async (req, res) => {
   res.json({
     success: true,
     message:
-      booking?.payment?.status === 'COMPLETED'
+      isPaidPaymentStatus(booking?.payment?.status)
         ? 'Booking declined and payment refunded'
         : 'Booking declined',
     data: updated,
@@ -436,51 +531,5 @@ exports.completeBooking = async (req, res) => {
 };
 
 exports.payForBooking = async (req, res) => {
-  const booking = await prisma.booking.findUnique({
-    where: { id: req.params.id },
-    include: { payment: true },
-  });
-
-  if (!booking || booking.learnerId !== req.user.id) {
-    throw new AppError('Booking not found', 404);
-  }
-
-  const payment =
-    booking.payment ||
-    (await prisma.payment.create({
-      data: {
-        userId: req.user.id,
-        bookingId: booking.id,
-        amount: booking.totalAmount,
-        currency: booking.currency || 'AUD',
-        status: 'PENDING',
-        description: `${booking.subject} session booking payment`,
-      },
-    }));
-
-  if (payment.status === 'COMPLETED') {
-    throw new AppError('This booking has already been paid', 400);
-  }
-
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      status: booking.status === 'UNPAID' ? 'PENDING' : booking.status,
-      payment: { update: { status: 'COMPLETED' } },
-      ...(booking.status === 'UNPAID'
-        ? {
-            statusHistory: {
-              create: { status: 'PENDING' },
-            },
-          }
-        : {}),
-    },
-    include: bookingInclude,
-  });
-
-  res.json({
-    success: true,
-    message: booking.status === 'UNPAID' ? 'Payment completed and booking is now pending' : 'Mock payment completed',
-    data: updated,
-  });
+  throw new AppError('Manual payment is no longer required. Save a payment method and wait for tutor approval.', 400);
 };

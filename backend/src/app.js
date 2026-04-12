@@ -11,9 +11,11 @@ const userRoutes = require('./routes/users');
 const tutorRoutes = require('./routes/tutors');
 const subjectRoutes = require('./routes/subjects');
 const bookingRoutes = require('./routes/bookings');
+const paymentRoutes = require('./routes/payments');
 const messageRoutes = require('./routes/messages');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
+const paymentController = require('./controllers/paymentController');
 
 const app = express();
 
@@ -40,6 +42,11 @@ app.use(
     },
   })
 );
+app.post(
+  '/api/v1/payments/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentController.handleStripeWebhook
+);
 app.use(express.json());
 app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -63,6 +70,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/tutors', tutorRoutes);
 app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/notifications', notificationRoutes);

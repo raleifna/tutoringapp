@@ -1,13 +1,24 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  CheckCircleIcon,
+  CreditCardIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { bookingApi } from '../../../../../lib/api-entry';
+import { bookingApi, paymentApi } from '../../../../../lib/api-entry';
 import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
+
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 const formatDate = (dateTime) => {
   if (!dateTime) return '-';
@@ -44,40 +55,128 @@ const formatCurrency = (amount, currency = 'AUD') => {
 };
 
 const getPaymentStatusClass = (status) => {
-  if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-  if (status === 'FAILED') return 'bg-red-50 text-red-700 border border-red-200';
-  if (status === 'REFUNDED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
+  if (status === 'PAID' || status === 'COMPLETED') {
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  }
+  if (status === 'PROCESSING') {
+    return 'bg-blue-50 text-blue-700 border border-blue-200';
+  }
+  if (status === 'FAILED') {
+    return 'bg-red-50 text-red-700 border border-red-200';
+  }
+  if (status === 'REFUNDED') {
+    return 'bg-gray-100 text-gray-700 border border-gray-200';
+  }
+  if (status === 'CANCELLED') {
+    return 'bg-gray-100 text-gray-700 border border-gray-200';
+  }
   return 'bg-amber-50 text-amber-700 border border-amber-200';
 };
 
 const formatPaymentStatus = (status) => {
-  if (status === 'COMPLETED') return 'Paid';
+  if (status === 'PAID' || status === 'COMPLETED') return 'Paid';
+  if (status === 'PROCESSING') return 'Processing';
   if (status === 'FAILED') return 'Payment Failed';
   if (status === 'REFUNDED') return 'Refunded';
   if (status === 'CANCELLED') return 'Cancelled';
-  return 'Unpaid';
+  return 'Pending';
 };
+
+function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, onSaved }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const successHref = useMemo(() => {
+    if (!returnTo) return `/bookings/${bookingId}?paymentMethod=saved`;
+
+    const [pathname, queryString = ''] = returnTo.split('?');
+    const params = new URLSearchParams(queryString);
+    params.set('paymentMethod', 'saved');
+    const query = params.toString();
+
+    return query ? `${pathname}?${query}` : pathname;
+  }, [bookingId, returnTo]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const submitResult = await elements.submit();
+
+    if (submitResult.error) {
+      toast.error(submitResult.error.message || 'Please check your payment details');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const result = await stripe.confirmSetup({
+      elements,
+      clientSecret,
+      confirmParams: {
+        return_url: `${window.location.origin}${successHref}`,
+      },
+      redirect: 'if_required',
+    });
+
+    if (result.error) {
+      toast.error(result.error.message || 'Failed to save payment method');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const confirmedSetupIntentId = result.setupIntent?.id || clientSecret.split('_secret')[0];
+
+    try {
+      await paymentApi.completeSetupIntent(confirmedSetupIntentId);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Payment method was confirmed, but we could not save it yet');
+      setIsSubmitting(false);
+      return;
+    }
+
+    toast.success('Payment method saved');
+    onSaved?.();
+    router.push(successHref);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <PaymentElement />
+      </div>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Link href={returnTo || `/bookings/${bookingId}`} className="btn-secondary text-center">
+          Cancel
+        </Link>
+        <button
+          type="submit"
+          disabled={!stripe || !elements || isSubmitting}
+          className="btn-primary gap-2"
+        >
+          <CheckCircleIcon className="w-4 h-4" />
+          {isSubmitting ? 'Saving...' : 'Save Payment Method'}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function BookingPaymentPage() {
   const { id } = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
   const returnTo = searchParams.get('returnTo') || '';
   const showBackButton = Boolean(returnTo);
-  const paymentSuccessHref = (() => {
-    if (!returnTo) return `/bookings/${id}?payment=success`;
-
-    const [pathname, queryString = ''] = returnTo.split('?');
-    const params = new URLSearchParams(queryString);
-    params.set('payment', 'success');
-    const query = params.toString();
-
-    return query ? `${pathname}?${query}` : pathname;
-  })();
+  const [setupIntentData, setSetupIntentData] = useState(null);
 
   const {
     data,
@@ -93,30 +192,39 @@ export default function BookingPaymentPage() {
 
   const booking = data?.data?.data;
   const paymentStatus = booking?.payment?.status || 'PENDING';
-  const isPaid = paymentStatus === 'COMPLETED';
-  const totalAmount =
-    booking?.totalAmount ??
-    ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const canUpdatePaymentMethod =
+    user?.role === 'LEARNER' &&
+    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
+    ['PENDING', 'FAILED'].includes(paymentStatus);
 
-  const payMutation = useMutation({
-    mutationFn: () => bookingApi.pay(id),
-    onSuccess: () => {
-      toast.success('Payment successful. Your booking is now waiting for tutor confirmation.');
+  const setupIntentMutation = useMutation({
+    mutationFn: () => paymentApi.createSetupIntent(),
+    onSuccess: (response) => {
+      setSetupIntentData(response?.data?.data || null);
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      router.push(paymentSuccessHref);
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Failed to process payment');
+      toast.error(err?.response?.data?.message || 'Failed to start Stripe setup');
     },
   });
+
+  useEffect(() => {
+    if (!canUpdatePaymentMethod) return;
+    if (setupIntentData?.clientSecret) return;
+    if (setupIntentMutation.isPending) return;
+    setupIntentMutation.mutate();
+  }, [
+    canUpdatePaymentMethod,
+    setupIntentData,
+    setupIntentMutation.isPending,
+    setupIntentMutation.mutate,
+  ]);
 
   if (!currentUserId) {
     return (
       <div className="max-w-2xl mx-auto text-center py-14">
         <p className="text-gray-700 font-medium mb-1">Login required</p>
-        <p className="text-gray-500 text-sm mb-4">Please log in first to continue payment.</p>
+        <p className="text-gray-500 text-sm mb-4">Please log in first to manage your payment method.</p>
         <Link href="/login" className="btn-primary btn-sm">
           Go to login
         </Link>
@@ -141,30 +249,39 @@ export default function BookingPaymentPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-14">
         <ExclamationTriangleIcon className="w-10 h-10 text-red-400 mx-auto mb-2" />
-        <p className="text-red-700 font-medium mb-1">Unable to load order detail</p>
+        <p className="text-red-700 font-medium mb-1">Unable to load payment setup</p>
         <p className="text-red-600 mb-3">{error?.response?.data?.message || 'Failed to load booking detail.'}</p>
         <div className="flex items-center justify-center gap-3">
           <button type="button" onClick={() => refetch()} className="btn-primary btn-sm">
             Retry
           </button>
-          {showBackButton && (
-            <BackButton href={returnTo} />
-          )}
+          {showBackButton && <BackButton href={returnTo} />}
         </div>
       </div>
     );
   }
 
+  const totalAmount =
+    booking?.totalAmount ??
+    ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+
+  const elementsOptions = setupIntentData?.clientSecret
+    ? {
+        clientSecret: setupIntentData.clientSecret,
+        appearance: {
+          theme: 'stripe',
+        },
+      }
+    : null;
+
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Order Detail</p>
-          <h1 className="text-2xl font-bold text-gray-900">Confirm Payment</h1>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
+          <h1 className="text-2xl font-bold text-gray-900">Set Up Payment</h1>
         </div>
-        {showBackButton && (
-          <BackButton href={returnTo} />
-        )}
+        {showBackButton && <BackButton href={returnTo} />}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
@@ -204,7 +321,7 @@ export default function BookingPaymentPage() {
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Total to Pay</p>
+              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Charge Later</p>
               <p className="text-2xl font-bold text-gray-900">
                 {formatCurrency(totalAmount, booking.currency || 'AUD')}
               </p>
@@ -212,29 +329,50 @@ export default function BookingPaymentPage() {
             <CreditCardIcon className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-sm text-blue-700 mt-3">
-            This is a mock payment flow for demo purposes. No real transaction will be charged.
-            After payment, your booking will be sent to the tutor for confirmation.
+            No money is charged when you save a payment method. We will only charge after the tutor accepts this booking.
           </p>
         </div>
 
-        {isPaid ? (
+        {!stripePromise && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
+            Stripe publishable key is missing. Please check your environment variables.
+          </div>
+        )}
+
+        {canUpdatePaymentMethod ? (
+          setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              Preparing Stripe payment form...
+            </div>
+          ) : setupIntentData?.clientSecret && stripePromise && elementsOptions ? (
+            <Elements stripe={stripePromise} options={elementsOptions}>
+              <SetupPaymentMethodForm
+                bookingId={booking.id}
+                clientSecret={setupIntentData.clientSecret}
+                returnTo={returnTo}
+                onSaved={() => {
+                  queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+                  queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+                  queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+                }}
+              />
+            </Elements>
+          ) : (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
+              We could not prepare Stripe setup. Please try again.
+            </div>
+          )
+        ) : paymentStatus === 'PROCESSING' ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-800">
+            Payment is currently processing for this booking.
+          </div>
+        ) : paymentStatus === 'PAID' || paymentStatus === 'COMPLETED' ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-            This booking has already been paid and is now waiting for tutor confirmation.
+            Payment has already been confirmed for this booking.
           </div>
         ) : (
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Link href={showBackButton ? returnTo : `/bookings/${id}`} className="btn-secondary text-center">
-              Cancel
-            </Link>
-            <button
-              type="button"
-              onClick={() => payMutation.mutate()}
-              disabled={payMutation.isPending}
-              className="btn-primary gap-2"
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-              {payMutation.isPending ? 'Processing...' : 'Pay and Send for Confirmation'}
-            </button>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+            Payment setup is not available for this booking at the moment.
           </div>
         )}
       </div>
