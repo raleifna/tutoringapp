@@ -177,7 +177,7 @@ export default function BookingDetailPage() {
   const canCancel =
     isLearner &&
     ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
-    (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
+    (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 48);
 
   const cancelMutation = useMutation({
     mutationFn: (refundToBalance = false) => bookingApi.cancel(id, '', refundToBalance),
