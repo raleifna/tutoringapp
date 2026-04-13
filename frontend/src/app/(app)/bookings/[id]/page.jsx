@@ -500,10 +500,10 @@ export default function BookingDetailPage() {
               className="btn-danger gap-2"
             >
               <XCircleIcon className="w-4 h-4" />
-              {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking (Refund to Credit Card)'}
+              {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking'}
             </button>
 
-            <button
+            {/* <button
             type="button"
             onClick={() => {
               if (window.confirm('Cancel this booking (Warning: After being converted into internal network points, they cannot be exported to the bank card.)?')) {
@@ -515,7 +515,7 @@ export default function BookingDetailPage() {
           >
             <XCircleIcon className="w-4 h-4" />
             {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking (Refund to Inner Balance)'}
-          </button>
+          </button> */}
           
           </>
         )}

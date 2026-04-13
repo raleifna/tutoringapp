@@ -210,9 +210,10 @@ export default function ProfilePage() {
               </span>
             )}
             
-              <span className="badge bg-gray-100 text-gray-700 text-xs">
+              {/* Cancel balance temp */}
+              {/* <span className="badge bg-gray-100 text-gray-700 text-xs">
                 Balance: {currentBalance}
-              </span>
+              </span> */}
             
           </div>
         </div>
