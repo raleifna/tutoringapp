@@ -224,7 +224,8 @@ exports.getBooking = async (req, res) => {
 };
 
 exports.cancelBooking = async (req, res) => {
-  const { reason } = req.body;
+  const stripe = getStripe();
+  const { reason, refundToBalance = false } = req.body;
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
@@ -265,7 +266,26 @@ exports.cancelBooking = async (req, res) => {
   // TODO: Will the refunded money be deducted by the platform fee and the teacher's fee?
   const paidAmount = parseFloat(booking.payment?.amount || 0);
   const newBalance = parseFloat(booking.learner.balance || 0) + paidAmount;
+
+  console.log("refundToBalance:" + refundToBalance);
   console.log("new balance:" + newBalance + ", paid amount:" + paidAmount + ", old balance: " + booking.learner.balance);
+
+  // Refound to stripe
+  if (isPaidPaymentStatus(booking?.payment?.status) && !refundToBalance) {
+    if (!booking.payment) {
+      throw new AppError('Payment not found', 404);
+    }
+    if (!booking.payment.stripePaymentIntentId) {
+      throw new AppError('Stripe payment intent ID not found', 404);
+    }
+
+    const refund = await stripe.refunds.create({
+      payment_intent: booking.payment.stripePaymentIntentId,
+    });
+
+    console.log("refund:" + refund);
+    console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
+  }
 
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
@@ -281,11 +301,11 @@ exports.cancelBooking = async (req, res) => {
                 refundedAt: new Date(),
               },
             },
-            learner: {
+            ...(refundToBalance ? {learner: {
               update: {
                 balance: newBalance,
               }
-            },
+            }} : {}),
           }
         : booking?.payment
           ? {
