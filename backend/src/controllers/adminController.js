@@ -1,6 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const notificationService = require('../services/notificationService');
+const { notify, notifyAdmin } = require('../services/notificationService');
 
 
 const ELEVATED_ROLES = ['ADMIN', 'SYSTEM_ADMIN'];
@@ -327,7 +327,7 @@ exports.updateUserStatus = async (req, res) => {
   });
 
   // notify user
-  await notificationService.notify(targetUser.id, 'system', `Your status changed to ${status}`, reason || `Your status changed to ${status}`, `/dashboard`);
+  await notify(targetUser.id, 'system', `Your status changed to ${status}`, reason || `Your status changed to ${status}`, `/dashboard`);
 
   res.json({ success: true, message: `User status updated to ${status}` });
 };
@@ -400,7 +400,7 @@ exports.approveTutor = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(tutor.userId, 'system', 'Tutor profile approved', 'Tutor profile approved', `/dashboard`);
+  await notify(tutor.userId, 'system', 'Tutor profile approved', 'Tutor profile approved', `/dashboard`);
 
 
   res.json({ success: true, message: 'Tutor approved successfully' });
@@ -431,7 +431,7 @@ exports.rejectTutor = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(tutor.userId, 'system', 'Tutor profile rejected', reason || 'Tutor profile rejected', `/dashboard`);
+  await notify(tutor.userId, 'system', 'Tutor profile rejected', reason || 'Tutor profile rejected', `/dashboard`);
 
   res.json({ success: true, message: 'Tutor profile rejected' });
 };
@@ -466,7 +466,7 @@ exports.returnTutor = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(tutor.userId, 'system', 'Tutor profile returned', feedback.trim(), `/dashboard`);
+  await notify(tutor.userId, 'system', 'Tutor profile returned', feedback.trim(), `/dashboard`);
 
   res.json({ success: true, message: 'Profile returned to tutor for changes' });
 };

@@ -46,10 +46,8 @@ const NotificationBox = ({ currentUserId }) => {
       keepPreviousData: true,
     });
 
-    const recentNotifications = notificationsData?.data?.data?.notifications || [];
-    const notifications = notificationsData?.data?.data?.notifications || [];
-  
-    const unreadCount = notifications.filter(n => !n.read).length;
+    const recentNotifications = notificationsData?.data?.data?.notifications || [];  
+    const unreadCount = recentNotifications.filter(n => !n.read).length;
   
     const handleNotificationClick = () => {
       setIsNotificationOpen(!isNotificationOpen);
@@ -79,6 +77,7 @@ const NotificationBox = ({ currentUserId }) => {
       if (notification.link) {
         router.push(notification.link);
         setIsNotificationOpen(false);
+        handleMarkAsRead(notification.id);
       }
     };
   
