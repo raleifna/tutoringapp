@@ -78,6 +78,7 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const currentIpAddress = formatIpAddress(user?.ipAddress);
   const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const currentBalance = user?.balance || 0;
   const currentUserId = user?.id || '';
 
   const savedMethodQuery = useQuery({
@@ -208,6 +209,11 @@ export default function ProfilePage() {
                 Region: {currentLocationLabel}
               </span>
             )}
+            
+              <span className="badge bg-gray-100 text-gray-700 text-xs">
+                Balance: {currentBalance}
+              </span>
+            
           </div>
         </div>
       </div>

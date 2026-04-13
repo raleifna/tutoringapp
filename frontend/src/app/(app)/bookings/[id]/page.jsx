@@ -100,7 +100,7 @@ export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, fetchMe } = useAuthStore();
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
@@ -187,6 +187,7 @@ export default function BookingDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      fetchMe();
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');

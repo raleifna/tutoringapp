@@ -262,6 +262,11 @@ exports.cancelBooking = async (req, res) => {
     throw new AppError('Cannot cancel an accepted booking within 24 hours of the session', 400);
   }
 
+  // TODO: Will the refunded money be deducted by the platform fee and the teacher's fee?
+  const paidAmount = parseFloat(booking.payment?.amount || 0);
+  const newBalance = parseFloat(booking.learner.balance || 0) + paidAmount;
+  console.log("new balance:" + newBalance + ", paid amount:" + paidAmount + ", old balance: " + booking.learner.balance);
+
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
     data: {
@@ -275,6 +280,11 @@ exports.cancelBooking = async (req, res) => {
                 refundAmount: booking.payment.amount,
                 refundedAt: new Date(),
               },
+            },
+            learner: {
+              update: {
+                balance: newBalance,
+              }
             },
           }
         : booking?.payment

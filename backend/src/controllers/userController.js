@@ -32,6 +32,7 @@ async function updateMyProfile(req, res) {
             phone: user.phone,
             role: user.role,
             status: user.status,
+            balance: user.balance,
         },
     });
 }
