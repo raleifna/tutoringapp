@@ -1,5 +1,5 @@
+// for token
 const crypto = require('crypto');
-
 const { prisma } = require('../config/database');
 const { sendVerificationEmail } = require('../services/emailService');
 
@@ -7,12 +7,19 @@ const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
         const normalized = value.trim().toLowerCase();
+        // equals true for 'true', '1', 'yes', 'on'
         return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
     }
     return false;
 };
 
 const toReviewItems = (value) =>
+    /*
+    [
+        { text: "UNSW Computer Science" },
+        { text: "Master of IT" }
+    ]
+    */
     typeof value === 'string'
         ? value
               .split('\n')
@@ -20,6 +27,30 @@ const toReviewItems = (value) =>
               .filter(Boolean)
               .map((item) => ({ text: item }))
         : [];
+
+    // for uploaded files
+    /*
+    [
+        {
+            kind: 'file',
+            originalName: 'resume.pdf',
+            fileName: '171234-resume.pdf',
+            url: '/uploads/documents/171234-resume.pdf',
+            mimeType: 'application/pdf',
+            size: 12345,
+            uploadedAt: '2026-04-13T08:20:30.000Z'
+        },
+        {
+            kind: 'file',
+            originalName: 'id-card.jpg',
+            fileName: '171235-id-card.jpg',
+            url: '/uploads/documents/171235-id-card.jpg',
+            mimeType: 'image/jpeg',
+            size: 45678,
+            uploadedAt: '2026-04-13T08:20:30.000Z'
+        }
+    ]
+    */
 
 const toUploadedFileItems = (files = []) =>
     files.map((file) => ({
@@ -57,6 +88,7 @@ const getRequestIpAddress = (req) =>
             req.socket?.remoteAddress
     );
 
+//password should be hashed in production, but for demo purposes we will store it in plain text (NOT recommended for real applications)
 const authUserSelect = {
     id: true,
     email: true,
@@ -84,6 +116,7 @@ const authUserSelectWithPassword = {
     password: true,
 };
 
+// user authentication and registration logic   
 const serializeAuthUser = (user, ipAddress = null) => ({
     id: user.id,
     email: user.email,
@@ -114,11 +147,21 @@ const createEmailVerificationToken = () => crypto.randomBytes(32).toString('hex'
 
 const createEmailVerificationExpiry = () => {
     const expiresAt = new Date();
+    // set expiry to 24 hours from now
     expiresAt.setHours(expiresAt.getHours() + 24);
     return expiresAt;
 };
 
-const isEmailVerificationRequired = () => String(process.env.EMAIL_VERIFICATION_REQUIRED || 'true') !== 'false';
+// fix code repetition for checking if email verification is required
+const isEmailVerificationRequired = () => {
+    const setting = process.env.EMAIL_VERIFICATION_REQUIRED;
+
+    if (setting === 'false') {
+        return false;
+    }
+
+    return true;
+};
 
 async function register(req, res) {
     const {
