@@ -17,25 +17,20 @@ const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
-const normalizeOrigin = (value = '') => value.trim().replace(/\/+$/, '');
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
-  .map(normalizeOrigin)
+  .map((s) => s.trim().replace(/\/+$/, ''))
   .filter(Boolean);
-
-// Print allowed origins for debugging
-console.log('Allowed CORS origins:', allowedOrigins);
 
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(normalizeOrigin(origin))) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin.trim().replace(/\/+$/, ''))) {
         callback(null, true);
         return;
       }
-
       callback(new Error(`CORS blocked: ${origin}`));
     },
   })
@@ -44,18 +39,12 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-const createHealthPayload = () => ({
-  success: true,
-  name: 'TutorConnect API',
-  timestamp: new Date().toISOString(),
-});
-
 app.get('/health', (_req, res) => {
-  res.json(createHealthPayload());
+  res.json({ success: true, name: 'TutorConnect API', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/v1/health', (_req, res) => {
-  res.json(createHealthPayload());
+  res.json({ success: true, name: 'TutorConnect API', timestamp: new Date().toISOString() });
 });
 
 app.use('/api/v1/auth', authRoutes);
