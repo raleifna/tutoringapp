@@ -25,7 +25,8 @@ const registerSchema = z
       .min(8, 'Password must be at least 8 characters')
       .regex(/[A-Z]/, 'Must contain an uppercase letter')
       .regex(/[a-z]/, 'Must contain a lowercase letter')
-      .regex(/[0-9]/, 'Must contain a number'),
+      .regex(/[0-9]/, 'Must contain a number')
+      .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Must contain a special character'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     role: z.enum(['LEARNER', 'TUTOR']),
     isMinor: z.boolean().optional(),
@@ -77,6 +78,7 @@ function RegisterContent() {
   const [verificationUrl, setVerificationUrl] = useState('');
   const [verificationFiles, setVerificationFiles] = useState([]);
   const [verificationFileError, setVerificationFileError] = useState('');
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   const defaultRole = searchParams.get('role') === 'TUTOR' ? 'TUTOR' : 'LEARNER';
   const {
@@ -309,7 +311,7 @@ function RegisterContent() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 className="input pr-10"
-                placeholder="At least 8 characters"
+                placeholder="At least 8 characters and contain a special character"
               />
               <button
                 type="button"
@@ -431,7 +433,12 @@ function RegisterContent() {
           )}
 
           <label className="flex items-start gap-2 text-sm text-gray-600">
-            <input type="checkbox" {...register('agreeToTerms')} className="mt-1 rounded border-gray-300" />
+            <input type="checkbox" {...register('agreeToTerms')} className="mt-1 rounded border-gray-300" onClick={(e) => {
+                  if (!watch('agreeToTerms')) {
+                    e.preventDefault();
+                    setIsPrivacyModalOpen(true);
+                  }
+                }} />
             <span>I agree to the terms and privacy policy.</span>
           </label>
           {errors.agreeToTerms && <p className="error-text -mt-2">{errors.agreeToTerms.message}</p>}
@@ -452,6 +459,84 @@ function RegisterContent() {
           </Link>
         </p>
       </div>
+      {isPrivacyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
+              <h2 className="text-xl font-bold text-gray-900">Privacy Policy</h2>
+              <button 
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+              <div className="space-y-4 text-sm text-gray-600">
+                <p className="font-semibold text-gray-900 text-base">Welcome to TutorConnect.</p>
+                <p>We value your privacy and are committed to protecting your personal information. This policy explains how we collect, use, store, and share your data when you use our platform.</p>
+                
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">We may collect basic information such as:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>your name</li>
+                    <li>email address</li>
+                    <li>account details</li>
+                    <li>booking and session information</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">We use this information to:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>create and manage your account</li>
+                    <li>connect learners with tutors</li>
+                    <li>handle bookings and payments</li>
+                    <li>improve our platform and user experience</li>
+                  </ul>
+                </div>
+
+                <p>We apply appropriate security measures to protect your data.</p>
+
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">In some cases, we may request access to certain device features, such as:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>camera</li>
+                    <li>storage</li>
+                    <li>notifications</li>
+                  </ul>
+                </div>
+
+                <p>These permissions are only used to support platform features, and you can manage them in your device settings.</p>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setValue('agreeToTerms', true, { shouldValidate: true });
+                  setIsPrivacyModalOpen(false);
+                }}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-sm"
+              >
+                I Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
