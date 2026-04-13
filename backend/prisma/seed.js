@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { hashPassword } = require('../src/utils/passwords');
 
 const prisma = new PrismaClient();
 
@@ -18,10 +19,12 @@ const SUBJECTS = [
 ];
 
 async function upsertUser({ email, password, firstName, lastName, role, status, bio }) {
+  const storedPassword = hashPassword(password);
+
   return prisma.user.upsert({
     where: { email },
     update: {
-      password,
+      password: storedPassword,
       firstName,
       lastName,
       role,
@@ -31,7 +34,7 @@ async function upsertUser({ email, password, firstName, lastName, role, status, 
     },
     create: {
       email,
-      password,
+      password: storedPassword,
       firstName,
       lastName,
       role,

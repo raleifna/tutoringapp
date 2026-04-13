@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { sendVerificationEmail } = require('../services/emailService');
+const { hashPassword, comparePassword } = require('../utils/passwords');
 
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
@@ -88,7 +89,6 @@ const getRequestIpAddress = (req) =>
             req.socket?.remoteAddress
     );
 
-//password should be hashed in production, but for demo purposes we will store it in plain text (NOT recommended for real applications)
 const authUserSelect = {
     id: true,
     email: true,
@@ -186,6 +186,7 @@ async function register(req, res) {
     const uploadedVerificationFiles = Array.isArray(req.files) ? req.files : [];
     const emailVerificationToken = createEmailVerificationToken();
     const emailVerificationExpiry = createEmailVerificationExpiry();
+    const hashedPassword = hashPassword(password);
 
     if (!normalizedEmail || !password || !normalizedFirstName || !normalizedLastName) {
         return res.status(400).json({
@@ -236,7 +237,7 @@ async function register(req, res) {
     const user = await prisma.user.create({
         data: {
             email: normalizedEmail,
-            password,
+            password: hashedPassword,
             firstName: normalizedFirstName,
             lastName: normalizedLastName,
             role: normalizedRole,
@@ -308,7 +309,9 @@ async function login(req, res) {
         select: authUserSelectWithPassword,
     });
 
-    if (!user || user.password !== password) {
+    const passwordMatches = user ? comparePassword(password, user.password) : false;
+
+    if (!user || !passwordMatches) {
         return res.status(401).json({
             success: false,
             message: 'Invalid email or password.',
