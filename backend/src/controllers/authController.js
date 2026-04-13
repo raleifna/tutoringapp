@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { sendVerificationEmail } = require('../services/emailService');
 const { hashPassword, comparePassword } = require('../utils/passwords');
+const { createAccessToken, createRefreshToken, verifyRefreshToken } = require('../utils/tokens');
 
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
@@ -338,8 +339,8 @@ async function login(req, res) {
     return res.status(200).json({
         success: true,
         message: 'Login successful.',
-        accessToken: `demo-token-${user.id}`,
-        refreshToken: `demo-refresh-${user.id}`,
+        accessToken: createAccessToken(authenticatedUser),
+        refreshToken: createRefreshToken(authenticatedUser),
         user: serializeAuthUser(authenticatedUser, ipAddress),
     });
 }
@@ -468,17 +469,20 @@ async function refreshToken(req, res) {
         });
     }
 
-    if (!refreshToken.startsWith('demo-refresh-')) {
+    let payload;
+
+    try {
+        payload = verifyRefreshToken(refreshToken);
+    } catch (error) {
         return res.status(401).json({
             success: false,
             message: 'Invalid refresh token.',
         });
     }
 
-    const userId = refreshToken.replace('demo-refresh-', '');
-
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: payload.id },
+        select: authUserSelect,
     });
 
     if (!user) {
@@ -491,7 +495,7 @@ async function refreshToken(req, res) {
     return res.status(200).json({
         success: true,
         message: 'Token refreshed.',
-        accessToken: `demo-token-${user.id}`,
+        accessToken: createAccessToken(user),
     });
 }
 
