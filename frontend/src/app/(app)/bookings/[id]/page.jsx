@@ -180,7 +180,7 @@ export default function BookingDetailPage() {
     (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
 
   const cancelMutation = useMutation({
-    mutationFn: () => bookingApi.cancel(id),
+    mutationFn: (refundToBalance = false) => bookingApi.cancel(id, '', refundToBalance),
     onSuccess: (response) => {
       const refunded = response?.data?.data?.payment?.status === 'REFUNDED';
       toast.success(refunded ? 'Booking cancelled and payment refunded' : 'Booking cancelled');
@@ -487,19 +487,37 @@ export default function BookingDetailPage() {
             : 'You can cancel this booking before the tutor confirms it.'}
         </div>
         {canCancel && (
-          <button
+          <>
+          
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Cancel this booking?')) {
+                  cancelMutation.mutate();
+                }
+              }}
+              disabled={cancelMutation.isPending}
+              className="btn-danger gap-2"
+            >
+              <XCircleIcon className="w-4 h-4" />
+              {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking (Refund to Credit Card)'}
+            </button>
+
+            <button
             type="button"
             onClick={() => {
-              if (window.confirm('Cancel this booking?')) {
-                cancelMutation.mutate();
+              if (window.confirm('Cancel this booking (Warning: After being converted into internal network points, they cannot be exported to the bank card.)?')) {
+                cancelMutation.mutate(true);
               }
             }}
             disabled={cancelMutation.isPending}
             className="btn-danger gap-2"
           >
             <XCircleIcon className="w-4 h-4" />
-            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking'}
+            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking (Refund to Inner Balance)'}
           </button>
+          
+          </>
         )}
 
         {isTutor && booking.status === 'PENDING' && (
