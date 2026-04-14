@@ -65,16 +65,6 @@ const pageTitles = {
   '/tutor/profile': 'Tutor Profile',
 };
 
-const formatIpAddress = (value) => {
-  const ipAddress = String(value || '').trim();
-  return ipAddress || null;
-};
-
-const formatLocationLabel = (value) => {
-  const locationLabel = String(value || '').trim();
-  return locationLabel || null;
-};
-
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -87,8 +77,8 @@ export default function AppLayout({ children }) {
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
-  const currentIpAddress = formatIpAddress(user?.ipAddress);
-  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const currentIpAddress = user?.ipAddress?.trim() || null;
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   useEffect(() => {
     setMounted(true);

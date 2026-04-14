@@ -48,16 +48,6 @@ const getAvatarUrl = (avatar, firstName, lastName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
-const formatIpAddress = (value) => {
-  const ipAddress = String(value || '').trim();
-  return ipAddress || null;
-};
-
-const formatLocationLabel = (value) => {
-  const locationLabel = String(value || '').trim();
-  return locationLabel || null;
-};
-
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -65,8 +55,8 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const currentIpAddress = formatIpAddress(user?.ipAddress);
-  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const currentIpAddress = user?.ipAddress?.trim() || null;
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   const {
     register,
