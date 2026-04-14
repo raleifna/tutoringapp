@@ -20,52 +20,41 @@ exports.getDashboard = async (req, res) => {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [
-    totalUsers,
-    newUsersThisMonth,
-    totalTutors,
-    pendingTutors,
-    totalBookings,
-    bookingsThisMonth,
-    completedBookings,
-    totalRevenue,
-    usersByRole,
-    recentBookings,
-  ] = await Promise.all([
-    prisma.user.count({ where: { role: { notIn: ELEVATED_ROLES } } }),
-    prisma.user.count({
-      where: {
-        role: { notIn: ELEVATED_ROLES },
-        createdAt: { gte: monthStart },
-      },
-    }),
-    prisma.tutorProfile.count(),
-    prisma.tutorProfile.count({ where: { status: 'PENDING' } }),
-    prisma.booking.count(),
-    prisma.booking.count({ where: { createdAt: { gte: monthStart } } }),
-    prisma.booking.count({ where: { status: 'COMPLETED' } }),
-    prisma.payment.aggregate({
-      where: { status: 'COMPLETED' },
-      _sum: { amount: true },
-    }),
-    prisma.user.groupBy({
-      by: ['role'],
-      _count: { role: true },
-      where: { role: { notIn: ELEVATED_ROLES } },
-    }),
-    prisma.booking.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: {
-        learner: { select: { id: true, firstName: true, lastName: true, email: true } },
-        tutorProfile: {
-          include: {
-            user: { select: { id: true, firstName: true, lastName: true, email: true } },
-          },
+  const totalUsers = await prisma.user.count({ where: { role: { notIn: ELEVATED_ROLES } } });
+  const newUsersThisMonth = await prisma.user.count({
+    where: { role: { notIn: ELEVATED_ROLES }, createdAt: { gte: monthStart } },
+  });
+  const totalTutors = await prisma.tutorProfile.count();
+  const pendingTutors = await prisma.tutorProfile.count({ where: { status: 'PENDING' } });
+  const totalBookings = await prisma.booking.count();
+  const bookingsThisMonth = await prisma.booking.count({ where: { createdAt: { gte: monthStart } } });
+  const completedBookings = await prisma.booking.count({ where: { status: 'COMPLETED' } });
+  const revenueResult = await prisma.payment.aggregate({
+    where: { status: 'COMPLETED' },
+    _sum: { amount: true },
+  });
+  const usersByRoleRaw = await prisma.user.groupBy({
+    by: ['role'],
+    _count: { role: true },
+    where: { role: { notIn: ELEVATED_ROLES } },
+  });
+  const recentBookings = await prisma.booking.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    include: {
+      learner: { select: { id: true, firstName: true, lastName: true, email: true } },
+      tutorProfile: {
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
       },
-    }),
-  ]);
+    },
+  });
+
+  const usersByRole = {};
+  for (const item of usersByRoleRaw) {
+    usersByRole[item.role] = item._count.role;
+  }
 
   const overview = {
     totalUsers,
@@ -75,20 +64,12 @@ exports.getDashboard = async (req, res) => {
     totalBookings,
     bookingsThisMonth,
     completedBookings,
-    totalRevenue: totalRevenue._sum.amount || 0,
+    totalRevenue: revenueResult._sum.amount || 0,
   };
 
   res.json({
     success: true,
-    data: {
-      ...overview,
-      overview,
-      recentBookings,
-      usersByRole: usersByRole.reduce((accumulator, item) => {
-        accumulator[item.role] = item._count.role;
-        return accumulator;
-      }, {}),
-    },
+    data: { ...overview, overview, recentBookings, usersByRole },
   });
 };
 
