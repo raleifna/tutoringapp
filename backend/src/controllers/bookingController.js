@@ -382,33 +382,6 @@ exports.declineBooking = async (req, res) => {
   });
 };
 
-exports.rescheduleBooking = async (req, res) => {
-  const { scheduledAt, reason } = req.body;
-  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
-  if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
-
-  const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
-  if (!['PENDING', 'ACCEPTED'].includes(booking.status)) {
-    throw new AppError('Cannot reschedule this booking', 400);
-  }
-
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      scheduledAt: new Date(scheduledAt),
-      status: 'RESCHEDULED',
-      statusHistory: { create: { status: 'RESCHEDULED', reason } },
-    },
-    include: bookingInclude,
-  });
-
-  // notify student
-  await notify(booking.learnerId, 'booking', 'Booking Rescheduled', `A booking has been rescheduled.`, `/bookings/${updated.id}`);
-
-   res.json({ success: true, message: 'Booking rescheduled', data: updated });
-};
-
 exports.completeBooking = async (req, res) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
