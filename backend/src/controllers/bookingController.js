@@ -24,7 +24,6 @@ exports.createBooking = async (req, res) => {
     duration,
     sessionType,
     notes,
-    hourlyRate,
     recurringType = 'ONE_OFF',
     meetingTool,
   } = req.body;
@@ -55,8 +54,7 @@ exports.createBooking = async (req, res) => {
 
   const parsedDuration = parseInt(duration, 10);
   const durationHours = parsedDuration / 60;
-  const rate =
-    hourlyRate !== undefined ? parseFloat(hourlyRate) : parseFloat(tutorProfile.hourlyRate);
+  const rate = parseFloat(tutorProfile.hourlyRate);
   const totalAmount = rate * durationHours;
 
   const booking = await prisma.booking.create({
