@@ -1,20 +1,15 @@
-// src/middleware/upload.js - File Upload Middleware (Multer)
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { AppError } = require('./errorHandler');
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024; // 5MB
+const UPLOAD_DIR = 'uploads';
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let folder = 'misc';
-    if (file.fieldname === 'avatar') folder = 'avatars';
-    else if (file.fieldname === 'attachment') folder = 'attachments';
-    else if (file.fieldname === 'file' || file.fieldname === 'verificationFiles')
-      folder = 'documents';
+    const folder = file.fieldname === 'avatar' ? 'avatars' : 'documents';
     const targetDir = path.join(UPLOAD_DIR, folder);
     fs.mkdirSync(targetDir, { recursive: true });
     cb(null, targetDir);
@@ -26,26 +21,9 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedImages = /jpeg|jpg|png|gif|webp/;
-  const allowedDocs = /pdf|doc|docx|txt/;
   const ext = path.extname(file.originalname).toLowerCase().slice(1);
-
-  if (file.fieldname === 'avatar' && allowedImages.test(ext)) {
-    return cb(null, true);
-  }
-  if (file.fieldname === 'attachment' && (allowedImages.test(ext) || allowedDocs.test(ext))) {
-    return cb(null, true);
-  }
-  if (file.fieldname === 'file' && allowedDocs.test(ext)) {
-    return cb(null, true);
-  }
-  if (
-    file.fieldname === 'verificationFiles' &&
-    (allowedImages.test(ext) || allowedDocs.test(ext))
-  ) {
-    return cb(null, true);
-  }
-
+  const allowed = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt/;
+  if (allowed.test(ext)) return cb(null, true);
   cb(new AppError('Invalid file type', 400));
 };
 

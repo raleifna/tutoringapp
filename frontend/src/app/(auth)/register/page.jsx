@@ -1,4 +1,3 @@
-// src/app/(auth)/register/page.jsx - Registration Page
 'use client';
 
 import { Suspense, useState } from 'react';
@@ -59,12 +58,6 @@ const registerSchema = z
       });
     }
   });
-
-const getErrorMessage = (error) => {
-  const message = error?.response?.data?.message;
-  if (Array.isArray(message)) return message[0];
-  return message || 'Registration failed';
-};
 
 function RegisterContent() {
   const searchParams = useSearchParams();
@@ -137,39 +130,32 @@ function RegisterContent() {
       return;
     }
 
-    const payload =
-      rawData.role === 'TUTOR'
-        ? (() => {
-            const formData = new FormData();
-            [
-              ['firstName', rawData.firstName],
-              ['lastName', rawData.lastName],
-              ['email', rawData.email],
-              ['password', rawData.password],
-              ['role', rawData.role],
-              ['tutorEducationSummary', rawData.tutorEducationSummary],
-              ['tutorExperienceYears', rawData.tutorExperienceYears],
-              ['tutorSupportingNotes', rawData.tutorSupportingNotes],
-            ].forEach(([key, value]) => {
-              if (value !== undefined && value !== null && value !== '') {
-                formData.append(key, value);
-              }
-            });
-
-            verificationFiles.forEach((file) => formData.append('verificationFiles', file));
-            return formData;
-          })()
-        : {
-            firstName: rawData.firstName,
-            lastName: rawData.lastName,
-            email: rawData.email,
-            password: rawData.password,
-            role: rawData.role,
-            isMinor: rawData.isMinor,
-            parentName: rawData.parentName,
-            parentEmail: rawData.parentEmail,
-            parentPhone: rawData.parentPhone,
-          };
+    let payload;
+    if (rawData.role === 'TUTOR') {
+      const formData = new FormData();
+      formData.append('firstName', rawData.firstName);
+      formData.append('lastName', rawData.lastName);
+      formData.append('email', rawData.email);
+      formData.append('password', rawData.password);
+      formData.append('role', rawData.role);
+      if (rawData.tutorEducationSummary) formData.append('tutorEducationSummary', rawData.tutorEducationSummary);
+      if (rawData.tutorExperienceYears) formData.append('tutorExperienceYears', rawData.tutorExperienceYears);
+      if (rawData.tutorSupportingNotes) formData.append('tutorSupportingNotes', rawData.tutorSupportingNotes);
+      verificationFiles.forEach((file) => formData.append('verificationFiles', file));
+      payload = formData;
+    } else {
+      payload = {
+        firstName: rawData.firstName,
+        lastName: rawData.lastName,
+        email: rawData.email,
+        password: rawData.password,
+        role: rawData.role,
+        isMinor: rawData.isMinor,
+        parentName: rawData.parentName,
+        parentEmail: rawData.parentEmail,
+        parentPhone: rawData.parentPhone,
+      };
+    }
 
     setIsLoading(true);
     try {
@@ -179,7 +165,7 @@ function RegisterContent() {
       setVerificationUrl(response?.data?.verificationUrl || '');
       setRegistered(true);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(error?.response?.data?.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
@@ -226,7 +212,7 @@ function RegisterContent() {
                   setVerificationUrl(response?.data?.verificationUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
-                  toast.error(getErrorMessage(error));
+                  toast.error(error?.response?.data?.message || 'Registration failed');
                 } finally {
                   setIsResending(false);
                 }

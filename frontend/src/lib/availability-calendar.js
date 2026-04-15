@@ -52,21 +52,21 @@ export const cellsToSlots = (cells) => {
 
     const groups = [];
     let start = hours[0];
-    let previous = hours[0];
+    let prev = hours[0];
 
-    for (let index = 1; index < hours.length; index += 1) {
-      const current = hours[index];
-      if (current === previous + 1) {
-        previous = current;
+    for (let i = 1; i < hours.length; i++) {
+      const cur = hours[i];
+      if (cur === prev + 1) {
+        prev = cur;
         continue;
       }
 
-      groups.push({ dayOfWeek: String(dayOfWeek), startTime: formatHour(start), endTime: formatHour(previous + 1) });
-      start = current;
-      previous = current;
+      groups.push({ dayOfWeek: String(dayOfWeek), startTime: formatHour(start), endTime: formatHour(prev + 1) });
+      start = cur;
+      prev = cur;
     }
 
-    groups.push({ dayOfWeek: String(dayOfWeek), startTime: formatHour(start), endTime: formatHour(previous + 1) });
+    groups.push({ dayOfWeek: String(dayOfWeek), startTime: formatHour(start), endTime: formatHour(prev + 1) });
     return groups;
   });
 };
