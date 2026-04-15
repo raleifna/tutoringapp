@@ -16,45 +16,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getStatusClass = (status) => {
-  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
-  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
-  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
-  return 'bg-gray-100 text-gray-700 border border-gray-200';
-};
-
-const formatBookingStatus = (status) => {
-  if (status === 'UNPAID') return 'Unpaid';
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'ACCEPTED') return 'Accepted';
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'CANCELLED') return 'Cancelled';
-  if (status === 'DECLINED') return 'Declined';
-  if (status === 'RESCHEDULED') return 'Rescheduled';
-  return status || 'Unknown';
-};
+import { getAvatarUrl } from '../../../lib/avatar';
+import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
+import { formatShortDateTime as formatDate, formatTimeAgo } from '../../../lib/formatters';
 
 const getTutorDetailHref = (booking, returnTo = '/dashboard') => {
   const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
@@ -253,7 +217,8 @@ export default function DashboardPage() {
                           src={getAvatarUrl(
                             booking.tutorProfile?.user?.avatar,
                             booking.tutorProfile?.user?.firstName,
-                            booking.tutorProfile?.user?.lastName
+                            booking.tutorProfile?.user?.lastName,
+                            { fallbackName: 'Tutor' }
                           )}
                           alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                           className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
@@ -264,7 +229,8 @@ export default function DashboardPage() {
                         src={getAvatarUrl(
                           booking.tutorProfile?.user?.avatar,
                           booking.tutorProfile?.user?.firstName,
-                          booking.tutorProfile?.user?.lastName
+                          booking.tutorProfile?.user?.lastName,
+                          { fallbackName: 'Tutor' }
                         )}
                         alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                         className="w-10 h-10 rounded-full object-cover flex-shrink-0"

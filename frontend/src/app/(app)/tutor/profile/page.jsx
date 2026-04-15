@@ -9,6 +9,8 @@ import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
+import { TUTOR_SESSION_TYPES } from '../../../../lib/tutor-options';
+import { cn } from '../../../../lib/utils';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -23,8 +25,6 @@ const DAY_OPTIONS = [
   { value: '6', label: 'Saturday' },
   { value: '0', label: 'Sunday' },
 ];
-
-const SESSION_TYPES = ['ONLINE', 'IN_PERSON', 'HYBRID'];
 
 const LEVELS = [
   { value: 'beginner', label: 'Beginner' },
@@ -60,10 +60,6 @@ const getApplicationNotes = (items) => {
         .map((item) => item.text)
         .join('\n')
     : '';
-};
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
 };
 
 export default function TutorProfilePage() {
@@ -671,7 +667,7 @@ export default function TutorProfilePage() {
           <div>
             <label className="label">Session Types</label>
             <div className="flex gap-3 flex-wrap">
-              {SESSION_TYPES.map((type) => (
+              {TUTOR_SESSION_TYPES.map((type) => (
                 <button
                   key={type}
                   type="button"

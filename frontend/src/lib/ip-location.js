@@ -1,4 +1,6 @@
 const CLIENT_IP_LOOKUP_URL = 'https://api.country.is/?fields=city,subdivision';
+const CLIENT_IP_LOOKUP_TIMEOUT_MS = 4000;
+const PRIVATE_IPV6_PREFIXES = ['fc', 'fd', 'fe80:'];
 
 export const normalizeIpAddress = (value) => {
   const candidate = String(value || '').split(',')[0].trim();
@@ -7,15 +9,39 @@ export const normalizeIpAddress = (value) => {
   return candidate.replace(/^::ffff:/i, '');
 };
 
+const isPrivateIpv4Address = (value) => {
+  const parts = String(value || '')
+    .split('.')
+    .map((segment) => Number(segment));
+
+  if (parts.length !== 4 || parts.some((segment) => Number.isNaN(segment))) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+};
+
+const isPrivateIpv6Address = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  return normalized === '::1' || PRIVATE_IPV6_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+
 export const isPrivateIpAddress = (value) => {
   const ipAddress = normalizeIpAddress(value);
   if (!ipAddress || ipAddress === 'localhost' || ipAddress === '127.0.0.1') return true;
 
-  const parts = ipAddress.split('.').map(Number);
-  if (parts.length !== 4 || parts.some(Number.isNaN)) return false;
+  if (ipAddress.includes(':')) {
+    return isPrivateIpv6Address(ipAddress);
+  }
 
-  const [first, second] = parts;
-  return first === 10 || (first === 192 && second === 168);
+  return isPrivateIpv4Address(ipAddress);
 };
 
 const formatCountryLabel = (value) => {
@@ -61,11 +87,24 @@ export const applyIpContextFallback = (user) => {
 };
 
 
+const toClientIpContext = (payload = {}) => {
+  const ipAddress = normalizeIpAddress(payload.ip);
+
+  return {
+    ipAddress,
+    ipLocationLabel: buildIpLocationLabel(payload) || getFallbackIpLocationLabel(ipAddress),
+    ipCity: payload.city || null,
+    ipRegion: payload.subdivision || payload.region || null,
+    ipCountry: formatCountryLabel(payload.country_name || payload.country || null),
+    ipLocationSource: 'client',
+  };
+};
+
 export const fetchClientIpContext = async () => {
   if (typeof window === 'undefined') return null;
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+  const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_IP_LOOKUP_TIMEOUT_MS);
 
   try {
     const response = await fetch(CLIENT_IP_LOOKUP_URL, {
@@ -81,16 +120,7 @@ export const fetchClientIpContext = async () => {
     }
 
     const payload = await response.json();
-    const ipAddress = normalizeIpAddress(payload.ip);
-
-    return {
-      ipAddress,
-      ipLocationLabel: buildIpLocationLabel(payload) || getFallbackIpLocationLabel(ipAddress),
-      ipCity: payload.city || null,
-      ipRegion: payload.subdivision || payload.region || null,
-      ipCountry: formatCountryLabel(payload.country_name || payload.country || null),
-      ipLocationSource: 'client',
-    };
+    return toClientIpContext(payload);
   } finally {
     window.clearTimeout(timeoutId);
   }

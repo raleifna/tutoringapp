@@ -14,9 +14,11 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
-import { cn, formatDate, getAvatarUrl } from '../../../../lib/format';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -210,7 +212,8 @@ function AdminTutorsContent() {
                     src={getAvatarUrl(
                       tutor.user?.avatar,
                       tutor.user?.firstName,
-                      tutor.user?.lastName
+                      tutor.user?.lastName,
+                      { fallbackName: 'Tutor' }
                     )}
                     alt={tutor.user?.firstName || 'Tutor'}
                     className="w-14 h-14 rounded-full object-cover flex-shrink-0"

@@ -15,6 +15,7 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { authApi, userApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
@@ -35,17 +36,14 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
 };
 
 export default function ProfilePage() {
@@ -138,7 +136,10 @@ export default function ProfilePage() {
       <div className="card flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="relative">
           <img
-            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName)}
+            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName, {
+              fallbackName: 'User',
+              ignoreTemporary: true,
+            })}
             alt={user?.firstName || 'User'}
             className="w-20 h-20 rounded-full object-cover"
           />

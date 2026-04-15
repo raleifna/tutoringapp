@@ -13,9 +13,11 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
-import { cn, formatDate, getAvatarUrl } from '../../../../lib/format';
 
 const ROLES = ['', 'LEARNER', 'TUTOR', 'ADMIN', 'SYSTEM_ADMIN'];
 const STATUSES = ['', 'ACTIVE', 'SUSPENDED', 'DEACTIVATED'];
@@ -214,7 +216,7 @@ function AdminUsersContent() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <img
-                          src={getAvatarUrl(user.avatar, user.firstName, user.lastName)}
+                          src={getAvatarUrl(user.avatar, user.firstName, user.lastName, { fallbackName: 'User' })}
                           alt=""
                           className="w-9 h-9 rounded-full object-cover"
                         />
@@ -327,7 +329,7 @@ function AdminUsersContent() {
               <>
                 <div className="flex items-center gap-4 rounded-2xl bg-gray-50 p-4">
                   <img
-                    src={getAvatarUrl(selectedUser.avatar, selectedUser.firstName, selectedUser.lastName)}
+                    src={getAvatarUrl(selectedUser.avatar, selectedUser.firstName, selectedUser.lastName, { fallbackName: 'User' })}
                     alt={selectedUser.firstName}
                     className="w-16 h-16 rounded-full object-cover"
                   />

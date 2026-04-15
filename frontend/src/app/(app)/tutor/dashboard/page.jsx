@@ -15,8 +15,10 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
-import { cn, formatCurrency, formatDate, formatDuration, getAvatarUrl } from '../../../../lib/format';
+import { cn } from '../../../../lib/utils';
 
 export default function TutorDashboardPage() {
   const router = useRouter();
@@ -205,7 +207,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
@@ -256,7 +261,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
