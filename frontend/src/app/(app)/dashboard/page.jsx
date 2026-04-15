@@ -10,7 +10,6 @@ import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   ClockIcon,
-  CheckCircleIcon,
   StarIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -18,7 +17,7 @@ import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
-import { formatShortDateTime as formatDate, formatTimeAgo } from '../../../lib/formatters';
+import { formatShortDateTime as formatDate } from '../../../lib/formatters';
 
 const getTutorDetailHref = (booking, returnTo = '/dashboard') => {
   const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
