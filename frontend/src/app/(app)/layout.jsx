@@ -77,7 +77,6 @@ export default function AppLayout({ children }) {
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
-  const currentIpAddress = user?.ipAddress?.trim() || null;
   const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   useEffect(() => {
@@ -166,12 +165,9 @@ export default function AppLayout({ children }) {
         <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
-            {currentIpAddress && (
+            {currentLocationLabel && (
               <p className="truncate text-xs text-gray-500">
-                Current IP: <span className="font-medium text-gray-700">{currentIpAddress}</span>
-                {currentLocationLabel && (
-                  <span className="text-gray-500"> · {currentLocationLabel}</span>
-                )}
+                Location: <span className="font-medium text-gray-700">{currentLocationLabel}</span>
               </p>
             )}
           </div>
