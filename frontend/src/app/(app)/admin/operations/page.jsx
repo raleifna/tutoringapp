@@ -17,6 +17,7 @@ import {
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
+import { cn, formatCurrency, formatDate, formatDuration } from '../../../../lib/format';
 
 const OPERATION_TABS = [
   { key: 'bookings', label: 'Bookings', icon: ClipboardDocumentListIcon },
@@ -26,37 +27,6 @@ const OPERATION_TABS = [
 
 const BOOKING_STATUSES = ['', 'UNPAID', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'RESCHEDULED'];
 const EMPTY_SUBJECT_FORM = { name: '', category: '', description: '' };
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: currency || 'AUD',
-    maximumFractionDigits: 2,
-  }).format(value);
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
 
 const getBookingStatusColor = (status) => {
   if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
