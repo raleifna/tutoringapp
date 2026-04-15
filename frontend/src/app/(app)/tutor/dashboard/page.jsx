@@ -18,6 +18,7 @@ import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import BookingCalendar from '../../../../components/BookingCalendar';
 import { cn } from '../../../../lib/utils';
 
 export default function TutorDashboardPage() {
@@ -308,6 +309,14 @@ export default function TutorDashboardPage() {
             })}
           </div>
         )}
+      </div>
+
+      <div className="card p-4">
+        <BookingCalendar
+          bookings={allBookings}
+          isTutor={true}
+          returnTo="/tutor/dashboard"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
