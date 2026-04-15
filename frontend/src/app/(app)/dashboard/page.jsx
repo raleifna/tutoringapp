@@ -79,12 +79,30 @@ export default function DashboardPage() {
   const { user, accessToken, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
+
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+
+  const formattedTime = time.toLocaleTimeString({
+    timeZone: timeZone,
+  });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
+  console.log(user);
   const {
     data: bookingsData,
     isLoading,
@@ -134,16 +152,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* welcome Header */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">
-          {displayName}
-        </h1>
-        <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-        <div className="mt-4 flex flex-wrap gap-2 pr-12 sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary btn-sm rounded-full px-4">
-            Log out
-          </button>
+      <div className="flex rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5 items-center">
+        <div className='flex-1'>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">
+            {displayName}
+          </h1>
+          <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
+          <div className="mt-4 flex flex-wrap gap-2 pr-12 sm:pr-0">
+            <button onClick={handleLogout} className="btn-secondary btn-sm rounded-full px-4">
+              Log out
+            </button>
+          </div>
+        </div>
+        <div className='text-xl font-bold'>
+          {currentLocationLabel} {formattedTime}
         </div>
       </div>
 
