@@ -17,6 +17,7 @@ import {
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import { cn, formatCurrency, formatDate, formatDuration, getAvatarUrl } from '../../../../lib/format';
+import BookingCalendar from '../../../../components/BookingCalendar';
 
 export default function TutorDashboardPage() {
   const router = useRouter();
@@ -277,6 +278,14 @@ export default function TutorDashboardPage() {
             })}
           </div>
         )}
+      </div>
+
+      <div className="card p-4">
+        <BookingCalendar
+          bookings={allBookings}
+          isTutor={true}
+          returnTo="/tutor/dashboard"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

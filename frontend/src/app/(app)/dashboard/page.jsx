@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
+import BookingCalendar from '../../../components/BookingCalendar';
 
 const getAvatarUrl = (avatar, firstName, lastName) => {
   if (avatar) return avatar;
@@ -131,6 +132,14 @@ export default function DashboardPage() {
     queryFn: () => bookingApi.getMyBookings({ limit: 5 }),
     enabled: mounted && !!accessToken && !!currentUserId,
   });
+
+  // fetch more bookings for the calendar view
+  const { data: calendarData } = useQuery({
+    queryKey: ['myBookings', 'calendar', currentUserId],
+    queryFn: () => bookingApi.getMyBookings({ limit: 50 }),
+    enabled: mounted && !!accessToken && !!currentUserId,
+  });
+  const calendarBookings = calendarData?.data?.data?.bookings || [];
 
   const bookings = bookingsData?.data?.data?.bookings || [];
   const totalBookings = bookingsData?.data?.data?.pagination?.total || 0;
@@ -298,6 +307,14 @@ export default function DashboardPage() {
       {isFetching && bookingsData && (
         <p className="text-xs text-gray-400 text-center">Refreshing dashboard...</p>
       )}
+
+      <div className="card p-4">
+        <BookingCalendar
+          bookings={calendarBookings}
+          isTutor={false}
+          returnTo="/dashboard"
+        />
+      </div>
 
       <div className="card p-5">
         <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
