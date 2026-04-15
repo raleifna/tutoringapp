@@ -430,19 +430,20 @@ exports.updateProfile = async (req, res) => {
     });
   }
 
+  const profileData = {};
+  if (headline !== undefined) profileData.headline = headline;
+  if (hourlyRate !== undefined) profileData.hourlyRate = parseFloat(hourlyRate);
+  if (currency) profileData.currency = currency;
+  if (yearsExperience !== undefined) profileData.yearsExperience = parseInt(yearsExperience, 10);
+  if (education) profileData.education = education;
+  if (certifications) profileData.certifications = certifications;
+  if (languages) profileData.languages = languages;
+  if (sessionTypes) profileData.sessionTypes = sessionTypes;
+  if (location !== undefined) profileData.location = location;
+
   const updated = await prisma.tutorProfile.update({
     where: { userId: req.user.id },
-    data: {
-      ...(headline !== undefined && { headline }),
-      ...(hourlyRate !== undefined && { hourlyRate: parseFloat(hourlyRate) }),
-      ...(currency && { currency }),
-      ...(yearsExperience !== undefined && { yearsExperience: parseInt(yearsExperience, 10) }),
-      ...(education && { education }),
-      ...(certifications && { certifications }),
-      ...(languages && { languages }),
-      ...(sessionTypes && { sessionTypes }),
-      ...(location !== undefined && { location }),
-    },
+    data: profileData,
     select: tutorProfileSelect,
   });
 
