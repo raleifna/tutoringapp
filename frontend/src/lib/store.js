@@ -2,51 +2,17 @@
 import { create } from 'zustand';
 import { authApi } from './api-entry';
 import {
+  clearAuthStorage,
+  getStoredUser,
+  getStoredValue,
+  saveAuthToStorage,
+  STORAGE_KEYS,
+} from './auth-storage';
+import {
   applyIpContextFallback,
   fetchClientIpContext,
   isPrivateIpAddress,
 } from './ip-location';
-
-const STORAGE_KEYS = {
-  USER: 'user',
-  ACCESS_TOKEN: 'accessToken',
-  REFRESH_TOKEN: 'refreshToken',
-};
-
-const getStoredValue = (key) => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(key);
-};
-
-const getStoredUser = () => {
-  const rawUser = getStoredValue(STORAGE_KEYS.USER);
-  if (!rawUser || rawUser === 'undefined') return null;
-  try {
-    return JSON.parse(rawUser);
-  } catch {
-    return null;
-  }
-};
-
-const saveAuthToStorage = ({ user, accessToken, refreshToken }) => {
-  if (typeof window === 'undefined') return;
-
-  if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-  else localStorage.removeItem(STORAGE_KEYS.USER);
-
-  if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-  else localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-
-  if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-  else localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
-const clearAuthStorage = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEYS.USER);
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
 
 // ==================== AUTH STORE ====================
 export const useAuthStore = create((set, get) => ({

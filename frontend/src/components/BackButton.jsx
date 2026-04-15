@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
+import { cn } from '../lib/utils';
 
 const variantClasses = {
   default:

@@ -15,15 +15,35 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
-import { cn, formatCurrency, formatDate, formatDuration, getAvatarUrl } from '../../../../lib/format';
 import BookingCalendar from '../../../../components/BookingCalendar';
+import { cn } from '../../../../lib/utils';
 
 export default function TutorDashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
+
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+
+  const formattedTime = time.toLocaleTimeString({
+    timeZone: timeZone,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -146,14 +166,19 @@ export default function TutorDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">{displayName}</h1>
-        <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <div className="mt-4 pr-12 sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary">
-            Log out
-          </button>
+      <div className="flex rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5 items-center">
+        <div className='flex-1'>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">{displayName}</h1>
+          <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+          <div className="mt-4 pr-12 sm:pr-0">
+            <button onClick={handleLogout} className="btn-secondary">
+              Log out
+            </button>
+          </div>
+        </div>
+        <div className='text-xl font-bold'>
+          {currentLocationLabel} {formattedTime}
         </div>
       </div>
 
@@ -206,7 +231,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
@@ -257,7 +285,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />

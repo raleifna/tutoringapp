@@ -87,7 +87,7 @@ const authUserSelectWithPassword = {
     password: true,
 };
 
-// user authentication and registration logic   
+// user authentication and registration logic
 const serializeAuthUser = (user, ipAddress = null) => ({
     id: user.id,
     email: user.email,

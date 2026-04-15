@@ -5,59 +5,16 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '../../../lib/api-entry';
-
-const MAX_VERIFICATION_FILES = 5;
-const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
-
-const registerSchema = z
-  .object({
-    firstName: z.string().min(2, 'First name must be at least 2 characters'),
-    lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-    email: z.string().email('Invalid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Must contain an uppercase letter')
-      .regex(/[a-z]/, 'Must contain a lowercase letter')
-      .regex(/[0-9]/, 'Must contain a number')
-      .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Must contain a special character'),
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
-    role: z.enum(['LEARNER', 'TUTOR']),
-    isMinor: z.boolean().optional(),
-    parentName: z.string().optional(),
-    parentEmail: z.union([z.literal(''), z.string().email('Invalid parent email')]).optional(),
-    parentPhone: z.string().optional(),
-    tutorEducationSummary: z.string().optional(),
-    tutorExperienceYears: z.string().optional(),
-    tutorSupportingNotes: z.string().optional(),
-    agreeToTerms: z.boolean().refine((v) => v === true, 'You must agree to the terms'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
-  .superRefine((data, ctx) => {
-    if (data.role === 'LEARNER' && data.isMinor && !data.parentName?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Parent/guardian name is required for minors',
-        path: ['parentName'],
-      });
-    }
-
-    if (data.role === 'TUTOR' && !data.tutorEducationSummary?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Education summary is required for tutors',
-        path: ['tutorEducationSummary'],
-      });
-    }
-  });
+import {
+  buildRegisterPayload,
+  getRegisterDefaultValues,
+  getRegisterErrorMessage,
+  registerSchema,
+  validateVerificationFiles,
+} from '../../../lib/register-form';
 
 function RegisterContent() {
   const searchParams = useSearchParams();
@@ -73,7 +30,6 @@ function RegisterContent() {
   const [verificationFileError, setVerificationFileError] = useState('');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
-  const defaultRole = searchParams.get('role') === 'TUTOR' ? 'TUTOR' : 'LEARNER';
   const {
     register,
     handleSubmit,
@@ -82,7 +38,7 @@ function RegisterContent() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: defaultRole, agreeToTerms: false, isMinor: false },
+    defaultValues: getRegisterDefaultValues(searchParams.get('role')),
   });
 
   const selectedRole = watch('role');
@@ -98,23 +54,10 @@ function RegisterContent() {
 
   const handleVerificationFilesChange = (event) => {
     const files = Array.from(event.target.files || []);
-
-    if (files.length > MAX_VERIFICATION_FILES) {
+    const errorMessage = validateVerificationFiles(files);
+    if (errorMessage) {
       setVerificationFiles([]);
-      setVerificationFileError(`Upload up to ${MAX_VERIFICATION_FILES} files`);
-      return;
-    }
-
-    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-      setVerificationFiles([]);
-      setVerificationFileError('Each file must be 5MB or smaller');
-      return;
-    }
-
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-      setVerificationFiles([]);
-      setVerificationFileError('Total file size must stay within 25MB');
+      setVerificationFileError(errorMessage);
       return;
     }
 
@@ -123,38 +66,11 @@ function RegisterContent() {
   };
 
   const onSubmit = async (values) => {
-    const { confirmPassword, agreeToTerms, ...rawData } = values;
+    const { payload, rawData } = buildRegisterPayload(values, verificationFiles);
 
     if (rawData.role === 'TUTOR' && verificationFiles.length === 0) {
       setVerificationFileError('Please upload at least one verification file');
       return;
-    }
-
-    let payload;
-    if (rawData.role === 'TUTOR') {
-      const formData = new FormData();
-      formData.append('firstName', rawData.firstName);
-      formData.append('lastName', rawData.lastName);
-      formData.append('email', rawData.email);
-      formData.append('password', rawData.password);
-      formData.append('role', rawData.role);
-      if (rawData.tutorEducationSummary) formData.append('tutorEducationSummary', rawData.tutorEducationSummary);
-      if (rawData.tutorExperienceYears) formData.append('tutorExperienceYears', rawData.tutorExperienceYears);
-      if (rawData.tutorSupportingNotes) formData.append('tutorSupportingNotes', rawData.tutorSupportingNotes);
-      verificationFiles.forEach((file) => formData.append('verificationFiles', file));
-      payload = formData;
-    } else {
-      payload = {
-        firstName: rawData.firstName,
-        lastName: rawData.lastName,
-        email: rawData.email,
-        password: rawData.password,
-        role: rawData.role,
-        isMinor: rawData.isMinor,
-        parentName: rawData.parentName,
-        parentEmail: rawData.parentEmail,
-        parentPhone: rawData.parentPhone,
-      };
     }
 
     setIsLoading(true);
@@ -165,7 +81,7 @@ function RegisterContent() {
       setVerificationUrl(response?.data?.verificationUrl || '');
       setRegistered(true);
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Registration failed');
+      toast.error(getRegisterErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +128,7 @@ function RegisterContent() {
                   setVerificationUrl(response?.data?.verificationUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
-                  toast.error(error?.response?.data?.message || 'Registration failed');
+                  toast.error(getRegisterErrorMessage(error));
                 } finally {
                   setIsResending(false);
                 }
@@ -448,10 +364,10 @@ function RegisterContent() {
       {isPrivacyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
+
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
               <h2 className="text-xl font-bold text-gray-900">Privacy Policy</h2>
-              <button 
+              <button
                 onClick={() => setIsPrivacyModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 focus:outline-none"
               >
@@ -465,7 +381,7 @@ function RegisterContent() {
               <div className="space-y-4 text-sm text-gray-600">
                 <p className="font-semibold text-gray-900 text-base">Welcome to TutorConnect.</p>
                 <p>We value your privacy and are committed to protecting your personal information. This policy explains how we collect, use, store, and share your data when you use our platform.</p>
-                
+
                 <div>
                   <p className="font-medium text-gray-900 mb-2">We may collect basic information such as:</p>
                   <ul className="list-disc pl-5 space-y-1">

@@ -15,9 +15,10 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
-import { cn, formatCurrency, formatDate, formatDuration } from '../../../../lib/format';
 
 const OPERATION_TABS = [
   { key: 'bookings', label: 'Bookings', icon: ClipboardDocumentListIcon },
