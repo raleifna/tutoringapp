@@ -266,10 +266,7 @@ export default function DashboardPage() {
       )}
 
       <div className="card p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Continue to the tutor search page and explore available tutors.
-        </p>
+        <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
