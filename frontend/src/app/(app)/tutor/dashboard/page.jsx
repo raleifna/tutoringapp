@@ -26,6 +26,24 @@ export default function TutorDashboardPage() {
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
 
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
+
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+
+  const formattedTime = time.toLocaleTimeString({
+    timeZone: timeZone,
+  });
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -147,14 +165,19 @@ export default function TutorDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">{displayName}</h1>
-        <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <div className="mt-4 pr-12 sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary">
-            Log out
-          </button>
+      <div className="flex rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5 items-center">
+        <div className='flex-1'>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">{displayName}</h1>
+          <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+          <div className="mt-4 pr-12 sm:pr-0">
+            <button onClick={handleLogout} className="btn-secondary">
+              Log out
+            </button>
+          </div>
+        </div>
+        <div className='text-xl font-bold'>
+          {currentLocationLabel} {formattedTime}
         </div>
       </div>
 
