@@ -16,32 +16,13 @@ import {
 import { adminApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
+import { cn, formatDate, getAvatarUrl } from '../../../../lib/format';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
   { value: 'ACTIVE', label: 'Approved' },
   { value: 'SUSPENDED', label: 'Needs Changes' },
 ];
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
 
 const formatBytes = (value) => {
   const size = Number(value) || 0;

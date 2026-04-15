@@ -8,20 +8,9 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
+import { cn, formatCurrency } from '../../../../lib/format';
 
 const PERIODS = [7, 30, 90];
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatCurrency = (amount) => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: 'AUD',
-    maximumFractionDigits: 2,
-  }).format(value);
-};
 
 function MetricList({ items, formatter, emptyLabel, tone = 'bg-primary-600' }) {
   if (!items.length) {

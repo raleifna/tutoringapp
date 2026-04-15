@@ -16,56 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
+import { cn, formatCurrency, formatDate, formatDuration, getAvatarUrl } from '../../../../lib/format';
 
 export default function TutorDashboardPage() {
   const router = useRouter();

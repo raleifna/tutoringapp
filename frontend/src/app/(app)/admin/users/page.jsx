@@ -15,6 +15,7 @@ import {
 import { adminApi } from '../../../../lib/api-entry';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
+import { cn, formatDate, getAvatarUrl } from '../../../../lib/format';
 
 const ROLES = ['', 'LEARNER', 'TUTOR', 'ADMIN', 'SYSTEM_ADMIN'];
 const STATUSES = ['', 'ACTIVE', 'SUSPENDED', 'DEACTIVATED'];
@@ -23,26 +24,6 @@ const STATUS_ACTIONS = {
   ACTIVE: [{ label: 'Suspend', value: 'SUSPENDED', className: 'text-yellow-700 hover:bg-yellow-50' }],
   SUSPENDED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
   DEACTIVATED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
-};
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 const getRoleBadgeClass = (role) => {
