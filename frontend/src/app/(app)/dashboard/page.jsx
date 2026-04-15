@@ -268,7 +268,7 @@ export default function DashboardPage() {
       <div className="card p-5">
         <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/search?from=dashboard"
             className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"
