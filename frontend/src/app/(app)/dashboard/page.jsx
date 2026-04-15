@@ -105,20 +105,6 @@ export default function DashboardPage() {
 
   const summaryItems = [
     {
-      label: 'Total Bookings',
-      value: totalBookings,
-      icon: CalendarDaysIcon,
-      color: 'bg-blue-100 text-blue-600',
-      href: '/bookings?from=dashboard',
-    },
-    {
-      label: 'Completed',
-      value: completedCount,
-      icon: CheckCircleIcon,
-      color: 'bg-green-100 text-green-600',
-      href: '/bookings?from=dashboard&status=COMPLETED',
-    },
-    {
       label: 'Unpaid',
       value: unpaidCount,
       icon: ClockIcon,
@@ -162,7 +148,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3">
         {summaryItems.map((item) => (
           <Link key={item.label} href={item.href} className="card p-4 hover:shadow-md transition-shadow">
             <div
