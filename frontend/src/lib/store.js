@@ -12,7 +12,6 @@ import {
   applyIpContextFallback,
   fetchClientIpContext,
   isPrivateIpAddress,
-  preserveClientIpContext,
 } from './ip-location';
 
 // ==================== AUTH STORE ====================
@@ -21,7 +20,6 @@ export const useAuthStore = create((set, get) => ({
   accessToken: getStoredValue(STORAGE_KEYS.ACCESS_TOKEN),
   refreshToken: getStoredValue(STORAGE_KEYS.REFRESH_TOKEN),
   isLoading: false,
-  isResolvingIpContext: false,
 
   setAuth: ({ user, accessToken, refreshToken }) => {
     const nextUser = applyIpContextFallback(user);
@@ -39,12 +37,18 @@ export const useAuthStore = create((set, get) => ({
     set({ user: nextUser });
   },
 
-  refreshClientIpContext: async () => {
+  ensureClientIpContext: async () => {
     const currentUser = get().user;
-    if (!currentUser || typeof window === 'undefined') return currentUser;
-    if (get().isResolvingIpContext) return currentUser;
+    if (!currentUser) return currentUser;
 
-    set({ isResolvingIpContext: true });
+    const alreadyHasLocation =
+      currentUser.ipLocationSource === 'client' &&
+      !!currentUser.ipLocationLabel &&
+      !isPrivateIpAddress(currentUser.ipAddress);
+
+    if (alreadyHasLocation || currentUser.ipLocationLookupFailed) {
+      return currentUser;
+    }
 
     let nextUser = currentUser;
     try {
@@ -61,24 +65,8 @@ export const useAuthStore = create((set, get) => ({
       accessToken: get().accessToken,
       refreshToken: get().refreshToken,
     });
-    set({ user: nextUser, isResolvingIpContext: false });
+    set({ user: nextUser });
     return nextUser;
-  },
-
-  ensureClientIpContext: async () => {
-    const currentUser = get().user;
-    if (!currentUser) return currentUser;
-
-    const hasClientLocation =
-      currentUser.ipLocationSource === 'client' &&
-      !!currentUser.ipLocationLabel &&
-      !isPrivateIpAddress(currentUser.ipAddress);
-
-    if (hasClientLocation || currentUser.ipLocationLookupFailed) {
-      return currentUser;
-    }
-
-    return get().refreshClientIpContext();
   },
 
   initializeAuth: async () => {
@@ -116,7 +104,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       const { data } = await authApi.getMe();
-      const nextUser = preserveClientIpContext(data.user, get().user);
+      const nextUser = applyIpContextFallback(data.user);
       saveAuthToStorage({
         user: nextUser,
         accessToken: get().accessToken,

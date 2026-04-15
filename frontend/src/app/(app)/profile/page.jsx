@@ -53,8 +53,8 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const currentIpAddress = formatIpAddress(user?.ipAddress);
-  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const currentIpAddress = user?.ipAddress?.trim() || null;
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   const {
     register,

@@ -64,8 +64,6 @@ export default function TutorDashboardPage() {
   const tutorProfileId = myProfile?.id || user?.tutorProfileId || user?.tutorProfile?.id || null;
   const tutorProfileStatus = myProfile?.status || user?.tutorProfile?.status || null;
   const hasTutorProfile = Boolean(tutorProfileId);
-  const shouldWaitForTutorProfile =
-    mounted && user?.role === 'TUTOR' && !!currentUserId && myProfileLoading && !user?.tutorProfile;
 
   const completedBookings = allBookings.filter((booking) => booking.status === 'COMPLETED');
   const totalEarnings = completedBookings.reduce(
@@ -118,7 +116,7 @@ export default function TutorDashboardPage() {
     return <div className="space-y-5" />;
   }
 
-  if (shouldWaitForTutorProfile) {
+  if (mounted && user?.role === 'TUTOR' && !!currentUserId && myProfileLoading && !user?.tutorProfile) {
     return <div className="space-y-5" />;
   }
 

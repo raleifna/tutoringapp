@@ -1,6 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
-const notificationService = require('../services/notificationService');
+const { notify, notifyAdmin } = require('../services/notificationService');
 
 const bookingInclude = {
   learner: {
@@ -24,7 +24,6 @@ exports.createBooking = async (req, res) => {
     duration,
     sessionType,
     notes,
-    hourlyRate,
     recurringType = 'ONE_OFF',
     meetingTool,
   } = req.body;
@@ -55,8 +54,7 @@ exports.createBooking = async (req, res) => {
 
   const parsedDuration = parseInt(duration, 10);
   const durationHours = parsedDuration / 60;
-  const rate =
-    hourlyRate !== undefined ? parseFloat(hourlyRate) : parseFloat(tutorProfile.hourlyRate);
+  const rate = parseFloat(tutorProfile.hourlyRate);
   const totalAmount = rate * durationHours;
 
   const booking = await prisma.booking.create({
@@ -90,7 +88,7 @@ exports.createBooking = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
+  await notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
 
   res.status(201).json({
     success: true,
@@ -291,7 +289,7 @@ exports.cancelBooking = async (req, res) => {
   });
 
   // notify tutor
-  await notificationService.notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
+  await notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
 
   res.json({
     success: true,
@@ -331,7 +329,7 @@ exports.acceptBooking = async (req, res) => {
   });
 
   // notify student
-  await notificationService.notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
+  await notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
 
   res.json({ success: true, message: 'Booking accepted', data: updated });
 };
@@ -370,7 +368,7 @@ exports.declineBooking = async (req, res) => {
   });
 
   // notify student
-  await notificationService.notify(booking.learnerId, 'booking', 'Booking Declined', `A booking has been declined.`, `/bookings/${updated.id}`);
+  await notify(booking.learnerId, 'booking', 'Booking Declined', `A booking has been declined.`, `/bookings/${updated.id}`);
 
   res.json({
     success: true,
@@ -382,33 +380,6 @@ exports.declineBooking = async (req, res) => {
   });
 };
 
-exports.rescheduleBooking = async (req, res) => {
-  const { scheduledAt, reason } = req.body;
-  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
-  if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
-
-  const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
-  if (!['PENDING', 'ACCEPTED'].includes(booking.status)) {
-    throw new AppError('Cannot reschedule this booking', 400);
-  }
-
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      scheduledAt: new Date(scheduledAt),
-      status: 'RESCHEDULED',
-      statusHistory: { create: { status: 'RESCHEDULED', reason } },
-    },
-    include: bookingInclude,
-  });
-
-  // notify student
-  await notificationService.notify(booking.learnerId, 'booking', 'Booking Rescheduled', `A booking has been rescheduled.`, `/bookings/${updated.id}`);
-
-   res.json({ success: true, message: 'Booking rescheduled', data: updated });
-};
-
 exports.completeBooking = async (req, res) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
@@ -417,19 +388,23 @@ exports.completeBooking = async (req, res) => {
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'ACCEPTED') throw new AppError('Booking must be accepted first', 400);
 
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      statusHistory: { create: { status: 'COMPLETED' } },
-    },
-    include: bookingInclude,
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const completedBooking = await tx.booking.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        statusHistory: { create: { status: 'COMPLETED' } },
+      },
+      include: bookingInclude,
+    });
 
-  await prisma.tutorProfile.update({
-    where: { id: tutorProfile.id },
-    data: { totalSessions: { increment: 1 } },
+    await tx.tutorProfile.update({
+      where: { id: tutorProfile.id },
+      data: { totalSessions: { increment: 1 } },
+    });
+
+    return completedBooking;
   });
 
   res.json({ success: true, message: 'Booking marked as completed', data: updated });

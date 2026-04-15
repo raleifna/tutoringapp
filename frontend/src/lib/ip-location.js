@@ -35,8 +35,7 @@ const isPrivateIpv6Address = (value) => {
 
 export const isPrivateIpAddress = (value) => {
   const ipAddress = normalizeIpAddress(value);
-  if (!ipAddress) return false;
-  if (ipAddress === 'localhost') return true;
+  if (!ipAddress || ipAddress === 'localhost' || ipAddress === '127.0.0.1') return true;
 
   if (ipAddress.includes(':')) {
     return isPrivateIpv6Address(ipAddress);
@@ -63,7 +62,7 @@ export const buildIpLocationLabel = (payload = {}) => {
     formatCountryLabel(payload.country_name || payload.countryName || payload.country),
   ].filter(Boolean);
 
-  return parts.length > 0 ? [...new Set(parts)].join(', ') : null;
+  return parts.length > 0 ? parts.join(', ') : null;
 };
 
 export const getFallbackIpLocationLabel = (ipAddress) =>
@@ -87,22 +86,6 @@ export const applyIpContextFallback = (user) => {
   };
 };
 
-export const preserveClientIpContext = (user, previousUser) => {
-  const nextUser = applyIpContextFallback(user);
-  if (!nextUser || previousUser?.ipLocationSource !== 'client') {
-    return nextUser;
-  }
-
-  return applyIpContextFallback({
-    ...nextUser,
-    ipAddress: previousUser.ipAddress || nextUser.ipAddress || null,
-    ipLocationLabel: previousUser.ipLocationLabel || nextUser.ipLocationLabel || null,
-    ipCity: previousUser.ipCity || nextUser.ipCity || null,
-    ipRegion: previousUser.ipRegion || nextUser.ipRegion || null,
-    ipCountry: previousUser.ipCountry || nextUser.ipCountry || null,
-    ipLocationSource: previousUser.ipLocationSource,
-  });
-};
 
 const toClientIpContext = (payload = {}) => {
   const ipAddress = normalizeIpAddress(payload.ip);
