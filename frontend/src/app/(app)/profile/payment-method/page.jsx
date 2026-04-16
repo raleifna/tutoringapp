@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { AddressElement, Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -15,6 +15,26 @@ import { useAuthStore } from '../../../../lib/store';
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+const addressElementOptions = {
+  mode: 'billing',
+  defaultValues: {
+    address: {
+      country: 'AU',
+    },
+  },
+};
+
+const paymentElementOptions = {
+  business: {
+    name: 'TutorConnect',
+  },
+  fields: {
+    billingDetails: {
+      address: 'never',
+    },
+  },
+};
 
 const formatSavedMethod = (paymentMethod) => {
   if (!paymentMethod?.last4) return 'No payment method saved';
@@ -79,7 +99,10 @@ function PaymentMethodForm({ clientSecret, onSaved, returnTo }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <PaymentElement />
+        <div className="space-y-4">
+          <AddressElement options={addressElementOptions} />
+          <PaymentElement options={paymentElementOptions} />
+        </div>
       </div>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Link href={returnTo} className="btn-secondary text-center">
@@ -152,6 +175,7 @@ export default function ProfilePaymentMethodPage() {
 
     return {
       clientSecret: setupIntentData.clientSecret,
+      locale: 'en',
       appearance: {
         theme: 'stripe',
       },

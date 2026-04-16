@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { AddressElement, Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   CheckCircleIcon,
@@ -27,6 +27,26 @@ import BackButton from '../../../../../components/BackButton';
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+const addressElementOptions = {
+  mode: 'billing',
+  defaultValues: {
+    address: {
+      country: 'AU',
+    },
+  },
+};
+
+const paymentElementOptions = {
+  business: {
+    name: 'TutorConnect',
+  },
+  fields: {
+    billingDetails: {
+      address: 'never',
+    },
+  },
+};
 const getPaymentStatusClass = (status) => {
   if (status === 'PAID' || status === 'COMPLETED') {
     return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
@@ -136,7 +156,10 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <PaymentElement />
+        <div className="space-y-4">
+          <AddressElement options={addressElementOptions} />
+          <PaymentElement options={paymentElementOptions} />
+        </div>
       </div>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Link href={returnTo || `/bookings/${bookingId}`} className="btn-secondary text-center">
@@ -293,6 +316,7 @@ export default function BookingPaymentPage() {
   const elementsOptions = setupIntentData?.clientSecret
     ? {
         clientSecret: setupIntentData.clientSecret,
+        locale: 'en',
         appearance: {
           theme: 'stripe',
         },

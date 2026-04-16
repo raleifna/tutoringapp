@@ -251,7 +251,6 @@ exports.createBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  // notify tutor
   await notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
 
   res.status(201).json({
@@ -409,8 +408,6 @@ exports.cancelBooking = async (req, res) => {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
 
-  // Learners can cancel before tutor confirmation at any time.
-  // The 24-hour rule only applies after the tutor has accepted the booking.
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
   const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
@@ -449,7 +446,6 @@ exports.cancelBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  // notify tutor
   await notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
 
   res.json({
