@@ -316,6 +316,7 @@ export default function BookingPaymentPage() {
   const elementsOptions = setupIntentData?.clientSecret
     ? {
         clientSecret: setupIntentData.clientSecret,
+        locale: 'en',
         appearance: {
           theme: 'stripe',
         },

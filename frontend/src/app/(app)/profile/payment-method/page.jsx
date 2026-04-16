@@ -175,6 +175,7 @@ export default function ProfilePaymentMethodPage() {
 
     return {
       clientSecret: setupIntentData.clientSecret,
+      locale: 'en',
       appearance: {
         theme: 'stripe',
       },
