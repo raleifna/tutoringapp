@@ -21,6 +21,7 @@ import { bookingApi, paymentApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import { formatSavedMethod } from '../../../../lib/payment-display';
 import {
   getPayableSeriesBookings,
   getRecurringLabel,
@@ -35,15 +36,6 @@ const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
   reason: z.string().optional(),
 });
-
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
-};
 
 export default function BookingDetailPage() {
   const { id } = useParams();
@@ -527,7 +519,7 @@ export default function BookingDetailPage() {
           {recurring
             ? 'Tutor accept/decline actions apply to all pending sessions in this series. Learner cancellation applies to this session only.'
             : isAcceptedBooking && isPaidBooking
-              ? 'Accepted bookings must be cancelled at least one day in advance.'
+              ? 'Accepted bookings must be cancelled at least 48 hours in advance.'
               : 'You can cancel this booking before the tutor confirms it.'}
         </div>
         {canCancel && (

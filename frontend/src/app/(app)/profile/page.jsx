@@ -18,6 +18,7 @@ import {
 import Link from 'next/link';
 import { authApi, paymentApi, userApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
+import { formatSavedMethod } from '../../../lib/payment-display';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
@@ -38,6 +39,7 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
+<<<<<<< HEAD
 const formatSavedMethod = (paymentMethod) => {
   if (!paymentMethod?.last4) return 'No payment method saved';
 
@@ -45,6 +47,16 @@ const formatSavedMethod = (paymentMethod) => {
   const label = brand.charAt(0).toUpperCase() + brand.slice(1);
 
   return `${label} ending in ${paymentMethod.last4}`;
+=======
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+>>>>>>> 336c407 (add payment display&booking status frontend tests and update cancellation policy)
 };
 
 export default function ProfilePage() {

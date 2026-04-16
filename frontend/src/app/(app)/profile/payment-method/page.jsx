@@ -10,6 +10,7 @@ import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroi
 import toast from 'react-hot-toast';
 import BackButton from '../../../../components/BackButton';
 import { paymentApi } from '../../../../lib/api-entry';
+import { formatSavedMethod } from '../../../../lib/payment-display';
 import { useAuthStore } from '../../../../lib/store';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -34,15 +35,6 @@ const paymentElementOptions = {
       address: 'never',
     },
   },
-};
-
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
 };
 
 function PaymentMethodForm({ clientSecret, onSaved, returnTo }) {
