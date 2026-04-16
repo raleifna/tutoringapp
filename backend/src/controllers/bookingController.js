@@ -410,11 +410,8 @@ exports.acceptBooking = async (req, res) => {
     `/bookings/${updated.id}`
   );
 
-  await notify(booking.learnerId, 'booking', 'Booking Accepted', `A booking has been accepted.`, `/bookings/${updated.id}`);
-
-
   if (paymentStatus === 'FAILED') {
-    await notificationService.notify(
+    await notify(
       booking.learnerId,
       'payment',
       'Payment Failed',
