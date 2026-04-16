@@ -10,6 +10,7 @@ import { bookingApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass } from '../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../lib/store';
 import { getPositivePageNumber } from '../../../lib/utils';
 import BackButton from '../../../components/BackButton';
@@ -234,6 +235,7 @@ function BookingCard({ booking, isTutor, returnTo }) {
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
   const otherLastName = other?.lastName || '';
   const sessionType = booking?.sessionType ? String(booking.sessionType).replace('_', '-') : 'Session';
+  const recurringLabel = getRecurringLabel(booking);
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
@@ -286,7 +288,14 @@ function BookingCard({ booking, isTutor, returnTo }) {
             <h3 className="font-semibold text-gray-900 text-sm">
               Session with: {otherFirstName} {otherLastName}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">{booking?.subject || 'Session'}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-gray-500">{booking?.subject || 'Session'}</p>
+              {isRecurringBooking(booking) && (
+                <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                  {recurringLabel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">

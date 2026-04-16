@@ -19,6 +19,7 @@ import BookingCalendar from '../../../components/BookingCalendar';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
 import { formatShortDateTime as formatDate } from '../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../lib/recurring-bookings';
 
 const getTutorDetailHref = (booking, returnTo = '/dashboard') => {
   const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
@@ -264,6 +265,11 @@ export default function DashboardPage() {
                         with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
                         {formatDate(booking.scheduledAt)}
                       </p>
+                      {isRecurringBooking(booking) && (
+                        <p className="mt-1 text-[11px] font-medium text-sky-700">
+                          {getRecurringLabel(booking)}
+                        </p>
+                      )}
                     </Link>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">

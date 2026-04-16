@@ -21,6 +21,13 @@ import { bookingApi, paymentApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import {
+  getPayableSeriesBookings,
+  getRecurringLabel,
+  getRecurringSeriesBookings,
+  getSeriesTotalAmount,
+  isRecurringBooking,
+} from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 
@@ -84,6 +91,7 @@ export default function BookingDetailPage() {
     enabled: !!currentUserId && !!isLearner,
   });
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
+  const bookingTutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
   const bookingDetailHref = (() => {
     const params = new URLSearchParams();
     if (returnTo) params.set('returnTo', returnTo);
@@ -94,14 +102,13 @@ export default function BookingDetailPage() {
   })();
   const tutorDetailHref = (() => {
     if (isTutor) return null;
-    const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
-    if (!tutorId) return null;
+    if (!bookingTutorId) return null;
 
     const params = new URLSearchParams();
     params.set('returnTo', bookingDetailHref);
     const query = params.toString();
 
-    return query ? `/tutors/${tutorId}?${query}` : `/tutors/${tutorId}`;
+    return query ? `/tutors/${bookingTutorId}?${query}` : `/tutors/${bookingTutorId}`;
   })();
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
@@ -129,6 +136,9 @@ export default function BookingDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      if (bookingTutorId) {
+        queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] });
+      }
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');
@@ -137,10 +147,11 @@ export default function BookingDetailPage() {
 
   const acceptMutation = useMutation({
     mutationFn: () => bookingApi.accept(id),
-    onSuccess: () => {
-      toast.success('Booking accepted!');
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking accepted!');
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to accept');
@@ -149,10 +160,14 @@ export default function BookingDetailPage() {
 
   const declineMutation = useMutation({
     mutationFn: () => bookingApi.decline(id),
-    onSuccess: () => {
-      toast.success('Booking declined');
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking declined');
       queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+      if (bookingTutorId) {
+        queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] });
+      }
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to decline');
@@ -248,6 +263,11 @@ export default function BookingDetailPage() {
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const recurring = isRecurringBooking(booking);
+  const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
+  const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
+  const paymentSetupSeriesAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-5">
@@ -259,7 +279,7 @@ export default function BookingDetailPage() {
 
       {paymentResult === 'success' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          Payment successful. Your booking has been sent to the tutor for confirmation.
+          Payment successful. {recurring ? 'The selected sessions have' : 'Your booking has'} been sent to the tutor for confirmation.
         </div>
       )}
 
@@ -352,6 +372,70 @@ export default function BookingDetailPage() {
           </div>
         </div>
 
+        {recurring && (
+          <>
+            <hr className="border-gray-100" />
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-sky-700 uppercase tracking-wide font-semibold">
+                    Recurring Booking
+                  </p>
+                  <h3 className="mt-1 font-semibold text-gray-900">{recurringLabel}</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Tutor accept/decline actions apply to all pending sessions in this series.
+                    Learner cancellation still applies to this session only.
+                  </p>
+                </div>
+                {paymentSetupSeriesBookings.length > 0 && isLearner && (
+                  <Link
+                    href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
+                    className="btn-secondary btn-sm shrink-0"
+                  >
+                    Set Up Series Payment
+                  </Link>
+                )}
+              </div>
+
+              {recurringBookings.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {recurringBookings.map((seriesBooking) => {
+                    const isCurrent = seriesBooking.id === booking.id;
+                    return (
+                      <Link
+                        key={seriesBooking.id}
+                        href={`/bookings/${seriesBooking.id}?returnTo=${encodeURIComponent(backHref)}&from=${from || 'bookings'}`}
+                        className={`block rounded-xl border px-3 py-2 text-sm transition-colors ${
+                          isCurrent
+                            ? 'border-sky-200 bg-white'
+                            : 'border-white/70 bg-white/70 hover:border-sky-200 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-gray-900">
+                            {formatDate(seriesBooking.scheduledAt)}
+                            {isCurrent ? ' · current' : ''}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusClass(seriesBooking.status)}`}>
+                            {formatBookingStatus(seriesBooking.status)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                          <span>{formatDuration(seriesBooking.duration)}</span>
+                          <span>{formatCurrency(seriesBooking.totalAmount, seriesBooking.currency || booking.currency || 'AUD')}</span>
+                          <span>
+                            Payment: {seriesBooking.payment?.status || 'PENDING'}
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {booking.notes && (
           <>
             <hr className="border-gray-100" />
@@ -383,22 +467,39 @@ export default function BookingDetailPage() {
                 )}
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
                   {isFailedPayment
-                    ? 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
+                    ? recurring
+                      ? 'One or more session payments failed after tutor approval. Please update your payment method for this recurring series.'
+                      : 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
                     : savedMethod
-                      ? `We will charge your saved ${formatSavedMethod(savedMethod)} automatically if the tutor accepts this booking.`
-                      : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
+                      ? recurring
+                        ? `We will use ${formatSavedMethod(savedMethod)} for this series when the tutor accepts the sessions.`
+                        : `We will charge your saved ${formatSavedMethod(savedMethod)} automatically if the tutor accepts this booking.`
+                      : recurring
+                        ? 'Save a payment method now so we can charge each session in this recurring series automatically after tutor acceptance.'
+                        : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
                 </p>
+                {recurring && paymentSetupSeriesBookings.length > 0 && (
+                  <p className="text-sm font-semibold text-sky-800">
+                    Series total: {formatCurrency(paymentSetupSeriesAmount, booking.currency || 'AUD')}
+                  </p>
+                )}
               </div>
 
               {isLearner && (
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <Link
-                    href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
-                    className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
-                  >
-                    <CheckCircleIcon className="w-4 h-4" />
-                    {isFailedPayment || savedMethod ? 'Update Payment Method' : 'Set Up Payment Method'}
-                  </Link>
+                  href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
+                  className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {isFailedPayment || savedMethod
+                    ? recurring
+                      ? 'Update Series Payment'
+                      : 'Update Payment Method'
+                    : recurring
+                      ? 'Set Up Series Payment'
+                      : 'Set Up Payment Method'}
+                </Link>
                   <p className="text-xs text-gray-500 sm:text-right">
                     Stripe test mode is used here. No real payment will be charged.
                   </p>
@@ -423,9 +524,11 @@ export default function BookingDetailPage() {
 
       <div className="flex flex-wrap gap-3">
         <div className='text-gray-700 text-sm mb-2 mt-2'>
-          {isAcceptedBooking && isPaidBooking
-            ? 'Accepted bookings must be cancelled at least one day in advance.'
-            : 'You can cancel this booking before the tutor confirms it.'}
+          {recurring
+            ? 'Tutor accept/decline actions apply to all pending sessions in this series. Learner cancellation applies to this session only.'
+            : isAcceptedBooking && isPaidBooking
+              ? 'Accepted bookings must be cancelled at least one day in advance.'
+              : 'You can cancel this booking before the tutor confirms it.'}
         </div>
         {canCancel && (
           <button
@@ -452,7 +555,7 @@ export default function BookingDetailPage() {
               className="btn-primary gap-2"
             >
               <CheckCircleIcon className="w-4 h-4" />
-              {acceptMutation.isPending ? 'Accepting...' : 'Accept'}
+              {acceptMutation.isPending ? 'Accepting...' : recurring ? 'Accept Series' : 'Accept'}
             </button>
             <button
               type="button"
@@ -461,7 +564,7 @@ export default function BookingDetailPage() {
               className="btn-danger gap-2"
             >
               <XCircleIcon className="w-4 h-4" />
-              {declineMutation.isPending ? 'Declining...' : 'Decline'}
+              {declineMutation.isPending ? 'Declining...' : recurring ? 'Decline Series' : 'Decline'}
             </button>
             <button
               type="button"

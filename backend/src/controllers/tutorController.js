@@ -114,6 +114,47 @@ const buildAvailabilityState = (baseAvailability = [], currentWeekOverride = nul
   };
 };
 
+const getAvailabilityRange = () => {
+  const start = getCurrentWeekStart();
+  const end = new Date(start);
+  end.setDate(start.getDate() + 13 * 7);
+  return { start, end };
+};
+
+const serializeBookedSlots = (bookings = []) =>
+  bookings.map((booking) => ({
+    id: booking.id,
+    scheduledAt: booking.scheduledAt,
+    duration: booking.duration,
+    status: booking.status,
+  }));
+
+const getBookedSlots = async (tutorId) => {
+  const { start, end } = getAvailabilityRange();
+  const lookupStart = new Date(start);
+  lookupStart.setDate(lookupStart.getDate() - 1);
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      tutorId,
+      status: { notIn: ['CANCELLED', 'DECLINED'] },
+      scheduledAt: {
+        gte: lookupStart,
+        lt: end,
+      },
+    },
+    select: {
+      id: true,
+      scheduledAt: true,
+      duration: true,
+      status: true,
+    },
+    orderBy: { scheduledAt: 'asc' },
+  });
+
+  return serializeBookedSlots(bookings);
+};
+
 const normalizeSubjectLevel = (value) => {
   if (!value) return 'all';
 
@@ -578,11 +619,17 @@ exports.getTutorAvailability = async (req, res) => {
   });
   if (!profile) throw new AppError('Tutor not found', 404);
 
-  const currentWeekOverride = await getCurrentWeekAvailabilityOverride(profile.id);
+  const [currentWeekOverride, bookedSlots] = await Promise.all([
+    getCurrentWeekAvailabilityOverride(profile.id),
+    getBookedSlots(profile.id),
+  ]);
 
   res.json({
     success: true,
-    data: buildAvailabilityState(profile.availability, currentWeekOverride),
+    data: {
+      ...buildAvailabilityState(profile.availability, currentWeekOverride),
+      bookedSlots,
+    },
   });
 };
 

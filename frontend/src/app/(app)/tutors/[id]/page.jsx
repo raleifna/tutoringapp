@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,8 +31,17 @@ const bookingSchema = z.object({
   sessionType: z.enum(['ONLINE', 'IN_PERSON', 'HYBRID']),
   scheduledAt: z.string().min(1, 'Please select a date and time'),
   duration: z.coerce.number().min(30).max(360),
+  bookingPeriod: z.string().optional(),
   notes: z.string().optional(),
 });
+
+const BOOKING_PERIOD_OPTIONS = [
+  { value: '1_WEEK', label: '1 week', weeks: 1 },
+  { value: '2_WEEKS', label: '2 weeks', weeks: 2 },
+  { value: '1_MONTH', label: '1 month (4 weeks)', weeks: 4 },
+  { value: '2_MONTHS', label: '2 months (8 weeks)', weeks: 8 },
+  { value: '3_MONTHS', label: '3 months (12 weeks)', weeks: 12 },
+];
 
 const WEEKDAY_LABELS = [
   'Sunday',
@@ -62,10 +71,71 @@ const formatRate = (amount, currency = 'AUD') => {
   return `$${value} ${currency}`;
 };
 
+const getBookingPeriod = (value) =>
+  BOOKING_PERIOD_OPTIONS.find((option) => option.value === value) || BOOKING_PERIOD_OPTIONS[0];
+
+const addWeeks = (date, weeks) => {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + weeks * 7);
+  return nextDate;
+};
+
+const createRecurringGroupId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `booking-series-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const formatBookingDate = (value) =>
+  new Intl.DateTimeFormat('en-AU', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+
+const getBookingErrorMessage = (error) =>
+  error?.response?.data?.errors?.[0]?.message ||
+  error?.response?.data?.message ||
+  error?.message ||
+  'Booking failed';
+
+const buildRecurringBookingDates = (selectedSlots, periodWeeks) => {
+  const dateMap = new Map();
+
+  selectedSlots.forEach((slot) => {
+    for (let weekIndex = 0; weekIndex < periodWeeks; weekIndex += 1) {
+      const date = addWeeks(slot.date, weekIndex);
+      dateMap.set(date.toISOString(), date);
+    }
+  });
+
+  return [...dateMap.values()].sort((left, right) => left - right);
+};
+
+const getConflictingPreviewDates = (dates, duration, bookedSlots = []) => {
+  const bookingDuration = Number(duration || 60);
+
+  return dates.filter((date) => {
+    const start = new Date(date);
+    const end = new Date(start.getTime() + bookingDuration * 60 * 1000);
+
+    return bookedSlots.some((slot) => {
+      const bookedStart = new Date(slot?.scheduledAt);
+      if (Number.isNaN(bookedStart.getTime())) return false;
+
+      const bookedEnd = new Date(bookedStart.getTime() + Number(slot?.duration || 60) * 60 * 1000);
+      return bookedStart < end && bookedEnd > start;
+    });
+  });
+};
+
 export default function TutorDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('about');
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -114,6 +184,7 @@ export default function TutorDetailPage() {
   const availabilityState = availabilityData?.data?.data || {};
   const availability = availabilityState?.availability || [];
   const currentWeekAvailability = availabilityState?.currentWeekEffectiveAvailability || availability;
+  const bookedSlots = availabilityState?.bookedSlots || [];
   const hasCurrentWeekAvailabilityOverride = Boolean(
     availabilityState?.hasCurrentWeekAvailabilityOverride
   );
@@ -125,6 +196,7 @@ export default function TutorDetailPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
     reset,
   } = useForm({
@@ -134,9 +206,22 @@ export default function TutorDetailPage() {
       sessionType: 'ONLINE',
       scheduledAt: '',
       duration: 60,
+      bookingPeriod: '1_WEEK',
       notes: '',
     },
   });
+  const watchedBookingPeriod = watch('bookingPeriod');
+  const watchedDuration = watch('duration');
+  const selectedPeriod = getBookingPeriod(watchedBookingPeriod);
+  const previewBookingDates = buildRecurringBookingDates(selectedSlots, selectedPeriod.weeks);
+  const previewDuration = Number(watchedDuration || 0);
+  const previewAmount =
+    previewBookingDates.length * (Number(tutor?.hourlyRate || 0) * (previewDuration / 60));
+  const conflictingPreviewDates = getConflictingPreviewDates(
+    previewBookingDates,
+    previewDuration,
+    bookedSlots
+  );
 
   const bookMutation = useMutation({
     mutationFn: (data) => {
@@ -154,31 +239,84 @@ export default function TutorDetailPage() {
         throw new Error('Please select a valid subject');
       }
 
+      const period = getBookingPeriod(data.bookingPeriod);
+      const bookingDates = buildRecurringBookingDates(selectedSlots, period.weeks);
+      const recurringGroupId = bookingDates.length > 1 ? createRecurringGroupId() : undefined;
+      const results = [];
+
       return Promise.all(
-        selectedSlots.map((slot) =>
+        bookingDates.map((date) =>
           bookingApi.create({
             tutorId: id,
             subjectId: data.subjectId,
             subject: selectedSubjectName,
             sessionType: data.sessionType,
-            scheduledAt: slot.date.toISOString(),
+            scheduledAt: date.toISOString(),
             duration: Number(data.duration),
             notes: data.notes,
+            recurringType: bookingDates.length > 1 ? 'WEEKLY' : 'ONE_OFF',
+            ...(recurringGroupId ? { recurringGroupId } : {}),
           })
+            .then((response) => {
+              results.push({ status: 'fulfilled', date, response });
+            })
+            .catch((error) => {
+              results.push({ status: 'rejected', date, error });
+            })
         )
-      );
+      ).then(() => {
+        const successfulResponses = results
+          .filter((result) => result.status === 'fulfilled')
+          .sort((left, right) => left.date - right.date)
+          .map((result) => result.response);
+        const failedBookings = results
+          .filter((result) => result.status === 'rejected')
+          .sort((left, right) => left.date - right.date)
+          .map((result) => ({
+            date: result.date,
+            message: getBookingErrorMessage(result.error),
+          }));
+
+        return {
+          successfulResponses,
+          failedBookings,
+          totalCount: bookingDates.length,
+        };
+      });
     },
-    onSuccess: (responses) => {
-      toast.success(
-        selectedSlots.length > 1
-          ? `${selectedSlots.length} booking requests sent!`
-          : 'Booking request sent!'
-      );
+    onSuccess: ({ successfulResponses, failedBookings, totalCount }) => {
+      const successCount = successfulResponses.length;
+      const failureCount = failedBookings.length;
+
+      if (successCount === 0) {
+        const firstFailure = failedBookings[0];
+        toast.error(firstFailure?.message || 'No booking requests were created');
+        return;
+      }
+
+      if (failureCount > 0) {
+        const failedDates = failedBookings
+          .slice(0, 3)
+          .map((booking) => formatBookingDate(booking.date))
+          .join(', ');
+        const extraCount = failureCount > 3 ? ` +${failureCount - 3} more` : '';
+        toast(
+          `Created ${successCount} of ${totalCount} booking requests. Failed: ${failedDates}${extraCount}.`
+        );
+      } else {
+        toast.success(
+          totalCount > 1
+            ? `${totalCount} booking requests sent!`
+            : 'Booking request sent!'
+        );
+      }
+
       reset();
       setSelectedSlots([]);
       setShowBookingForm(false);
-      const bookingId = responses?.[0]?.data?.data?.id;
-      if (responses?.length === 1 && bookingId) {
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability', id] });
+      const bookingId = successfulResponses?.[0]?.data?.data?.id;
+      if (successCount === 1 && totalCount === 1 && bookingId) {
         router.push(`/bookings/${bookingId}`);
         return;
       }
@@ -564,6 +702,7 @@ export default function TutorDetailPage() {
                   slots={availability}
                   currentWeekSlots={currentWeekAvailability}
                   hasCurrentWeekOverride={hasCurrentWeekAvailabilityOverride}
+                  bookedSlots={bookedSlots}
                   mode="select"
                   selectedKeys={selectedSlots.map((slot) => slot.key)}
                   onSelect={handleSlotSelect}
@@ -597,6 +736,51 @@ export default function TutorDetailPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="label">Booking period</label>
+                <select {...register('bookingPeriod')} className="input">
+                  {BOOKING_PERIOD_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Repeats weekly on the same day and time. If one week fails, later weeks will still be submitted.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                  Booking summary
+                </p>
+                {previewBookingDates.length > 0 ? (
+                  <div className="mt-2 space-y-1 text-gray-700">
+                    <p>
+                      {previewBookingDates.length} booking request
+                      {previewBookingDates.length === 1 ? '' : 's'} will be created across{' '}
+                      {selectedPeriod.weeks} week{selectedPeriod.weeks === 1 ? '' : 's'}.
+                    </p>
+                    <p>
+                      Estimated total:{' '}
+                      <span className="font-semibold text-gray-900">
+                        {formatRate(previewAmount, tutor?.currency || 'AUD')}
+                      </span>
+                    </p>
+                    {conflictingPreviewDates.length > 0 && (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {conflictingPreviewDates.length} selected session
+                        {conflictingPreviewDates.length === 1 ? ' is' : 's are'} already booked and may be skipped if submitted.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-gray-600">
+                    Select at least one available time slot to preview the recurring booking.
+                  </p>
+                )}
               </div>
 
               <div>

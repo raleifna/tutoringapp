@@ -14,6 +14,13 @@ import {
 import toast from 'react-hot-toast';
 import { bookingApi, paymentApi } from '../../../../../lib/api-entry';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../../lib/formatters';
+import {
+  getPayableSeriesBookings,
+  getRecurringLabel,
+  getRecurringSeriesBookings,
+  getSeriesTotalAmount,
+  isRecurringBooking,
+} from '../../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
 
@@ -175,6 +182,10 @@ export default function BookingPaymentPage() {
 
   const booking = data?.data?.data;
   const paymentStatus = booking?.payment?.status || 'PENDING';
+  const recurring = isRecurringBooking(booking);
+  const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
+  const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
   const savedMethodQuery = useQuery({
     queryKey: ['savedPaymentMethod', currentUserId],
     queryFn: () => paymentApi.getSavedMethod(),
@@ -277,6 +288,7 @@ export default function BookingPaymentPage() {
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const seriesTotalAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
 
   const elementsOptions = setupIntentData?.clientSecret
     ? {
@@ -292,7 +304,9 @@ export default function BookingPaymentPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
-          <h1 className="text-2xl font-bold text-gray-900">Set Up Payment</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {recurring ? 'Set Up Series Payment' : 'Set Up Payment'}
+          </h1>
         </div>
         {showBackButton && <BackButton href={returnTo} />}
       </div>
@@ -302,6 +316,9 @@ export default function BookingPaymentPage() {
           <div>
             <p className="text-sm text-gray-500">Booking ID</p>
             <p className="font-medium text-gray-900">{booking.id}</p>
+            {recurring && (
+              <p className="mt-1 text-xs font-medium text-sky-700">{recurringLabel}</p>
+            )}
           </div>
           <span
             className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(paymentStatus)}`}
@@ -331,18 +348,65 @@ export default function BookingPaymentPage() {
           </div>
         </div>
 
+        {recurring && recurringBookings.length > 0 && (
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs text-sky-700 uppercase tracking-wide font-semibold">
+                  Sessions in this series
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Setting up a card here lets the tutor charge this recurring series when sessions are accepted.
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
+                {recurringBookings.length} total
+              </span>
+            </div>
+            <div className="mt-4 space-y-2">
+              {recurringBookings.map((seriesBooking) => {
+                const needsSetup = paymentSetupSeriesBookings.some((item) => item.id === seriesBooking.id);
+                return (
+                  <div
+                    key={seriesBooking.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{formatDate(seriesBooking.scheduledAt)}</p>
+                      <p className="text-xs text-gray-500">{formatDuration(seriesBooking.duration)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">
+                        {formatCurrency(seriesBooking.totalAmount, seriesBooking.currency || booking.currency || 'AUD')}
+                      </p>
+                      <p className={`text-xs ${needsSetup ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {needsSetup ? 'Included in series setup' : 'Already covered'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Charge Later</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(totalAmount, booking.currency || 'AUD')}
+                {formatCurrency(recurring ? seriesTotalAmount || totalAmount : totalAmount, booking.currency || 'AUD')}
               </p>
+              {recurring && (
+                <p className="mt-1 text-sm text-blue-700">
+                  {paymentSetupSeriesBookings.length} session{paymentSetupSeriesBookings.length === 1 ? '' : 's'} currently need payment setup
+                </p>
+              )}
             </div>
             <CreditCardIcon className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-sm text-blue-700 mt-3">
-            No money is charged when you save a payment method. We will only charge after the tutor accepts this booking.
+            No money is charged when you save a payment method. We will only charge after the tutor accepts {recurring ? 'the selected sessions' : 'this booking'}.
           </p>
         </div>
 
@@ -450,7 +514,9 @@ export default function BookingPaymentPage() {
           </div>
         ) : paymentStatus === 'PAID' || paymentStatus === 'COMPLETED' ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-            Payment has already been confirmed for this booking.
+            {recurring
+              ? 'Payment has already been confirmed for this booking in the recurring series.'
+              : 'Payment has already been confirmed for this booking.'}
           </div>
         ) : (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">

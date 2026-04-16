@@ -15,6 +15,7 @@ import {
 import { bookingApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring-bookings';
 import { cn, getPositivePageNumber } from '../../../../lib/utils';
 
 const STATUS_TABS = [
@@ -74,9 +75,10 @@ function TutorRequestsContent() {
 
   const acceptMutation = useMutation({
     mutationFn: (id) => bookingApi.accept(id),
-    onSuccess: () => {
-      toast.success('Booking accepted!');
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking accepted!');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to accept');
@@ -88,6 +90,7 @@ function TutorRequestsContent() {
     onSuccess: (response) => {
       toast.success(response?.data?.message || 'Booking declined');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to decline');
@@ -188,7 +191,14 @@ function TutorRequestsContent() {
                         <h3 className="font-semibold text-gray-900 text-sm">
                           {learner?.firstName} {learner?.lastName}
                         </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{booking.subject}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-gray-500">{booking.subject}</p>
+                          {isRecurringBooking(booking) && (
+                            <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                              {getRecurringLabel(booking)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span
                         className={cn(
@@ -237,7 +247,8 @@ function TutorRequestsContent() {
                         disabled={acceptMutation.isPending}
                         className="btn-primary btn-sm gap-1.5 flex-1"
                       >
-                        <CheckCircleIcon className="w-4 h-4" /> Accept
+                        <CheckCircleIcon className="w-4 h-4" />
+                        {isRecurringBooking(booking) ? 'Accept Series' : 'Accept'}
                       </button>
                       <button
                         type="button"
@@ -248,7 +259,8 @@ function TutorRequestsContent() {
                         disabled={declineMutation.isPending}
                         className="btn-danger btn-sm gap-1.5 flex-1"
                       >
-                        <XCircleIcon className="w-4 h-4" /> Decline
+                        <XCircleIcon className="w-4 h-4" />
+                        {isRecurringBooking(booking) ? 'Decline Series' : 'Decline'}
                       </button>
                     </>
                   )}

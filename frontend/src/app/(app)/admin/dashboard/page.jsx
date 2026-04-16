@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
 import { formatCurrency, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
 
 const getBookingStatusStyle = (status) => {
@@ -160,7 +161,14 @@ export default function AdminDashboardPage() {
                         <td className="py-2.5 px-4 text-gray-600">
                           {booking.tutorProfile?.user?.firstName} {booking.tutorProfile?.user?.lastName}
                         </td>
-                        <td className="py-2.5 px-4 text-gray-600">{booking.subject || '-'}</td>
+                        <td className="py-2.5 px-4 text-gray-600">
+                          <div>{booking.subject || '-'}</div>
+                          {isRecurringBooking(booking) && (
+                            <div className="mt-1 text-[11px] font-medium text-sky-700">
+                              {getRecurringLabel(booking)}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-4 text-gray-500">{formatDate(booking.scheduledAt)}</td>
                         <td className="py-2.5 px-4 font-medium text-gray-800">
                           {formatCurrency(booking.totalAmount || 0)}

@@ -15,6 +15,7 @@ import {
 import { adminApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
 import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
@@ -366,7 +367,14 @@ function AdminUsersContent() {
                     <div className="space-y-2">
                       {selectedUser.bookingsAsLearner.map((booking) => (
                         <div key={booking.id} className="rounded-2xl border border-gray-100 p-3">
-                          <p className="font-medium text-gray-900">{booking.subject}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-gray-900">{booking.subject}</p>
+                            {isRecurringBooking(booking) && (
+                              <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                                {getRecurringLabel(booking)}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 mt-1">
                             With {booking.tutorProfile?.user?.firstName} {booking.tutorProfile?.user?.lastName} ·{' '}
                             {formatDate(booking.scheduledAt)}
@@ -378,7 +386,14 @@ function AdminUsersContent() {
                     <div className="space-y-2">
                       {selectedUser.tutorProfile.bookings.map((booking) => (
                         <div key={booking.id} className="rounded-2xl border border-gray-100 p-3">
-                          <p className="font-medium text-gray-900">{booking.subject}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-gray-900">{booking.subject}</p>
+                            {isRecurringBooking(booking) && (
+                              <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                                {getRecurringLabel(booking)}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 mt-1">
                             Learner {booking.learner?.firstName} {booking.learner?.lastName} ·{' '}
                             {formatDate(booking.scheduledAt)}
