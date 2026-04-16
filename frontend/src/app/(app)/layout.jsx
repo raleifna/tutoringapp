@@ -72,12 +72,10 @@ export default function AppLayout({ children }) {
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
-  const ensureClientIpContext = useAuthStore((state) => state.ensureClientIpContext);
   const unreadCount = useMessageStore((state) => state.unreadCount);
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
-  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   useEffect(() => {
     setMounted(true);
@@ -98,10 +96,6 @@ export default function AppLayout({ children }) {
     initializeAuth().catch(() => {});
   }, [mounted, accessToken, user, isGuestPath, initializeAuth]);
 
-  useEffect(() => {
-    if (!mounted || !accessToken || !user || isGuestPath) return;
-    ensureClientIpContext().catch(() => {});
-  }, [mounted, accessToken, user, isGuestPath, ensureClientIpContext]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -165,11 +159,6 @@ export default function AppLayout({ children }) {
         <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
-            {currentLocationLabel && (
-              <p className="truncate text-xs text-gray-500">
-                Location: <span className="font-medium text-gray-700">{currentLocationLabel}</span>
-              </p>
-            )}
           </div>
 
           <div className='flex justify-between items-center gap-2'>

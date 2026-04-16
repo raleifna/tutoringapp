@@ -50,8 +50,6 @@ const makeToken = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const filePlaceholderUrl = (fileName = 'verification-file') =>
   `data:text/plain;charset=utf-8,${encodeURIComponent(`Mock verification file: ${fileName}`)}`;
-const MOCK_IP_ADDRESS = '127.0.0.1';
-
 const toVerificationFileMeta = (files = []) => {
   if (!Array.isArray(files)) return [];
   return files
@@ -202,7 +200,6 @@ const toPublicUser = (user) => {
 
 const toAuthUser = (user) => ({
   ...toPublicUser(user),
-  ipAddress: MOCK_IP_ADDRESS,
 });
 
 const parseRegisterPayload = (payload) => {

@@ -27,8 +27,6 @@ export default function TutorDashboardPage() {
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
 
-  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
-
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -178,7 +176,7 @@ export default function TutorDashboardPage() {
           </div>
         </div>
         <div className='text-xl font-bold'>
-          {currentLocationLabel} {formattedTime}
+          {formattedTime}
         </div>
       </div>
 
