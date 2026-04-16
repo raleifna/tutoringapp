@@ -81,7 +81,6 @@ export default function DashboardPage() {
   const { user, accessToken, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
-  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   const [time, setTime] = useState(new Date());
 
@@ -175,9 +174,9 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-        {/* <div className='text-xl font-bold'>
-          {currentLocationLabel} {formattedTime}
-        </div> */}
+        <div className='text-xl font-bold'>
+          {formattedTime}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3">

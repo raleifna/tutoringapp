@@ -8,12 +8,6 @@ import {
   saveAuthToStorage,
   STORAGE_KEYS,
 } from './auth-storage';
-import {
-  applyIpContextFallback,
-  fetchClientIpContext,
-  isPrivateIpAddress,
-} from './ip-location';
-
 // ==================== AUTH STORE ====================
 export const useAuthStore = create((set, get) => ({
   user: getStoredUser(),
@@ -22,70 +16,30 @@ export const useAuthStore = create((set, get) => ({
   isLoading: false,
 
   setAuth: ({ user, accessToken, refreshToken }) => {
-    const nextUser = applyIpContextFallback(user);
-    saveAuthToStorage({ user: nextUser, accessToken, refreshToken });
-    set({ user: nextUser, accessToken, refreshToken });
+    saveAuthToStorage({ user, accessToken, refreshToken });
+    set({ user, accessToken, refreshToken });
   },
 
   setUser: (user) => {
-    const nextUser = applyIpContextFallback(user);
     saveAuthToStorage({
-      user: nextUser,
+      user,
       accessToken: get().accessToken,
       refreshToken: get().refreshToken,
     });
-    set({ user: nextUser });
-  },
-
-  ensureClientIpContext: async () => {
-    const currentUser = get().user;
-    if (!currentUser) return currentUser;
-
-    const alreadyHasLocation =
-      currentUser.ipLocationSource === 'client' &&
-      !!currentUser.ipLocationLabel &&
-      !isPrivateIpAddress(currentUser.ipAddress);
-
-    if (alreadyHasLocation || currentUser.ipLocationLookupFailed) {
-      return currentUser;
-    }
-
-    let nextUser = currentUser;
-    try {
-      const ipContext = await fetchClientIpContext();
-      nextUser = ipContext
-        ? { ...currentUser, ...ipContext, ipLocationLookupFailed: false }
-        : applyIpContextFallback(currentUser);
-    } catch {
-      nextUser = { ...applyIpContextFallback(currentUser), ipLocationLookupFailed: true };
-    }
-
-    saveAuthToStorage({
-      user: nextUser,
-      accessToken: get().accessToken,
-      refreshToken: get().refreshToken,
-    });
-    set({ user: nextUser });
-    return nextUser;
+    set({ user });
   },
 
   initializeAuth: async () => {
-    const { accessToken, user, fetchMe, logout, ensureClientIpContext } = get();
+    const { accessToken, user, fetchMe, logout } = get();
     if (!accessToken) return null;
 
-    // If user already exists in storage, UI can use it immediately.
     if (user) {
-      fetchMe()
-        .then((currentUser) => {
-          if (currentUser) ensureClientIpContext().catch(() => {});
-        })
-        .catch(() => {});
+      fetchMe().catch(() => {});
       return user;
     }
 
     const currentUser = await fetchMe();
     if (!currentUser) await logout();
-    else ensureClientIpContext().catch(() => {});
     return currentUser;
   },
 
@@ -104,13 +58,12 @@ export const useAuthStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       const { data } = await authApi.getMe();
-      const nextUser = applyIpContextFallback(data.user);
       saveAuthToStorage({
-        user: nextUser,
+        user: data.user,
         accessToken: get().accessToken,
         refreshToken: get().refreshToken,
       });
-      set({ user: nextUser, isLoading: false });
+      set({ user: data.user, isLoading: false });
       return nextUser;
     } catch {
       set({ isLoading: false });
