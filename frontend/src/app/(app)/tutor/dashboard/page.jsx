@@ -177,9 +177,9 @@ export default function TutorDashboardPage() {
             </button>
           </div>
         </div>
-        <div className='text-xl font-bold'>
+        {/* <div className='text-xl font-bold'>
           {currentLocationLabel} {formattedTime}
-        </div>
+        </div> */}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
