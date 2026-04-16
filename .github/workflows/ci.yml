@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  frontend-build:
-    name: Frontend Build
+  frontend:
+    name: Frontend Tests & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,14 +25,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter tutorconnect-frontend...
 
-      - name: Build frontend
+      - name: Run tests
+        run: pnpm --filter tutorconnect-frontend test
+
+      - name: Build
         run: pnpm --filter tutorconnect-frontend build
         env:
           NEXT_PUBLIC_API_URL: /api/v1
           NEXT_PUBLIC_SOCKET_URL: ''
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''
 
-  backend-check:
+  backend:
     name: Backend Install & Generate
     runs-on: ubuntu-latest
     steps:
