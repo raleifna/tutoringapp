@@ -17,7 +17,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi } from '../../../../lib/api-entry';
+import { bookingApi, paymentApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
@@ -28,6 +28,67 @@ const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
   reason: z.string().optional(),
 });
+
+const getAvatarUrl = (avatar, firstName, lastName) => {
+  if (avatar) return avatar;
+  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
+};
+
+const formatDate = (dateTime) => {
+  if (!dateTime) return '-';
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('en-AU', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const formatDuration = (minutes) => {
+  const value = Number(minutes || 0);
+  if (!value) return '0 mins';
+  if (value % 60 === 0) return `${value / 60} hr`;
+  return `${value} mins`;
+};
+
+const formatCurrency = (amount, currency = 'AUD') => {
+  const value = Number(amount || 0);
+  if (Number.isNaN(value)) return '$0';
+  try {
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: currency || 'AUD',
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `$${value}`;
+  }
+};
+
+const getStatusClass = (status) => {
+  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
+  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
+  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
+  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
+  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
+  return 'bg-gray-100 text-gray-700 border border-gray-200';
+};
+
+const formatBookingStatus = (status) => {
+  if (status === 'UNPAID') return 'Unpaid';
+  if (status === 'PENDING') return 'Pending';
+  if (status === 'ACCEPTED') return 'Accepted';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === 'DECLINED') return 'Declined';
+  if (status === 'RESCHEDULED') return 'Rescheduled';
+  return status || 'Unknown';
+};
 
 export default function BookingDetailPage() {
   const { id } = useParams();
@@ -41,6 +102,7 @@ export default function BookingDetailPage() {
   const returnTo = searchParams.get('returnTo') || '';
   const paymentResult = (searchParams.get('payment') || '').toLowerCase();
   const showBackButton = Boolean(returnTo || from);
+  const paymentMethodResult = (searchParams.get('paymentMethod') || '').toLowerCase();
   const backConfigMap = {
     'tutor-requests': { href: '/tutor/requests', label: 'Back' },
     'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
@@ -67,6 +129,12 @@ export default function BookingDetailPage() {
   const booking = data?.data?.data;
   const isTutor = user?.role === 'TUTOR';
   const isLearner = user?.role === 'LEARNER';
+
+  const savedMethodQuery = useQuery({
+    queryKey: ['savedPaymentMethod', currentUserId],
+    queryFn: () => paymentApi.getSavedMethod(),
+    enabled: !!currentUserId && !!isLearner,
+  });
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const bookingDetailHref = (() => {
     const params = new URLSearchParams();
@@ -89,14 +157,20 @@ export default function BookingDetailPage() {
   })();
   const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
-  const isPaidBooking = paymentStatus === 'COMPLETED';
+  const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
+  const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
   const isRefunded = paymentStatus === 'REFUNDED';
-  const isDeclinedRefund = booking?.status === 'DECLINED' && isRefunded;
+  const isProcessingPayment = paymentStatus === 'PROCESSING';
+  const isFailedPayment = paymentStatus === 'FAILED';
   const timeDelta = new Date(scheduledAt) - new Date();
   const isAcceptedBooking = booking?.status === 'ACCEPTED';
+  const canSetupPaymentMethod =
+    isLearner &&
+    booking?.status === 'PENDING' &&
+    ['PENDING', 'FAILED'].includes(paymentStatus);
   const canCancel =
     isLearner &&
-    ['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status) &&
+    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
     (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
 
   const cancelMutation = useMutation({
@@ -229,17 +303,15 @@ export default function BookingDetailPage() {
 
   return (
     <div className="relative max-w-2xl mx-auto space-y-5">
-      {paymentResult === 'success' && (
+      {paymentMethodResult === 'saved' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          Payment successful. Your booking has been sent to the tutor for confirmation.
+          Payment method saved. We will charge it automatically once the tutor accepts this booking.
         </div>
       )}
 
-      {isRefunded && (
+      {paymentResult === 'success' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          {isDeclinedRefund
-            ? 'This booking was declined by the tutor and the payment has been refunded.'
-            : 'This booking was cancelled and the payment has been refunded.'}
+          Payment successful. Your booking has been sent to the tutor for confirmation.
         </div>
       )}
 
@@ -343,21 +415,30 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {booking.status === 'UNPAID' && (
+      {canSetupPaymentMethod && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
                 <p className="text-xs text-sky-700 uppercase tracking-[0.18em] font-semibold">
-                  Checkout
+                  Payment Method
                 </p>
                 <div className="flex items-end gap-3">
                   <h3 className="text-3xl font-bold tracking-tight text-gray-900">
                     {formatCurrency(totalAmount, booking.currency || 'AUD')}
                   </h3>
                 </div>
+                {savedMethod && !isFailedPayment && (
+                  <div className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700">
+                    Saved method: {formatSavedMethod(savedMethod)}
+                  </div>
+                )}
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
-                  Complete payment to send this booking to the tutor for confirmation.
+                  {isFailedPayment
+                    ? 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
+                    : savedMethod
+                      ? `We will charge your saved ${formatSavedMethod(savedMethod)} automatically if the tutor accepts this booking.`
+                      : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
                 </p>
               </div>
 
@@ -368,15 +449,27 @@ export default function BookingDetailPage() {
                     className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
                   >
                     <CheckCircleIcon className="w-4 h-4" />
-                    Pay Now
+                    {isFailedPayment || savedMethod ? 'Update Payment Method' : 'Set Up Payment Method'}
                   </Link>
                   <p className="text-xs text-gray-500 sm:text-right">
-                    No real payment will be charged in this demo.
+                    Stripe test mode is used here. No real payment will be charged.
                   </p>
                 </div>
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {isLearner && booking.status === 'ACCEPTED' && isProcessingPayment && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Payment is currently processing for this accepted booking.
+        </div>
+      )}
+
+      {isLearner && booking.status === 'DECLINED' && isRefunded && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          Refunded
         </div>
       )}
 

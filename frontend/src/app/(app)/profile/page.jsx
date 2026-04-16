@@ -5,16 +5,18 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   CameraIcon,
+  CreditCardIcon,
   EyeIcon,
   EyeSlashIcon,
   KeyIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
-import { authApi, userApi } from '../../../lib/api-entry';
+import Link from 'next/link';
+import { authApi, paymentApi, userApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { useAuthStore } from '../../../lib/store';
 
@@ -36,6 +38,29 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
+const getAvatarUrl = (avatar, firstName, lastName) => {
+  const avatarValue = String(avatar || '');
+  if (
+    avatarValue &&
+    !avatarValue.startsWith('blob:') &&
+    !avatarValue.includes('mock.local/avatar/')
+  ) {
+    return avatarValue;
+  }
+  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
+};
+
+const formatIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  return ipAddress || null;
+};
+
+const formatLocationLabel = (value) => {
+  const locationLabel = String(value || '').trim();
+  return locationLabel || null;
+};
+
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -43,7 +68,8 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
+  const currentIpAddress = formatIpAddress(user?.ipAddress);
+  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
 
   const {
     register,
@@ -251,6 +277,43 @@ export default function ProfilePage() {
               </button>
             </div>
           </form>
+
+          {user?.role === 'LEARNER' && (
+            <div className="mt-8 border-t border-gray-100 pt-6">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-blue-50 p-3">
+                      <CreditCardIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Payment Method</h3>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {savedMethodQuery.isLoading
+                          ? 'Checking your saved card...'
+                          : formatSavedMethod(savedMethod)}
+                      </p>
+                      {savedMethod?.expMonth && savedMethod?.expYear ? (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Expires {String(savedMethod.expMonth).padStart(2, '0')}/{savedMethod.expYear}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Add a card once here, and we will charge it automatically after a tutor accepts your booking.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Link
+                    href="/profile/payment-method?returnTo=/profile"
+                    className="btn-primary whitespace-nowrap"
+                  >
+                    {savedMethod ? 'Update Payment Method' : 'Add Payment Method'}
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

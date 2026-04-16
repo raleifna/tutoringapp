@@ -4,6 +4,7 @@ import {
   bookingApi as realBookingApi,
   messageApi as realMessageApi,
   notificationApi as realNotificationApi,
+  paymentApi as realPaymentApi,
   subjectApi as realSubjectApi,
   tutorApi as realTutorApi,
   userApi as realUserApi,
@@ -92,5 +93,6 @@ export const bookingApi = {
 
 export const messageApi = STAGE4_API_MODE === 'mock' ? mockMessageApi : realMessageApi;
 export const notificationApi = realNotificationApi;
+export const paymentApi = realPaymentApi;
 export const userApi = STAGE4_API_MODE === 'mock' ? mockUserApi : realUserApi;
 export const adminApi = STAGE5_API_MODE === 'mock' ? mockAdminApi : realAdminApi;
