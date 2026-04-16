@@ -26,20 +26,13 @@ const normalizeDayOfWeek = (value) => {
 
 const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;
 
-const readHour = (value, { allow24 = false } = {}) => {
+const readHour = (value, allowUpTo24 = false) => {
   const [rawHour, rawMinute] = String(value || '').trim().split(':');
   const hour = Number.parseInt(rawHour, 10);
   const minute = Number.parseInt(rawMinute, 10);
 
-  if (
-    Number.isNaN(hour) ||
-    Number.isNaN(minute) ||
-    minute !== 0 ||
-    hour < 0 ||
-    hour > (allow24 ? 24 : 23) ||
-    (!allow24 && hour === 24)
-  ) {
-    throw new AppError('Availability time must use whole hours like 09:00 or 24:00', 400);
+  if (Number.isNaN(hour) || Number.isNaN(minute) || minute !== 0 || hour < 0 || hour > (allowUpTo24 ? 24 : 23)) {
+    throw new AppError('Invalid time format', 400);
   }
 
   return hour;
@@ -49,50 +42,27 @@ const normalizeAvailabilitySlots = (availability) => {
   if (availability == null) return [];
   if (!Array.isArray(availability)) throw new AppError('Availability must be an array', 400);
 
-  const normalized = availability
+  return availability
     .map((slot) => {
       const dayOfWeek = normalizeDayOfWeek(slot?.dayOfWeek);
       const startHour = readHour(slot?.startTime);
-      const endHour = readHour(slot?.endTime, { allow24: true });
+      const endHour = readHour(slot?.endTime, true);
 
       if (endHour <= startHour) {
-        throw new AppError('Availability end time must be after start time', 400);
+        throw new AppError('End time must be after start time', 400);
       }
 
       return {
         dayOfWeek,
-        startHour,
-        endHour,
+        startTime: formatHour(startHour),
+        endTime: formatHour(endHour),
         timezone: slot?.timezone || 'UTC',
       };
     })
-    .sort((left, right) => {
-      if (left.dayOfWeek !== right.dayOfWeek) return left.dayOfWeek - right.dayOfWeek;
-      if (left.startHour !== right.startHour) return left.startHour - right.startHour;
-      return left.endHour - right.endHour;
+    .sort((a, b) => {
+      if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+      return a.startTime.localeCompare(b.startTime);
     });
-
-  return normalized.reduce((merged, slot) => {
-    const previous = merged[merged.length - 1];
-
-    if (
-      previous &&
-      previous.dayOfWeek === slot.dayOfWeek &&
-      previous.timezone === slot.timezone &&
-      slot.startHour <= previous.endHour
-    ) {
-      previous.endHour = Math.max(previous.endHour, slot.endHour);
-      return merged;
-    }
-
-    merged.push({ ...slot });
-    return merged;
-  }, []).map((slot) => ({
-    dayOfWeek: slot.dayOfWeek,
-    startTime: formatHour(slot.startHour),
-    endTime: formatHour(slot.endHour),
-    timezone: slot.timezone,
-  }));
 };
 
 const getCurrentWeekStart = (date = new Date()) => {
@@ -426,7 +396,7 @@ exports.updateApplication = async (req, res) => {
   const latestReviewAction = await getLatestReviewAction(req.user.id);
 
   // notify admin
-  await notificationService.notifyAdmin('system', 'Tutor Application Resubmitted', `A tutor application has been resubmitted for review.`, `/admin/tutors?status=PENDING`);
+  await notifyAdmin('system', 'Tutor Application Resubmitted', `A tutor application has been resubmitted for review.`, `/admin/tutors?status=PENDING`);
 
   res.json({
     success: true,
@@ -460,19 +430,20 @@ exports.updateProfile = async (req, res) => {
     });
   }
 
+  const profileData = {};
+  if (headline !== undefined) profileData.headline = headline;
+  if (hourlyRate !== undefined) profileData.hourlyRate = parseFloat(hourlyRate);
+  if (currency) profileData.currency = currency;
+  if (yearsExperience !== undefined) profileData.yearsExperience = parseInt(yearsExperience, 10);
+  if (education) profileData.education = education;
+  if (certifications) profileData.certifications = certifications;
+  if (languages) profileData.languages = languages;
+  if (sessionTypes) profileData.sessionTypes = sessionTypes;
+  if (location !== undefined) profileData.location = location;
+
   const updated = await prisma.tutorProfile.update({
     where: { userId: req.user.id },
-    data: {
-      ...(headline !== undefined && { headline }),
-      ...(hourlyRate !== undefined && { hourlyRate: parseFloat(hourlyRate) }),
-      ...(currency && { currency }),
-      ...(yearsExperience !== undefined && { yearsExperience: parseInt(yearsExperience, 10) }),
-      ...(education && { education }),
-      ...(certifications && { certifications }),
-      ...(languages && { languages }),
-      ...(sessionTypes && { sessionTypes }),
-      ...(location !== undefined && { location }),
-    },
+    data: profileData,
     select: tutorProfileSelect,
   });
 

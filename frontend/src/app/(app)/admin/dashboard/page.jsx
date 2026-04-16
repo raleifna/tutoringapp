@@ -11,29 +11,8 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { formatCurrency, formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
-
-const formatCurrency = (amount) => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: 'AUD',
-    maximumFractionDigits: 2,
-  }).format(value);
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
 
 const getBookingStatusStyle = (status) => {
   if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';

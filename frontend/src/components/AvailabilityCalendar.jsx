@@ -1,12 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { formatMonthDay as formatDate } from '../lib/formatters';
 import { DAY_ORDER, DAY_LABELS, HOURS, buildCellKey, cellsToSlots, getSlotDate, getWeekStart, slotsToCells } from '../lib/availability-calendar';
-
-const formatDate = (dayOfWeek, weekOffset) =>
-  new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' }).format(
-    getSlotDate(dayOfWeek, 0, weekOffset)
-  );
 
 const formatWeekRange = (weekOffset) => {
   const start = getWeekStart(new Date(), weekOffset);
@@ -80,7 +76,7 @@ export default function AvailabilityCalendar({
           {DAY_ORDER.map((dayOfWeek) => (
             <div key={dayOfWeek} className="rounded-lg bg-gray-50 p-2 text-center font-medium text-gray-600">
               <div>{DAY_LABELS[dayOfWeek]}</div>
-              <div className="text-[11px] text-gray-400">{formatDate(dayOfWeek, weekOffset)}</div>
+              <div className="text-[11px] text-gray-400">{formatDate(getSlotDate(dayOfWeek, 0, weekOffset))}</div>
             </div>
           ))}
           {HOURS.map((hour) => (

@@ -292,8 +292,6 @@ model Booking {
   address            String?
   cancellationReason String?
   declineReason      String?
-  rescheduleNote     String?
-  proposedTime       DateTime?
   recurringType      RecurringType @default(ONE_OFF)
   recurringGroupId   String?
   createdAt          DateTime      @default(now())
@@ -500,3 +498,5 @@ model Notification {
   @@index([userId])
   @@map("notifications")
 }
+
+

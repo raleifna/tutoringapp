@@ -13,7 +13,10 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const ROLES = ['', 'LEARNER', 'TUTOR', 'ADMIN', 'SYSTEM_ADMIN'];
@@ -23,26 +26,6 @@ const STATUS_ACTIONS = {
   ACTIVE: [{ label: 'Suspend', value: 'SUSPENDED', className: 'text-yellow-700 hover:bg-yellow-50' }],
   SUSPENDED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
   DEACTIVATED: [{ label: 'Activate', value: 'ACTIVE', className: 'text-green-700 hover:bg-green-50' }],
-};
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 const getRoleBadgeClass = (role) => {
@@ -233,7 +216,7 @@ function AdminUsersContent() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <img
-                          src={getAvatarUrl(user.avatar, user.firstName, user.lastName)}
+                          src={getAvatarUrl(user.avatar, user.firstName, user.lastName, { fallbackName: 'User' })}
                           alt=""
                           className="w-9 h-9 rounded-full object-cover"
                         />
@@ -346,7 +329,7 @@ function AdminUsersContent() {
               <>
                 <div className="flex items-center gap-4 rounded-2xl bg-gray-50 p-4">
                   <img
-                    src={getAvatarUrl(selectedUser.avatar, selectedUser.firstName, selectedUser.lastName)}
+                    src={getAvatarUrl(selectedUser.avatar, selectedUser.firstName, selectedUser.lastName, { fallbackName: 'User' })}
                     alt={selectedUser.firstName}
                     className="w-16 h-16 rounded-full object-cover"
                   />

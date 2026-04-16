@@ -14,7 +14,10 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatShortDateTime as formatDate } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const STATUS_TABS = [
@@ -22,26 +25,6 @@ const STATUS_TABS = [
   { value: 'ACTIVE', label: 'Approved' },
   { value: 'SUSPENDED', label: 'Needs Changes' },
 ];
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
 
 const formatBytes = (value) => {
   const size = Number(value) || 0;
@@ -229,7 +212,8 @@ function AdminTutorsContent() {
                     src={getAvatarUrl(
                       tutor.user?.avatar,
                       tutor.user?.firstName,
-                      tutor.user?.lastName
+                      tutor.user?.lastName,
+                      { fallbackName: 'Tutor' }
                     )}
                     alt={tutor.user?.firstName || 'Tutor'}
                     className="w-14 h-14 rounded-full object-cover flex-shrink-0"

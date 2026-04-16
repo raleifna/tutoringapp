@@ -10,51 +10,15 @@ import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   ClockIcon,
-  CheckCircleIcon,
   StarIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getStatusClass = (status) => {
-  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
-  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
-  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
-  return 'bg-gray-100 text-gray-700 border border-gray-200';
-};
-
-const formatBookingStatus = (status) => {
-  if (status === 'UNPAID') return 'Unpaid';
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'ACCEPTED') return 'Accepted';
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'CANCELLED') return 'Cancelled';
-  if (status === 'DECLINED') return 'Declined';
-  if (status === 'RESCHEDULED') return 'Rescheduled';
-  return status || 'Unknown';
-};
+import BookingCalendar from '../../../components/BookingCalendar';
+import { getAvatarUrl } from '../../../lib/avatar';
+import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
+import { formatShortDateTime as formatDate } from '../../../lib/formatters';
 
 const getTutorDetailHref = (booking, returnTo = '/dashboard') => {
   const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
@@ -111,30 +75,35 @@ const mockNotifications = [
   }
 ];
 
-const formatTimeAgo = (timestamp) => {
-  const now = new Date();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
-};
-
 export default function DashboardPage() {
   const router = useRouter();
   const { user, accessToken, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
+
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+
+  const formattedTime = time.toLocaleTimeString({
+    timeZone: timeZone,
+  });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const displayName = mounted ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : '';
+  console.log(user);
   const {
     data: bookingsData,
     isLoading,
@@ -145,6 +114,14 @@ export default function DashboardPage() {
     enabled: mounted && !!accessToken && !!currentUserId,
   });
 
+  // fetch more bookings for the calendar view
+  const { data: calendarData } = useQuery({
+    queryKey: ['myBookings', 'calendar', currentUserId],
+    queryFn: () => bookingApi.getMyBookings({ limit: 50 }),
+    enabled: mounted && !!accessToken && !!currentUserId,
+  });
+  const calendarBookings = calendarData?.data?.data?.bookings || [];
+
   const bookings = bookingsData?.data?.data?.bookings || [];
   const totalBookings = bookingsData?.data?.data?.pagination?.total || 0;
   const completedCount = bookings.filter((item) => item.status === 'COMPLETED').length;
@@ -153,20 +130,6 @@ export default function DashboardPage() {
   const upcomingCount = bookings.filter((item) => item.status === 'ACCEPTED').length;
 
   const summaryItems = [
-    {
-      label: 'Total Bookings',
-      value: totalBookings,
-      icon: CalendarDaysIcon,
-      color: 'bg-blue-100 text-blue-600',
-      href: '/bookings?from=dashboard',
-    },
-    {
-      label: 'Completed',
-      value: completedCount,
-      icon: CheckCircleIcon,
-      color: 'bg-green-100 text-green-600',
-      href: '/bookings?from=dashboard&status=COMPLETED',
-    },
     {
       label: 'Unpaid',
       value: unpaidCount,
@@ -198,20 +161,25 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* welcome Header */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">
-          {displayName}
-        </h1>
-        <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
-        <div className="mt-4 flex flex-wrap gap-2 pr-12 sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary btn-sm rounded-full px-4">
-            Log out
-          </button>
+      <div className="flex rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5 items-center">
+        <div className='flex-1'>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">
+            {displayName}
+          </h1>
+          <p className="text-primary-200 text-sm mt-1">Ready to continue learning?</p>
+          <div className="mt-4 flex flex-wrap gap-2 pr-12 sm:pr-0">
+            <button onClick={handleLogout} className="btn-secondary btn-sm rounded-full px-4">
+              Log out
+            </button>
+          </div>
+        </div>
+        <div className='text-xl font-bold'>
+          {currentLocationLabel} {formattedTime}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3">
         {summaryItems.map((item) => (
           <Link key={item.label} href={item.href} className="card p-4 hover:shadow-md transition-shadow">
             <div
@@ -266,7 +234,8 @@ export default function DashboardPage() {
                           src={getAvatarUrl(
                             booking.tutorProfile?.user?.avatar,
                             booking.tutorProfile?.user?.firstName,
-                            booking.tutorProfile?.user?.lastName
+                            booking.tutorProfile?.user?.lastName,
+                            { fallbackName: 'Tutor' }
                           )}
                           alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                           className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
@@ -277,7 +246,8 @@ export default function DashboardPage() {
                         src={getAvatarUrl(
                           booking.tutorProfile?.user?.avatar,
                           booking.tutorProfile?.user?.firstName,
-                          booking.tutorProfile?.user?.lastName
+                          booking.tutorProfile?.user?.lastName,
+                          { fallbackName: 'Tutor' }
                         )}
                         alt={booking.tutorProfile?.user?.firstName || 'Tutor'}
                         className="w-10 h-10 rounded-full object-cover flex-shrink-0"
@@ -312,13 +282,18 @@ export default function DashboardPage() {
         <p className="text-xs text-gray-400 text-center">Refreshing dashboard...</p>
       )}
 
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Continue to the tutor search page and explore available tutors.
-        </p>
+      <div className="card p-4">
+        <BookingCalendar
+          bookings={calendarBookings}
+          isTutor={false}
+          returnTo="/dashboard"
+        />
+      </div>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="card p-5">
+        <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/search?from=dashboard"
             className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:bg-gray-50"

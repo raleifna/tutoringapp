@@ -65,16 +65,6 @@ const pageTitles = {
   '/tutor/profile': 'Tutor Profile',
 };
 
-const formatIpAddress = (value) => {
-  const ipAddress = String(value || '').trim();
-  return ipAddress || null;
-};
-
-const formatLocationLabel = (value) => {
-  const locationLabel = String(value || '').trim();
-  return locationLabel || null;
-};
-
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -87,8 +77,7 @@ export default function AppLayout({ children }) {
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
-  const currentIpAddress = formatIpAddress(user?.ipAddress);
-  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const currentLocationLabel = user?.ipLocationLabel?.trim() || null;
 
   useEffect(() => {
     setMounted(true);
@@ -176,12 +165,9 @@ export default function AppLayout({ children }) {
         <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
-            {currentIpAddress && (
+            {currentLocationLabel && (
               <p className="truncate text-xs text-gray-500">
-                Current IP: <span className="font-medium text-gray-700">{currentIpAddress}</span>
-                {currentLocationLabel && (
-                  <span className="text-gray-500"> · {currentLocationLabel}</span>
-                )}
+                Location: <span className="font-medium text-gray-700">{currentLocationLabel}</span>
               </p>
             )}
           </div>

@@ -18,6 +18,9 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, paymentApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 
@@ -85,15 +88,6 @@ const formatBookingStatus = (status) => {
   if (status === 'DECLINED') return 'Declined';
   if (status === 'RESCHEDULED') return 'Rescheduled';
   return status || 'Unknown';
-};
-
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
 };
 
 export default function BookingDetailPage() {
@@ -341,7 +335,7 @@ export default function BookingDetailPage() {
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
-                src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+                src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName, { fallbackName: 'Tutor' })}
                 alt={other?.firstName || 'Tutor'}
                 className="w-14 h-14 rounded-full object-cover ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
               />
@@ -359,7 +353,7 @@ export default function BookingDetailPage() {
         ) : (
           <div className="flex items-center gap-3">
             <img
-              src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName)}
+              src={getAvatarUrl(other?.avatar, other?.firstName, other?.lastName, { fallbackName: 'Tutor' })}
               alt={other?.firstName || 'Tutor'}
               className="w-14 h-14 rounded-full object-cover"
             />

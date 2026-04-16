@@ -1,11 +1,9 @@
 const { prisma } = require('../config/database');
+const { verifyAccessToken } = require('../utils/tokens');
 
 async function authenticate(req, res, next) {
     const authHeader = req.headers.authorization;
-    console.log('method =', req.method);
-    console.log('path =', req.originalUrl);
-    console.log('auth header =', authHeader);
-    // expecting something like: Bearer demo-token-userId
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
             success: false,
@@ -14,18 +12,20 @@ async function authenticate(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
+    let payload;
 
-    if (!token.startsWith('demo-token-')) {
+    try {
+        // Decode and verify the JWT before trusting the user id.
+        payload = verifyAccessToken(token);
+    } catch (error) {
         return res.status(401).json({
             success: false,
             message: 'Invalid token.',
         });
     }
 
-    const userId = token.replace('demo-token-', '');
-
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: payload.id },
     });
 
     if (!user) {
@@ -53,15 +53,16 @@ async function optionalAuth(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
+    let payload;
 
-    if (!token.startsWith('demo-token-')) {
+    try {
+        payload = verifyAccessToken(token);
+    } catch (error) {
         return next();
     }
 
-    const userId = token.replace('demo-token-', '');
-
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: payload.id },
     });
 
     if (user) {

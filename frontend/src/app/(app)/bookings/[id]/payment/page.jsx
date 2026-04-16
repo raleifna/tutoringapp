@@ -12,6 +12,7 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+<<<<<<< HEAD
 import { bookingApi, paymentApi } from '../../../../../lib/api-entry';
 import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
@@ -54,6 +55,13 @@ const formatCurrency = (amount, currency = 'AUD') => {
   }
 };
 
+=======
+import { bookingApi } from '../../../../../lib/api-entry';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../../lib/formatters';
+import { useAuthStore } from '../../../../../lib/store';
+import BackButton from '../../../../../components/BackButton';
+
+>>>>>>> origin
 const getPaymentStatusClass = (status) => {
   if (status === 'PAID' || status === 'COMPLETED') {
     return 'bg-emerald-50 text-emerald-700 border border-emerald-200';

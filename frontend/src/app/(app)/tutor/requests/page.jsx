@@ -13,6 +13,9 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import { cn, getPositivePageNumber } from '../../../../lib/utils';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -27,55 +30,6 @@ const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
 const getInitialStatus = (value) => {
   const next = String(value || '').toUpperCase();
   return STATUS_VALUES.has(next) ? next : 'PENDING';
-};
-
-const getPageNumber = (value) => {
-  const next = Number.parseInt(String(value || '1'), 10);
-  return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 export default function TutorRequestsPage() {
@@ -94,7 +48,7 @@ function TutorRequestsContent() {
   const [activeStatus, setActiveStatus] = useState(() =>
     getInitialStatus(statusParam)
   );
-  const [page, setPage] = useState(() => getPageNumber(pageParam));
+  const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
   const queryClient = useQueryClient();
   const currentRequestsHref = (() => {
     const params = new URLSearchParams();
@@ -107,7 +61,7 @@ function TutorRequestsContent() {
   useEffect(() => {
     const next = getInitialStatus(statusParam);
     setActiveStatus(next);
-    setPage(getPageNumber(pageParam));
+    setPage(getPositivePageNumber(pageParam));
   }, [pageParam, statusParam]);
 
   const { data, isLoading } = useQuery({
@@ -224,7 +178,7 @@ function TutorRequestsContent() {
               >
                 <div className="flex items-start gap-4">
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, { fallbackName: 'Learner' })}
                     alt={learner?.firstName || 'Learner'}
                     className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                   />

@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { authApi, paymentApi, userApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
@@ -60,15 +61,6 @@ const formatLocationLabel = (value) => {
   return locationLabel || null;
 };
 
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
-};
-
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -78,15 +70,6 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const currentIpAddress = formatIpAddress(user?.ipAddress);
   const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
-  const currentUserId = user?.id || '';
-
-  const savedMethodQuery = useQuery({
-    queryKey: ['savedPaymentMethod', currentUserId],
-    queryFn: () => paymentApi.getSavedMethod(),
-    enabled: !!currentUserId && user?.role === 'LEARNER',
-  });
-
-  const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
 
   const {
     register,
@@ -168,7 +151,10 @@ export default function ProfilePage() {
       <div className="card flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="relative">
           <img
-            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName)}
+            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName, {
+              fallbackName: 'User',
+              ignoreTemporary: true,
+            })}
             alt={user?.firstName || 'User'}
             className="w-20 h-20 rounded-full object-cover"
           />
@@ -198,11 +184,6 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-500">{user?.email}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="badge bg-primary-50 text-primary-700 text-xs">{user?.role}</span>
-            {currentIpAddress && (
-              <span className="badge bg-gray-100 text-gray-700 text-xs">
-                Current IP: {currentIpAddress}
-              </span>
-            )}
             {currentLocationLabel && (
               <span className="badge bg-gray-100 text-gray-700 text-xs">
                 Region: {currentLocationLabel}

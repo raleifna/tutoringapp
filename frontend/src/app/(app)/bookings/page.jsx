@@ -7,7 +7,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
+import { formatBookingStatus, getBookingStatusClass } from '../../../lib/booking-status';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../lib/formatters';
 import { useAuthStore } from '../../../lib/store';
+import { getPositivePageNumber } from '../../../lib/utils';
 import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [
@@ -26,82 +30,6 @@ const getInitialStatus = (value) => {
   return STATUS_VALUES.has(next) ? next : '';
 };
 
-const getPageNumber = (value) => {
-  const next = Number.parseInt(String(value || '1'), 10);
-  return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) {
-    return `${value / 60} hr`;
-  }
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getBookingStatusClass = (status) => {
-  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
-  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
-  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
-  return 'bg-gray-100 text-gray-700 border border-gray-200';
-};
-
-const formatBookingStatus = (status) => {
-  if (status === 'UNPAID') return 'Unpaid';
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'ACCEPTED') return 'Accepted';
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'CANCELLED') return 'Cancelled';
-  if (status === 'DECLINED') return 'Declined';
-  if (status === 'RESCHEDULED') return 'Rescheduled';
-  return status || 'Unknown';
-};
-
-// export default function BookingsPage() {
-//   return (
-//     <Suspense fallback={<BookingsPageFallback />}>
-//       <BookingsPageContent />
-//     </Suspense>
-//   );
-// }
-
 function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -111,7 +39,7 @@ function BookingsPageContent() {
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
-  const [page, setPage] = useState(() => getPageNumber(pageParam));
+  const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
   const isTutor = user?.role === 'TUTOR';
   const showBackButton = Boolean(fromParam);
   const fallbackBackHrefMap = {
@@ -126,7 +54,7 @@ function BookingsPageContent() {
 
   useEffect(() => {
     setActiveStatus(getInitialStatus(statusParam));
-    setPage(getPageNumber(pageParam));
+    setPage(getPositivePageNumber(pageParam));
   }, [pageParam, statusParam]);
 
   const handleBack = () => {
@@ -342,14 +270,14 @@ function BookingCard({ booking, isTutor, returnTo }) {
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
-                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
                 alt={otherFirstName}
                 className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
               />
             </Link>
           ) : (
             <img
-              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
               alt={otherFirstName}
               className="w-12 h-12 rounded-full object-cover flex-shrink-0"
             />

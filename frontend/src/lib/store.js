@@ -2,52 +2,17 @@
 import { create } from 'zustand';
 import { authApi } from './api-entry';
 import {
+  clearAuthStorage,
+  getStoredUser,
+  getStoredValue,
+  saveAuthToStorage,
+  STORAGE_KEYS,
+} from './auth-storage';
+import {
   applyIpContextFallback,
   fetchClientIpContext,
   isPrivateIpAddress,
-  preserveClientIpContext,
 } from './ip-location';
-
-const STORAGE_KEYS = {
-  USER: 'user',
-  ACCESS_TOKEN: 'accessToken',
-  REFRESH_TOKEN: 'refreshToken',
-};
-
-const getStoredValue = (key) => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(key);
-};
-
-const getStoredUser = () => {
-  const rawUser = getStoredValue(STORAGE_KEYS.USER);
-  if (!rawUser || rawUser === 'undefined') return null;
-  try {
-    return JSON.parse(rawUser);
-  } catch {
-    return null;
-  }
-};
-
-const saveAuthToStorage = ({ user, accessToken, refreshToken }) => {
-  if (typeof window === 'undefined') return;
-
-  if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-  else localStorage.removeItem(STORAGE_KEYS.USER);
-
-  if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-  else localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-
-  if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-  else localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
-const clearAuthStorage = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEYS.USER);
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
 
 // ==================== AUTH STORE ====================
 export const useAuthStore = create((set, get) => ({
@@ -55,7 +20,6 @@ export const useAuthStore = create((set, get) => ({
   accessToken: getStoredValue(STORAGE_KEYS.ACCESS_TOKEN),
   refreshToken: getStoredValue(STORAGE_KEYS.REFRESH_TOKEN),
   isLoading: false,
-  isResolvingIpContext: false,
 
   setAuth: ({ user, accessToken, refreshToken }) => {
     const nextUser = applyIpContextFallback(user);
@@ -73,12 +37,18 @@ export const useAuthStore = create((set, get) => ({
     set({ user: nextUser });
   },
 
-  refreshClientIpContext: async () => {
+  ensureClientIpContext: async () => {
     const currentUser = get().user;
-    if (!currentUser || typeof window === 'undefined') return currentUser;
-    if (get().isResolvingIpContext) return currentUser;
+    if (!currentUser) return currentUser;
 
-    set({ isResolvingIpContext: true });
+    const alreadyHasLocation =
+      currentUser.ipLocationSource === 'client' &&
+      !!currentUser.ipLocationLabel &&
+      !isPrivateIpAddress(currentUser.ipAddress);
+
+    if (alreadyHasLocation || currentUser.ipLocationLookupFailed) {
+      return currentUser;
+    }
 
     let nextUser = currentUser;
     try {
@@ -95,24 +65,8 @@ export const useAuthStore = create((set, get) => ({
       accessToken: get().accessToken,
       refreshToken: get().refreshToken,
     });
-    set({ user: nextUser, isResolvingIpContext: false });
+    set({ user: nextUser });
     return nextUser;
-  },
-
-  ensureClientIpContext: async () => {
-    const currentUser = get().user;
-    if (!currentUser) return currentUser;
-
-    const hasClientLocation =
-      currentUser.ipLocationSource === 'client' &&
-      !!currentUser.ipLocationLabel &&
-      !isPrivateIpAddress(currentUser.ipAddress);
-
-    if (hasClientLocation || currentUser.ipLocationLookupFailed) {
-      return currentUser;
-    }
-
-    return get().refreshClientIpContext();
   },
 
   initializeAuth: async () => {
@@ -150,7 +104,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       const { data } = await authApi.getMe();
-      const nextUser = preserveClientIpContext(data.user, get().user);
+      const nextUser = applyIpContextFallback(data.user);
       saveAuthToStorage({
         user: nextUser,
         accessToken: get().accessToken,
