@@ -39,26 +39,6 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
-<<<<<<< HEAD
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
-=======
-const formatIpAddress = (value) => {
-  const ipAddress = String(value || '').trim();
-  return ipAddress || null;
-};
-
-const formatLocationLabel = (value) => {
-  const locationLabel = String(value || '').trim();
-  return locationLabel || null;
->>>>>>> 336c407 (add payment display&booking status frontend tests and update cancellation policy)
-};
-
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
