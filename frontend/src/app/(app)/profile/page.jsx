@@ -38,19 +38,6 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
 const formatIpAddress = (value) => {
   const ipAddress = String(value || '').trim();
   return ipAddress || null;
@@ -59,6 +46,15 @@ const formatIpAddress = (value) => {
 const formatLocationLabel = (value) => {
   const locationLabel = String(value || '').trim();
   return locationLabel || null;
+};
+
+const formatSavedMethod = (paymentMethod) => {
+  if (!paymentMethod?.last4) return 'No payment method saved';
+
+  const brand = String(paymentMethod.brand || 'card');
+  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
+
+  return `${label} ending in ${paymentMethod.last4}`;
 };
 
 export default function ProfilePage() {
@@ -70,6 +66,12 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const currentIpAddress = formatIpAddress(user?.ipAddress);
   const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
+  const savedMethodQuery = useQuery({
+    queryKey: ['savedPaymentMethod', user?.id],
+    queryFn: () => paymentApi.getSavedMethod(),
+    enabled: user?.role === 'LEARNER' && !!user?.id,
+  });
+  const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
 
   const {
     register,

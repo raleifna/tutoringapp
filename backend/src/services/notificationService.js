@@ -1,6 +1,6 @@
-import { prisma } from '../config/database.js';
+const { prisma } = require('../config/database');
 
-export async function notify(receiverId, type, title, message, link) {
+async function notify(receiverId, type, title, message, link) {
   await prisma.notification.create({
     data: {
       userId: receiverId,
@@ -9,27 +9,34 @@ export async function notify(receiverId, type, title, message, link) {
       message,
       read: false,
       timestamp: new Date(),
-      link
-    }
+      link,
+    },
   });
 }
 
-export async function notifyAdmin(type, title, message, link) {
+async function notifyAdmin(type, title, message, link) {
   const admins = await prisma.user.findMany({
-    where: { role: 'admin' }
+    where: { role: 'ADMIN' },
   });
 
-  const notifications = admins.map(admin => ({
+  const notifications = admins.map((admin) => ({
     userId: admin.id,
     type,
     title,
     message,
     read: false,
     timestamp: new Date(),
-    link
+    link,
   }));
 
+  if (!notifications.length) return;
+
   await prisma.notification.createMany({
-    data: notifications
+    data: notifications,
   });
 }
+
+module.exports = {
+  notify,
+  notifyAdmin,
+};

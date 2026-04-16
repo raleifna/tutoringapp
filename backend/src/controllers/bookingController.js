@@ -398,7 +398,7 @@ exports.acceptBooking = async (req, res) => {
   });
 
   // notify student
-  await notificationService.notify(
+  await notify(
     booking.learnerId,
     'booking',
     'Booking Accepted',

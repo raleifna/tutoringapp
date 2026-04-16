@@ -29,65 +29,13 @@ const rescheduleSchema = z.object({
   reason: z.string().optional(),
 });
 
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
+const formatSavedMethod = (paymentMethod) => {
+  if (!paymentMethod?.last4) return 'No payment method saved';
 
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
+  const brand = String(paymentMethod.brand || 'card');
+  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
 
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getStatusClass = (status) => {
-  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
-  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
-  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
-  return 'bg-gray-100 text-gray-700 border border-gray-200';
-};
-
-const formatBookingStatus = (status) => {
-  if (status === 'UNPAID') return 'Unpaid';
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'ACCEPTED') return 'Accepted';
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'CANCELLED') return 'Cancelled';
-  if (status === 'DECLINED') return 'Declined';
-  if (status === 'RESCHEDULED') return 'Rescheduled';
-  return status || 'Unknown';
+  return `${label} ending in ${paymentMethod.last4}`;
 };
 
 export default function BookingDetailPage() {
