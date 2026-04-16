@@ -488,18 +488,18 @@ export default function BookingDetailPage() {
               {isLearner && (
                 <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
                   <Link
-                  href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
-                  className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
-                >
-                  <CheckCircleIcon className="w-4 h-4" />
-                  {isFailedPayment || savedMethod
-                    ? recurring
-                      ? 'Update Series Payment'
-                      : 'Update Payment Method'
-                    : recurring
-                      ? 'Set Up Series Payment'
-                      : 'Set Up Payment Method'}
-                </Link>
+                    href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
+                    className="btn-primary inline-flex min-w-[220px] justify-center whitespace-nowrap rounded-xl px-5 py-3 shadow-sm"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                    {isFailedPayment || savedMethod
+                      ? recurring
+                        ? 'Update Series Payment'
+                        : 'Update Payment Method'
+                      : recurring
+                        ? 'Set Up Series Payment'
+                        : 'Set Up Payment Method'}
+                  </Link>
                   <p className="text-xs text-gray-500 sm:text-right">
                     Stripe test mode is used here. No real payment will be charged.
                   </p>

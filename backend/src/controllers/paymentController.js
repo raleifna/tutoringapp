@@ -423,7 +423,6 @@ exports.deleteSavedPaymentMethod = async (req, res) => {
   try {
     await stripe.paymentMethods.detach(targetPaymentMethodId);
   } catch (error) {
-    // ignore detach errors so local state can still be cleaned up
   }
 
   const nextDefaultPaymentMethodId =
