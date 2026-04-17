@@ -3,12 +3,20 @@ const jwt = require('jsonwebtoken');
 const ACCESS_TOKEN_EXPIRES_IN = '1h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
+function getRequiredEnv(name) {
+    const value = process.env[name];
+    if (!value) {
+        throw new Error(`${name} is not configured`);
+    }
+    return value;
+}
+
 function getAccessTokenSecret() {
-    return process.env.JWT_SECRET || 'dev-access-secret';
+    return getRequiredEnv('JWT_SECRET');
 }
 
 function getRefreshTokenSecret() {
-    return process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
+    return getRequiredEnv('JWT_REFRESH_SECRET');
 }
 
 function createAccessToken(user) {
