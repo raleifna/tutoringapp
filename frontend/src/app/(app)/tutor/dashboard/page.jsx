@@ -209,7 +209,7 @@ export default function TutorDashboardPage() {
 
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-900">Pending Requests</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Pending Requests</h2>
           <Link
             href="/tutor/requests"
             className="text-sm text-primary-600 hover:underline flex items-center gap-1"
@@ -271,7 +271,7 @@ export default function TutorDashboardPage() {
 
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-900">Upcoming Sessions</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Upcoming Sessions</h2>
           <Link
             href="/bookings?from=tutor-dashboard"
             className="text-sm text-primary-600 hover:underline flex items-center gap-1"
@@ -286,7 +286,7 @@ export default function TutorDashboardPage() {
             ))}
           </div>
         ) : upcomingBookings.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4 text-center">No upcoming sessions</p>
+          <p className="text-sm font-semibold text-gray-900">No upcoming sessions</p>
         ) : (
           <div className="space-y-2">
             {upcomingBookings.map((booking) => {
@@ -332,54 +332,57 @@ export default function TutorDashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          {
-            label: 'Manage Profile',
-            desc: 'Update subjects, rates, availability',
-            href: '/tutor/profile',
-            color: 'bg-primary-600',
-          },
-          {
-            label: 'Booking Requests',
-            desc: 'Accept or decline requests',
-            href: '/tutor/requests',
-            color: 'bg-green-600',
-          },
-          {
-            label: 'Messages',
-            desc: 'Open learner chats',
-            href: '/messages',
-            color: 'bg-blue-600',
-          },
-          {
-            label: 'View as Learner',
-            desc: 'See your public profile',
-            href: viewAsLearnerNavHref,
-            color: 'bg-purple-600',
-          },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="card p-5 hover:shadow-md transition-shadow group"
-          >
-            <div
-              className={cn(
-                'w-10 h-10 rounded-lg mb-3 flex items-center justify-center',
-                item.color
-              )}
+      <div className="card p-5">
+        <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            {
+              label: 'Manage Profile',
+              desc: 'Update subjects, rates, availability',
+              href: '/tutor/profile',
+              color: 'bg-primary-600',
+            },
+            {
+              label: 'Booking Requests',
+              desc: 'Accept or decline requests',
+              href: '/tutor/requests',
+              color: 'bg-green-600',
+            },
+            {
+              label: 'Messages',
+              desc: 'Open learner chats',
+              href: '/messages',
+              color: 'bg-blue-600',
+            },
+            {
+              label: 'View as Learner',
+              desc: 'See your public profile',
+              href: viewAsLearnerNavHref,
+              color: 'bg-purple-600',
+            },
+          ].map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="card p-5 hover:shadow-md transition-shadow group"
             >
-              {item.label === 'Messages' ? (
-                <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
-              ) : (
-                <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
-              )}
-            </div>
-            <h3 className="font-semibold text-gray-900 text-sm">{item.label}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
-          </Link>
-        ))}
+              <div
+                className={cn(
+                  'w-10 h-10 rounded-lg mb-3 flex items-center justify-center',
+                  item.color
+                )}
+              >
+                {item.label === 'Messages' ? (
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+                ) : (
+                  <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
+                )}
+              </div>
+              <h3 className="font-semibold text-gray-900 text-sm">{item.label}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
