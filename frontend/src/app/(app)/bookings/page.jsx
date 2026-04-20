@@ -8,9 +8,20 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
-import { formatBookingStatus, getBookingStatusClass } from '../../../lib/booking-status';
+import { getBookingStatusClass } from '../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../lib/formatters';
-import { getRecurringLabel, isRecurringBooking } from '../../../lib/recurring-bookings';
+import {
+  getDisplayStatusLabel,
+  getBookingDisplayStatus,
+  getRecurringDisplayBookings,
+  getRecurringDisplayStatus,
+  getRecurringLabel,
+  getRecurringSeriesBookings,
+  getRecurringStatusSummary,
+  getSeriesTotalAmount,
+  isRecurringBooking,
+  matchesBookingDisplayStatus,
+} from '../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../lib/store';
 import { getPositivePageNumber } from '../../../lib/utils';
 import BackButton from '../../../components/BackButton';
@@ -63,19 +74,22 @@ function BookingsPageContent() {
   };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['bookings', currentUserId, activeStatus, page, isTutor],
+    queryKey: ['bookings', currentUserId, isTutor],
     queryFn: () =>
       isTutor
-        ? bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 })
-        : bookingApi.getMyBookings({ status: activeStatus, page, limit: 10 }),
+        ? bookingApi.getTutorBookings({ limit: 200 })
+        : bookingApi.getMyBookings({ limit: 200 }),
     enabled: !!currentUserId,
     keepPreviousData: true,
   });
 
   const bookings = data?.data?.data?.bookings || [];
   const sortedBookings = [...bookings].sort((a, b) => {
-    const statusPriority = (status) => (status === 'UNPAID' ? 0 : 1);
-    const priorityDiff = statusPriority(a?.status) - statusPriority(b?.status);
+    const statusPriority = (booking) => {
+      const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+      return displayStatus === 'UNPAID' ? 0 : 1;
+    };
+    const priorityDiff = statusPriority(a) - statusPriority(b);
     if (priorityDiff !== 0) return priorityDiff;
 
     const createdAtA = new Date(a?.createdAt || 0).getTime();
@@ -86,9 +100,12 @@ function BookingsPageContent() {
     const scheduledAtB = new Date(b?.scheduledAt || 0).getTime();
     return scheduledAtB - scheduledAtA;
   });
-  const pagination = data?.data?.data?.pagination;
-  const totalPages = pagination?.totalPages || 1;
-  const currentPage = pagination?.page || page;
+  const displayBookings = getRecurringDisplayBookings(sortedBookings).filter((booking) =>
+    matchesBookingDisplayStatus(booking, activeStatus)
+  );
+  const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
   const currentBookingsHref = (() => {
     const params = new URLSearchParams();
     if (fromParam) params.set('from', fromParam);
@@ -158,7 +175,7 @@ function BookingsPageContent() {
             </div>
           ))}
         </div>
-      ) : !isError && bookings.length === 0 ? (
+      ) : !isError && displayBookings.length === 0 ? (
         <div className="text-center py-16 bg-white border border-gray-200 rounded-xl">
           <CalendarDaysIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h3 className="font-medium text-gray-900 mb-2">No bookings found</h3>
@@ -173,7 +190,7 @@ function BookingsPageContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {sortedBookings.map((booking) => (
+          {paginatedBookings.map((booking) => (
             <BookingCard
               key={booking.id}
               booking={booking}
@@ -236,9 +253,14 @@ function BookingCard({ booking, isTutor, returnTo }) {
   const otherLastName = other?.lastName || '';
   const sessionType = booking?.sessionType ? String(booking.sessionType).replace('_', '-') : 'Session';
   const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
   const totalAmount =
-    booking?.totalAmount ??
+    (isRecurringBooking(booking)
+      ? getSeriesTotalAmount(recurringBookings)
+      : booking?.totalAmount) ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+  const recurringStatus = getRecurringStatusSummary(booking);
   const bookingDetailHref = returnTo
     ? `/bookings/${booking.id}?returnTo=${encodeURIComponent(returnTo)}`
     : `/bookings/${booking.id}`;
@@ -299,8 +321,8 @@ function BookingCard({ booking, isTutor, returnTo }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(booking?.status)}`}>
-            {formatBookingStatus(booking?.status)}
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(displayStatus)}`}>
+            {getDisplayStatusLabel(booking)}
           </span>
         </div>
       </div>

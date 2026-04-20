@@ -126,7 +126,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="relative max-w-2xl mx-auto space-y-6">
+    <div className="relative w-full space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title flex-1">My Profile</h1>
       </div>

@@ -28,7 +28,6 @@ import BackButton from '../../../../../components/BackButton';
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
-
 const addressElementOptions = {
   mode: 'billing',
   defaultValues: {
@@ -37,6 +36,7 @@ const addressElementOptions = {
     },
   },
 };
+const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const paymentElementOptions = {
   business: {
@@ -54,14 +54,14 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
   const elements = useElements();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitLabel = saveForFuture ? 'Save and Use Card' : 'Use This Card';
+  const submitLabel = saveForFuture ? 'Save Card and Pay' : 'Use Card and Pay';
 
   const successHref = useMemo(() => {
-    if (!returnTo) return `/bookings/${bookingId}?paymentMethod=saved`;
+    if (!returnTo) return `/bookings/${bookingId}?payment=success`;
 
     const [pathname, queryString = ''] = returnTo.split('?');
     const params = new URLSearchParams(queryString);
-    params.set('paymentMethod', 'saved');
+    params.set('payment', 'success');
     const query = params.toString();
 
     return query ? `${pathname}?${query}` : pathname;
@@ -107,13 +107,14 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
         bookingId,
         saveAsDefault: saveForFuture,
       });
+      await bookingApi.pay(bookingId);
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Payment method was confirmed, but we could not save it yet');
+      toast.error(error?.response?.data?.message || 'Payment could not be completed');
       setIsSubmitting(false);
       return;
     }
 
-    toast.success(saveForFuture ? 'Payment method saved' : 'Card selected for this booking');
+    toast.success('Payment successful');
     onSaved?.();
     router.push(successHref);
   };
@@ -182,19 +183,48 @@ export default function BookingPaymentPage() {
   const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
   const canUpdatePaymentMethod =
     user?.role === 'LEARNER' &&
-    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
-    ['PENDING', 'FAILED'].includes(paymentStatus);
+    (
+      recurring
+        ? paymentSetupSeriesBookings.length > 0
+        : ['PENDING', 'ACCEPTED'].includes(booking?.status) && ['PENDING', 'FAILED'].includes(paymentStatus)
+    );
 
   const useSavedMethodMutation = useMutation({
-    mutationFn: () => paymentApi.useSavedMethodForBooking(id),
-    onSuccess: async () => {
-      toast.success('Saved payment method selected for this booking');
+    mutationFn: async () => {
+      await paymentApi.useSavedMethodForBooking(id);
+      return bookingApi.pay(id);
+    },
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Payment successful');
       await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      router.push(returnTo || `/bookings/${id}?paymentMethod=saved`);
+      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      router.push(returnTo || `/bookings/${id}?payment=success`);
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not use saved payment method');
+      toast.error(err?.response?.data?.message || 'Could not complete payment');
+    },
+  });
+
+  const localTestPaymentMutation = useMutation({
+    mutationFn: async () => {
+      await paymentApi.completeSetupIntent({
+        setupIntentId: `local_setup_${currentUserId || id}`,
+        bookingId: id,
+        saveAsDefault: true,
+      });
+      return bookingApi.pay(id);
+    },
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Payment successful');
+      await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+      await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
+      router.push(returnTo || `/bookings/${id}?payment=success`);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Could not complete payment');
     },
   });
 
@@ -210,6 +240,7 @@ export default function BookingPaymentPage() {
   });
 
   useEffect(() => {
+    if (!stripeEnabled) return;
     if (!canUpdatePaymentMethod || setupMode !== 'new') return;
     if (setupIntentData?.clientSecret) return;
     if (setupIntentMutation.isPending) return;
@@ -277,6 +308,8 @@ export default function BookingPaymentPage() {
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
   const seriesTotalAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
+  const fullSeriesAmount = getSeriesTotalAmount(recurringBookings);
+  const amountToPayNow = recurring ? seriesTotalAmount || fullSeriesAmount || totalAmount : totalAmount;
 
   const elementsOptions = setupIntentData?.clientSecret
     ? {
@@ -289,12 +322,12 @@ export default function BookingPaymentPage() {
     : null;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment</p>
           <h1 className="text-2xl font-bold text-gray-900">
-            {recurring ? 'Set Up Series Payment' : 'Set Up Payment'}
+            {recurring ? 'Pay Series' : 'Pay Booking'}
           </h1>
         </div>
         {showBackButton && <BackButton href={returnTo} />}
@@ -345,12 +378,17 @@ export default function BookingPaymentPage() {
                   Sessions in this series
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  Setting up a card here lets the tutor charge this recurring series when sessions are accepted.
+                  Paying here charges the whole recurring booking together. Later changes can still be refunded per session.
                 </p>
               </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-                {recurringBookings.length} total
-              </span>
+              <div className="text-right">
+                <p className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
+                  {recurringBookings.length} sessions
+                </p>
+                <p className="mt-2 text-lg font-bold text-sky-900">
+                  {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
+                </p>
+              </div>
             </div>
             <div className="mt-4 space-y-2">
               {recurringBookings.map((seriesBooking) => {
@@ -364,14 +402,9 @@ export default function BookingPaymentPage() {
                       <p className="font-medium text-gray-900">{formatDate(seriesBooking.scheduledAt)}</p>
                       <p className="text-xs text-gray-500">{formatDuration(seriesBooking.duration)}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">
-                        {formatCurrency(seriesBooking.totalAmount, seriesBooking.currency || booking.currency || 'AUD')}
-                      </p>
-                      <p className={`text-xs ${needsSetup ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        {needsSetup ? 'Included in series setup' : 'Already covered'}
-                      </p>
-                    </div>
+                    <p className={`text-xs font-medium ${needsSetup ? 'text-sky-700' : 'text-emerald-700'}`}>
+                      {needsSetup ? 'Included in total' : 'Already paid'}
+                    </p>
                   </div>
                 );
               })}
@@ -382,20 +415,20 @@ export default function BookingPaymentPage() {
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Charge Later</p>
+              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Pay Now</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(recurring ? seriesTotalAmount || totalAmount : totalAmount, booking.currency || 'AUD')}
+                {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
               </p>
               {recurring && (
                 <p className="mt-1 text-sm text-blue-700">
-                  {paymentSetupSeriesBookings.length} session{paymentSetupSeriesBookings.length === 1 ? '' : 's'} currently need payment setup
+                  {paymentSetupSeriesBookings.length} session{paymentSetupSeriesBookings.length === 1 ? '' : 's'} included
                 </p>
               )}
             </div>
             <CreditCardIcon className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-sm text-blue-700 mt-3">
-            No money is charged when you save a payment method. We will only charge after the tutor accepts {recurring ? 'the selected sessions' : 'this booking'}.
+            Payment will be processed now. If a session is later cancelled, the refund will be applied to that session.
           </p>
         </div>
 
@@ -431,17 +464,13 @@ export default function BookingPaymentPage() {
           </div>
         )}
 
-        {!stripePromise && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
-            Stripe publishable key is missing. Please check your environment variables.
-          </div>
-        )}
-
         {canUpdatePaymentMethod ? (
           savedMethod && setupMode === 'saved' ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-sm text-emerald-800 mb-3">
-                This booking will use your saved {formatSavedMethod(savedMethod)} after the tutor accepts it.
+                {recurring
+                  ? `We will charge your saved ${formatSavedMethod(savedMethod)} for this recurring booking now.`
+                  : `We will charge your saved ${formatSavedMethod(savedMethod)} for this booking now.`}
               </p>
               <div className="flex justify-end">
                 <button
@@ -451,7 +480,28 @@ export default function BookingPaymentPage() {
                   className="btn-primary gap-2"
                 >
                   <CheckCircleIcon className="w-4 h-4" />
-                  {useSavedMethodMutation.isPending ? 'Confirming...' : 'Confirm Saved Method'}
+                  {useSavedMethodMutation.isPending ? 'Paying...' : recurring ? 'Pay Series Now' : 'Pay Now'}
+                </button>
+              </div>
+            </div>
+          ) : !stripeEnabled ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm text-blue-800 mb-3">
+                {recurring
+                  ? 'Pay this booking now.'
+                  : 'Pay this booking now.'}
+              </p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => localTestPaymentMutation.mutate()}
+                  disabled={localTestPaymentMutation.isPending}
+                  className="btn-primary gap-2"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {localTestPaymentMutation.isPending
+                    ? 'Paying...'
+                    : 'Pay Now'}
                 </button>
               </div>
             </div>
@@ -472,7 +522,7 @@ export default function BookingPaymentPage() {
                   <span>
                     <span className="font-medium text-gray-900">Save this card for future use?</span>
                     <span className="block text-xs text-gray-500 mt-1">
-                      If you leave this unticked, we will only use the new card for this booking.
+                      If you leave this unticked, we will only use the new card for this payment flow.
                     </span>
                   </span>
                 </label>

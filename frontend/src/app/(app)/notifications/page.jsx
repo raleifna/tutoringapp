@@ -4,7 +4,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   BellIcon, 
   CalendarDaysIcon, 
@@ -62,8 +62,22 @@ const getNotificationTypeColor = (type) => {
   }
 };
 
+const appendNotificationContext = (href) => {
+  if (!href) return href;
+
+  const separator = href.includes('?') ? '&' : '?';
+  const hasFrom = href.includes('from=');
+  const hasReturnTo = href.includes('returnTo=');
+
+  let nextHref = href;
+  if (!hasFrom) nextHref += `${separator}from=notifications`;
+  if (!hasReturnTo) nextHref += `${nextHref.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent('/notifications')}`;
+  return nextHref;
+};
+
 function NotificationsPageContent() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
   const fromParam = (searchParams.get('from') || '').toLowerCase();
@@ -110,7 +124,7 @@ function NotificationsPageContent() {
   const handleMarkAsRead = async (notificationId) => {
     try {
       await notificationApi.markAsRead(notificationId);
-      refetch();
+      await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
       toast.success('Notification marked as read');
     } catch (error) {
       toast.error('Failed to mark notification as read');
@@ -120,7 +134,7 @@ function NotificationsPageContent() {
   const handleMarkAllAsRead = async () => {
     try {
       await notificationApi.markAsRead('all');
-      refetch();
+      await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
       toast.success('All notifications marked as read');
     } catch (error) {
       toast.error('Failed to mark all notifications as read');
@@ -129,7 +143,7 @@ function NotificationsPageContent() {
 
   const handleNotificationClick = (notification) => {
     if (notification.link) {
-      router.push(notification.link);
+      router.push(appendNotificationContext(notification.link));
     }
   };
 

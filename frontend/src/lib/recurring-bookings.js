@@ -8,6 +8,111 @@ export const getRecurringSeriesBookings = (booking) =>
     (left, right) => new Date(left.scheduledAt) - new Date(right.scheduledAt)
   );
 
+const normalizeStatus = (status) => String(status || 'PENDING').toUpperCase();
+const normalizePaymentStatus = (status) => String(status || 'PENDING').toUpperCase();
+
+export const isAwaitingPayment = (booking) => {
+  const bookingStatus = normalizeStatus(booking?.status);
+  const paymentStatus = normalizePaymentStatus(booking?.payment?.status);
+
+  if (['CANCELLED', 'DECLINED', 'COMPLETED', 'RESCHEDULED'].includes(bookingStatus)) {
+    return false;
+  }
+
+  return ['PENDING', 'FAILED', 'PROCESSING'].includes(paymentStatus);
+};
+
+export const getBookingDisplayStatus = (booking) => {
+  const bookingStatus = normalizeStatus(booking?.status);
+
+  if (isAwaitingPayment(booking)) {
+    return 'UNPAID';
+  }
+
+  return bookingStatus;
+};
+
+export const getRecurringStatusSummary = (booking) => {
+  const seriesBookings = getRecurringSeriesBookings(booking);
+  const bookings = seriesBookings.length ? seriesBookings : booking ? [booking] : [];
+  const counts = bookings.reduce((accumulator, entry) => {
+    const status = normalizeStatus(entry?.status);
+    accumulator[status] = (accumulator[status] || 0) + 1;
+    return accumulator;
+  }, {});
+  const totalSessions = bookings.length;
+  const unpaidCount = bookings.filter(isAwaitingPayment).length;
+  const acceptedCount = (counts.ACCEPTED || 0) + (counts.COMPLETED || 0);
+  const declinedCount = counts.DECLINED || 0;
+  const cancelledCount = counts.CANCELLED || 0;
+  const pendingCount = bookings.filter((entry) => {
+    const status = normalizeStatus(entry?.status);
+    return status === 'PENDING' && !isAwaitingPayment(entry);
+  }).length;
+
+  let status = getBookingDisplayStatus(booking);
+  if (totalSessions > 0) {
+    if ((counts.COMPLETED || 0) === totalSessions) {
+      status = 'COMPLETED';
+    } else if ((counts.CANCELLED || 0) === totalSessions) {
+      status = 'CANCELLED';
+    } else if ((counts.DECLINED || 0) === totalSessions) {
+      status = 'DECLINED';
+    } else if (acceptedCount > 0) {
+      status = 'ACCEPTED';
+    } else if (unpaidCount > 0) {
+      status = 'UNPAID';
+    } else if (pendingCount > 0) {
+      status = 'PENDING';
+    } else if (declinedCount > 0) {
+      status = counts.DECLINED ? 'DECLINED' : 'CANCELLED';
+    }
+  }
+
+  return {
+    status,
+    counts,
+    totalSessions,
+    acceptedCount,
+    declinedCount,
+    cancelledCount,
+    unpaidCount,
+    pendingCount,
+    isPartiallyAccepted: status === 'ACCEPTED' && acceptedCount > 0 && acceptedCount < totalSessions,
+  };
+};
+
+export const getRecurringDisplayStatus = (booking) => getRecurringStatusSummary(booking).status;
+
+export const getDisplayStatusLabel = (booking) => {
+  if (isRecurringBooking(booking) && getRecurringStatusSummary(booking).isPartiallyAccepted) {
+    return 'Partially accepted';
+  }
+
+  const status = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+  if (status === 'UNPAID') return 'Unpaid';
+  if (status === 'PENDING') return 'Pending';
+  if (status === 'ACCEPTED') return 'Accepted';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === 'DECLINED') return 'Declined';
+  if (status === 'RESCHEDULED') return 'Rescheduled';
+  return status || 'Unknown';
+};
+
+export const getRecurringDisplayBookings = (bookings) => {
+  const seenRecurringGroups = new Set();
+
+  return bookings.filter((booking) => {
+    const groupId = booking?.recurringGroupId || booking?.recurringSeries?.recurringGroupId;
+    if (!groupId) return true;
+    if (seenRecurringGroups.has(groupId)) return false;
+
+    seenRecurringGroups.add(groupId);
+    return true;
+  });
+};
+
 export const getRecurringSessionCount = (booking) => {
   if (!isRecurringBooking(booking)) return 1;
   return getRecurringSeries(booking)?.totalSessions || getRecurringSeriesBookings(booking).length || 1;
@@ -26,6 +131,18 @@ export const getRecurringLabel = (booking) => {
   const count = getRecurringSessionCount(booking);
   const type = formatRecurringType(booking?.recurringType || getRecurringSeries(booking)?.recurringType);
   return count > 1 ? `${type} · ${count} sessions` : type;
+};
+
+export const matchesBookingDisplayStatus = (booking, status) => {
+  if (!status) return true;
+  const targetStatus = normalizeStatus(status);
+  const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+
+  if (targetStatus === 'CANCELLED') {
+    return displayStatus === 'CANCELLED' || displayStatus === 'DECLINED';
+  }
+
+  return displayStatus === targetStatus;
 };
 
 export const isPaidBooking = (booking) =>

@@ -156,7 +156,7 @@ export default function AppLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 px-4 py-2">
+        <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-2 sm:px-6 xl:px-8">
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
           </div>
@@ -199,11 +199,11 @@ export default function AppLayout({ children }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-4 pb-24 md:pb-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-4 pb-24 sm:px-6 md:pb-8 xl:px-8">{children}</main>
 
       {navItems.length > 0 && (
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white md:hidden">
-          <div className="mx-auto flex h-16 max-w-5xl items-center justify-around px-2">
+          <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-around px-2 sm:px-4">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               const Icon = isActive ? item.activeIcon : item.icon;

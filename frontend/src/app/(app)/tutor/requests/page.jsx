@@ -14,8 +14,17 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
+import { getBookingStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
-import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring-bookings';
+import {
+  getDisplayStatusLabel,
+  getRecurringDisplayBookings,
+  getRecurringDisplayStatus,
+  getRecurringLabel,
+  getRecurringStatusSummary,
+  isRecurringBooking,
+  matchesBookingDisplayStatus,
+} from '../../../../lib/recurring-bookings';
 import { cn, getPositivePageNumber } from '../../../../lib/utils';
 
 const STATUS_TABS = [
@@ -66,12 +75,17 @@ function TutorRequestsContent() {
   }, [pageParam, statusParam]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['tutor-requests', activeStatus, page],
-    queryFn: () => bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 }),
+    queryKey: ['tutor-requests'],
+    queryFn: () => bookingApi.getTutorBookings({ limit: 200 }),
   });
 
   const bookings = data?.data?.data?.bookings || [];
-  const pagination = data?.data?.data?.pagination;
+  const displayBookings = getRecurringDisplayBookings(bookings).filter((booking) =>
+    matchesBookingDisplayStatus(booking, activeStatus)
+  );
+  const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
 
   const acceptMutation = useMutation({
     mutationFn: (id) => bookingApi.accept(id),
@@ -152,7 +166,7 @@ function TutorRequestsContent() {
             </div>
           ))}
         </div>
-      ) : bookings.length === 0 ? (
+      ) : displayBookings.length === 0 ? (
         <div className="text-center py-16 bg-white border border-gray-200 rounded-xl">
           <CalendarDaysIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h3 className="font-medium text-gray-900 mb-2">
@@ -162,9 +176,12 @@ function TutorRequestsContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => {
+          {paginatedBookings.map((booking) => {
             const learner = booking.learner;
             const detailHref = `/bookings/${booking.id}?returnTo=${encodeURIComponent(currentRequestsHref)}&from=tutor-requests`;
+            const recurring = isRecurringBooking(booking);
+            const displayStatus = recurring ? getRecurringDisplayStatus(booking) : booking.status;
+            const recurringStatus = getRecurringStatusSummary(booking);
             return (
               <div
                 key={booking.id}
@@ -203,14 +220,10 @@ function TutorRequestsContent() {
                       <span
                         className={cn(
                           'badge text-xs flex-shrink-0',
-                          booking.status === 'PENDING' && 'bg-yellow-50 text-yellow-700',
-                          booking.status === 'ACCEPTED' && 'bg-green-50 text-green-700',
-                          booking.status === 'COMPLETED' && 'bg-gray-100 text-gray-600',
-                          (booking.status === 'CANCELLED' || booking.status === 'DECLINED') &&
-                            'bg-red-50 text-red-700'
+                          getBookingStatusClass(displayStatus)
                         )}
                       >
-                        {booking.status}
+                        {getDisplayStatusLabel(booking)}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
@@ -227,6 +240,12 @@ function TutorRequestsContent() {
                       </span>
                       <span>{booking.sessionType?.replace('_', '-')}</span>
                     </div>
+                    {(recurringStatus.isPartiallyAccepted || recurringStatus.cancelledCount > 0 || recurringStatus.declinedCount > 0) && (
+                      <p className="mt-2 text-xs font-medium text-emerald-700">
+                        {recurringStatus.isPartiallyAccepted ? 'Partially accepted · ' : ''}
+                        {recurringStatus.acceptedCount} accepted · {recurringStatus.pendingCount} pending · {recurringStatus.declinedCount} declined · {recurringStatus.cancelledCount} cancelled
+                      </p>
+                    )}
                     {booking.notes && (
                       <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded px-2 py-1.5 italic">
                         &quot;{booking.notes}&quot;
@@ -236,7 +255,7 @@ function TutorRequestsContent() {
                 </div>
 
                 <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-                  {booking.status === 'PENDING' && (
+                  {!recurring && booking.status === 'PENDING' && (
                     <>
                       <button
                         type="button"
@@ -248,7 +267,7 @@ function TutorRequestsContent() {
                         className="btn-primary btn-sm gap-1.5 flex-1"
                       >
                         <CheckCircleIcon className="w-4 h-4" />
-                        {isRecurringBooking(booking) ? 'Accept Series' : 'Accept'}
+                        Accept
                       </button>
                       <button
                         type="button"
@@ -260,11 +279,11 @@ function TutorRequestsContent() {
                         className="btn-danger btn-sm gap-1.5 flex-1"
                       >
                         <XCircleIcon className="w-4 h-4" />
-                        {isRecurringBooking(booking) ? 'Decline Series' : 'Decline'}
+                        Decline
                       </button>
                     </>
                   )}
-                  {booking.status === 'ACCEPTED' && (
+                  {!recurring && booking.status === 'ACCEPTED' && (
                     <button
                       type="button"
                       onClick={(event) => {
@@ -282,7 +301,7 @@ function TutorRequestsContent() {
                     onClick={(event) => event.stopPropagation()}
                     className="btn-secondary btn-sm ml-auto"
                   >
-                    View Details
+                    {recurring ? 'Review Series' : 'View Details'}
                   </Link>
                 </div>
               </div>
@@ -291,23 +310,23 @@ function TutorRequestsContent() {
         </div>
       )}
 
-      {pagination && pagination.totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => setPage((p) => p - 1)}
-            disabled={page <= 1}
+            disabled={currentPage <= 1}
             className="btn-secondary btn-sm disabled:opacity-40"
           >
             ← Previous
           </button>
           <span className="text-sm text-gray-600">
-            Page {page} of {pagination.totalPages}
+            Page {currentPage} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            disabled={page >= pagination.totalPages}
+            disabled={currentPage >= totalPages}
             className="btn-secondary btn-sm disabled:opacity-40"
           >
             Next →

@@ -76,6 +76,7 @@ export default function BookingCalendar({ bookings = [], isTutor = false, return
   // keep only bookings that fall in this week
   const thisWeekBookings = bookings.filter((b) => {
     if (!b.scheduledAt) return false;
+    if (['CANCELLED', 'DECLINED'].includes(String(b.status || '').toUpperCase())) return false;
     const d = new Date(b.scheduledAt);
     return d >= weekStart && d < weekEnd;
   });

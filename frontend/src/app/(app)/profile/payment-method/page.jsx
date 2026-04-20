@@ -16,6 +16,7 @@ import { useAuthStore } from '../../../../lib/store';
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const addressElementOptions = {
   mode: 'billing',
@@ -150,7 +151,24 @@ export default function ProfilePaymentMethodPage() {
     },
   });
 
+  const localSaveMethodMutation = useMutation({
+    mutationFn: () =>
+      paymentApi.completeSetupIntent({
+        setupIntentId: `local_setup_${currentUserId}`,
+        saveAsDefault: true,
+      }),
+    onSuccess: async () => {
+      toast.success('Local test payment method saved');
+      await fetchMe();
+      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Could not save payment method');
+    },
+  });
+
   useEffect(() => {
+    if (!stripeEnabled) return;
     if (!currentUserId) return;
     if (setupIntentData?.clientSecret) return;
     if (setupIntentMutation.isPending) return;
@@ -199,7 +217,7 @@ export default function ProfilePaymentMethodPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
@@ -311,13 +329,24 @@ export default function ProfilePaymentMethodPage() {
           </div>
         )}
 
-        {!stripePromise && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
-            Stripe publishable key is missing. Please check your environment variables.
+        {!stripeEnabled ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm text-blue-800 mb-3">
+              Save a local test card once, and the booking flow can reuse it for series payments and refunds.
+            </p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => localSaveMethodMutation.mutate()}
+                disabled={localSaveMethodMutation.isPending}
+                className="btn-primary gap-2"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+                {localSaveMethodMutation.isPending ? 'Saving...' : 'Save Local Test Card'}
+              </button>
+            </div>
           </div>
-        )}
-
-        {setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
+        ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
             Preparing Stripe payment form...
           </div>

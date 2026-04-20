@@ -270,7 +270,7 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       <div className="mb-4 flex flex-wrap items-start gap-3 md:mb-6">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold text-gray-900 md:text-2xl">Messages</h1>

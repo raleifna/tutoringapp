@@ -17,6 +17,11 @@ import {
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import {
+  getRecurringDisplayBookings,
+  getRecurringLabel,
+  isRecurringBooking,
+} from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
 import BookingCalendar from '../../../../components/BookingCalendar';
 import { cn } from '../../../../lib/utils';
@@ -51,7 +56,7 @@ export default function TutorDashboardPage() {
 
   const { data: requestsData, isLoading: requestsLoading } = useQuery({
     queryKey: ['tutor-requests', currentUserId, 'PENDING'],
-    queryFn: () => bookingApi.getTutorBookings({ status: 'PENDING', limit: 5 }),
+    queryFn: () => bookingApi.getTutorBookings({ status: 'PENDING', limit: 200 }),
     enabled: mounted && !!currentUserId,
   });
 
@@ -74,7 +79,9 @@ export default function TutorDashboardPage() {
     retry: false,
   });
 
-  const requests = requestsData?.data?.data?.bookings || [];
+  const pendingRequestBookings = requestsData?.data?.data?.bookings || [];
+  const requests = getRecurringDisplayBookings(pendingRequestBookings);
+  const pendingRequestPreview = requests.slice(0, 5);
   const upcomingBookings = upcomingData?.data?.data?.bookings || [];
   const allBookings = allBookingsData?.data?.data?.bookings || [];
   const myProfile = myProfileData?.data?.data || null;
@@ -96,7 +103,7 @@ export default function TutorDashboardPage() {
   const stats = [
     {
       label: 'Pending Requests',
-      value: requestsData?.data?.data?.pagination?.total || 0,
+      value: requests.length,
       icon: ClockIcon,
       color: 'text-yellow-600 bg-yellow-50',
       href: '/tutor/requests?status=PENDING',
@@ -220,8 +227,9 @@ export default function TutorDashboardPage() {
           <p className="text-gray-400 text-sm py-4 text-center">No pending requests</p>
         ) : (
           <div className="space-y-2">
-            {requests.map((booking) => {
+            {pendingRequestPreview.map((booking) => {
               const learner = booking.learner;
+              const recurring = isRecurringBooking(booking);
               return (
                 <Link
                   key={booking.id}
@@ -240,9 +248,16 @@ export default function TutorDashboardPage() {
                     <p className="font-medium text-sm text-gray-900">
                       {learner?.firstName} {learner?.lastName}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {booking.subject} · {formatDate(booking.scheduledAt)}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-gray-500">
+                        {booking.subject} · {formatDate(booking.scheduledAt)}
+                      </p>
+                      {recurring && (
+                        <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                          {getRecurringLabel(booking)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="mt-0.5 shrink-0 rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700">
                     Pending

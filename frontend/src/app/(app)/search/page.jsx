@@ -224,7 +224,7 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-0 py-2 sm:px-2 sm:py-4">
+    <div className="w-full px-0 py-2 sm:py-4">
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="flex flex-wrap items-start gap-2">
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />

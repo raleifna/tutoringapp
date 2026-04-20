@@ -17,9 +17,17 @@ import { useAuthStore } from '../../../lib/store';
 import { bookingApi } from '../../../lib/api-entry';
 import BookingCalendar from '../../../components/BookingCalendar';
 import { getAvatarUrl } from '../../../lib/avatar';
-import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
+import { getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
 import { formatShortDateTime as formatDate } from '../../../lib/formatters';
-import { getRecurringLabel, isRecurringBooking } from '../../../lib/recurring-bookings';
+import {
+  getDisplayStatusLabel,
+  getBookingDisplayStatus,
+  getRecurringDisplayBookings,
+  getRecurringDisplayStatus,
+  getRecurringLabel,
+  getRecurringStatusSummary,
+  isRecurringBooking,
+} from '../../../lib/recurring-bookings';
 
 const getTutorDetailHref = (booking, returnTo = '/dashboard') => {
   const tutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
@@ -123,11 +131,14 @@ export default function DashboardPage() {
   const calendarBookings = calendarData?.data?.data?.bookings || [];
 
   const bookings = bookingsData?.data?.data?.bookings || [];
+  const displayBookings = getRecurringDisplayBookings(bookings);
   const totalBookings = bookingsData?.data?.data?.pagination?.total || 0;
-  const completedCount = bookings.filter((item) => item.status === 'COMPLETED').length;
-  const unpaidCount = bookings.filter((item) => item.status === 'UNPAID').length;
-  const pendingCount = bookings.filter((item) => item.status === 'PENDING').length;
-  const upcomingCount = bookings.filter((item) => item.status === 'ACCEPTED').length;
+  const getDisplayStatus = (booking) =>
+    isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+  const completedCount = displayBookings.filter((item) => getDisplayStatus(item) === 'COMPLETED').length;
+  const unpaidCount = displayBookings.filter((item) => getDisplayStatus(item) === 'UNPAID').length;
+  const pendingCount = displayBookings.filter((item) => getDisplayStatus(item) === 'PENDING').length;
+  const upcomingCount = displayBookings.filter((item) => getDisplayStatus(item) === 'ACCEPTED').length;
 
   const summaryItems = [
     {
@@ -206,7 +217,7 @@ export default function DashboardPage() {
         <div className="divide-y divide-gray-50">
           {isLoading && !bookingsData ? (
             <div className="py-8 px-4 text-sm text-gray-500">Loading bookings...</div>
-          ) : bookings.length === 0 ? (
+          ) : displayBookings.length === 0 ? (
             <div className="py-10 text-center text-gray-500 px-4">
               <CalendarDaysIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
               <p className="text-sm font-medium text-gray-700 mb-1">No bookings yet</p>
@@ -216,8 +227,10 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            bookings.map((booking) => {
+            displayBookings.map((booking) => {
               const tutorDetailHref = getTutorDetailHref(booking, '/dashboard');
+              const displayStatus = getDisplayStatus(booking);
+              const recurringStatus = getRecurringStatusSummary(booking);
 
               return (
                 <div
@@ -272,8 +285,8 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
-                    <span className={`mt-0.5 text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(booking.status)}`}>
-                      {formatBookingStatus(booking.status)}
+                    <span className={`mt-0.5 text-[11px] px-2 py-0.5 rounded-full font-medium ${getStatusClass(displayStatus)}`}>
+                      {getDisplayStatusLabel(booking)}
                     </span>
                   </div>
                 </div>

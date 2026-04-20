@@ -244,27 +244,26 @@ export default function TutorDetailPage() {
       const recurringGroupId = bookingDates.length > 1 ? createRecurringGroupId() : undefined;
       const results = [];
 
-      return Promise.all(
-        bookingDates.map((date) =>
-          bookingApi.create({
-            tutorId: id,
-            subjectId: data.subjectId,
-            subject: selectedSubjectName,
-            sessionType: data.sessionType,
-            scheduledAt: date.toISOString(),
-            duration: Number(data.duration),
-            notes: data.notes,
-            recurringType: bookingDates.length > 1 ? 'WEEKLY' : 'ONE_OFF',
-            ...(recurringGroupId ? { recurringGroupId } : {}),
-          })
-            .then((response) => {
-              results.push({ status: 'fulfilled', date, response });
-            })
-            .catch((error) => {
-              results.push({ status: 'rejected', date, error });
-            })
-        )
-      ).then(() => {
+      return (async () => {
+        for (const date of bookingDates) {
+          try {
+            const response = await bookingApi.create({
+              tutorId: id,
+              subjectId: data.subjectId,
+              subject: selectedSubjectName,
+              sessionType: data.sessionType,
+              scheduledAt: date.toISOString(),
+              duration: Number(data.duration),
+              notes: data.notes,
+              recurringType: bookingDates.length > 1 ? 'WEEKLY' : 'ONE_OFF',
+              ...(recurringGroupId ? { recurringGroupId } : {}),
+            });
+            results.push({ status: 'fulfilled', date, response });
+          } catch (error) {
+            results.push({ status: 'rejected', date, error });
+          }
+        }
+
         const successfulResponses = results
           .filter((result) => result.status === 'fulfilled')
           .sort((left, right) => left.date - right.date)
@@ -282,7 +281,7 @@ export default function TutorDetailPage() {
           failedBookings,
           totalCount: bookingDates.length,
         };
-      });
+      })();
     },
     onSuccess: ({ successfulResponses, failedBookings, totalCount }) => {
       const successCount = successfulResponses.length;
@@ -315,6 +314,10 @@ export default function TutorDetailPage() {
       setSelectedSlots([]);
       setShowBookingForm(false);
       queryClient.invalidateQueries({ queryKey: ['tutor-availability', id] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', user?.id, false] });
+      queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      queryClient.invalidateQueries({ queryKey: ['myBookings', 'dashboard', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['myBookings', 'calendar', user?.id] });
       const bookingId = successfulResponses?.[0]?.data?.data?.id;
       if (successCount === 1 && totalCount === 1 && bookingId) {
         router.push(`/bookings/${bookingId}`);
@@ -366,7 +369,7 @@ export default function TutorDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="w-full px-4 py-6">
         <div className="bg-white border border-gray-200 rounded-2xl p-6 animate-pulse">
           <div className="flex gap-4">
             <div className="w-24 h-24 rounded-full bg-gray-200" />
@@ -409,7 +412,7 @@ export default function TutorDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-4 py-6 space-y-5">
       {showBackButton && (
         <div className="flex justify-end">
           <BackButton href={backHref} label={backLabel} />

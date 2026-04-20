@@ -399,7 +399,7 @@ export default function TutorProfilePage() {
 
   if (profileLoading || subjectsLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 animate-pulse">
+      <div className="w-full space-y-4 animate-pulse">
         <div className="h-10 bg-gray-200 rounded w-1/3" />
         <div className="card p-6 h-48" />
       </div>
@@ -408,7 +408,7 @@ export default function TutorProfilePage() {
 
   if (profileError || subjectsError || !profile) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <div className="card p-6">
           <h1 className="page-title">Tutor Profile</h1>
           <p className="text-sm text-gray-600 mt-3">
@@ -422,7 +422,7 @@ export default function TutorProfilePage() {
   }
 
   return (
-    <div className="relative max-w-3xl mx-auto space-y-5">
+    <div className="relative w-full space-y-5">
       <div>
         <div className='flex'>
           <h1 className="page-title flex-1">Tutor Profile</h1>

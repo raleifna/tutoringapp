@@ -2,6 +2,8 @@ const Stripe = require('stripe');
 
 let stripeClient = null;
 
+const isStripeConfigured = () => Boolean(process.env.STRIPE_SECRET_KEY);
+
 const getStripe = () => {
   if (stripeClient) return stripeClient;
 
@@ -17,4 +19,5 @@ const getStripe = () => {
 
 module.exports = {
   getStripe,
+  isStripeConfigured,
 };

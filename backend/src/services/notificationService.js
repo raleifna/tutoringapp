@@ -14,6 +14,36 @@ async function notify(receiverId, type, title, message, link) {
   });
 }
 
+async function notifyOrRefresh(receiverId, type, title, message, link) {
+  const existingNotification = await prisma.notification.findFirst({
+    where: {
+      userId: receiverId,
+      type,
+      title,
+      link,
+    },
+    orderBy: {
+      timestamp: 'desc',
+    },
+  });
+
+  if (existingNotification) {
+    await prisma.notification.update({
+      where: {
+        id: existingNotification.id,
+      },
+      data: {
+        message,
+        read: false,
+        timestamp: new Date(),
+      },
+    });
+    return;
+  }
+
+  await notify(receiverId, type, title, message, link);
+}
+
 async function notifyAdmin(type, title, message, link) {
   const admins = await prisma.user.findMany({
     where: { role: 'ADMIN' },
@@ -38,5 +68,6 @@ async function notifyAdmin(type, title, message, link) {
 
 module.exports = {
   notify,
+  notifyOrRefresh,
   notifyAdmin,
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { notificationApi } from '../lib/api-entry';
 import { formatTimeAgo } from '../lib/formatters';
@@ -13,12 +13,26 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 
+const appendNotificationContext = (href) => {
+  if (!href) return href;
+
+  const separator = href.includes('?') ? '&' : '?';
+  const hasFrom = href.includes('from=');
+  const hasReturnTo = href.includes('returnTo=');
+
+  let nextHref = href;
+  if (!hasFrom) nextHref += `${separator}from=notifications`;
+  if (!hasReturnTo) nextHref += `${nextHref.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent('/notifications')}`;
+  return nextHref;
+};
+
 const NotificationBox = ({ currentUserId }) => {
 
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   // ============= notifications ===============
-    const { data: notificationsData, refetch: fetchNotifications } = useQuery({
+    const { data: notificationsData } = useQuery({
       queryKey: ['notifications', currentUserId],
       queryFn: () => notificationApi.search({ 
         page: 1, 
@@ -35,11 +49,13 @@ const NotificationBox = ({ currentUserId }) => {
       setIsNotificationOpen(!isNotificationOpen);
     };
   
-    const handleMarkAsRead = async (notificationId) => {
+    const handleMarkAsRead = async (notificationId, { silent = false } = {}) => {
       try {
         await notificationApi.markAsRead(notificationId);
-        fetchNotifications();
-        toast.success('Notification marked as read');
+        await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
+        if (!silent) {
+          toast.success('Notification marked as read');
+        }
       } catch (error) {
         toast.error('Failed to mark notification as read');
       }
@@ -48,18 +64,20 @@ const NotificationBox = ({ currentUserId }) => {
     const handleMarkAllAsRead = async () => {
       try {
         await notificationApi.markAsRead('all');
-        fetchNotifications();
+        await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
         toast.success('All notifications marked as read');
       } catch (error) {
         toast.error('Failed to mark all notifications as read');
       }
     };
   
-    const handleNotificationAction = (notification) => {
+    const handleNotificationAction = async (notification) => {
       if (notification.link) {
-        router.push(notification.link);
+        if (!notification.read) {
+          await handleMarkAsRead(notification.id, { silent: true });
+        }
+        router.push(appendNotificationContext(notification.link));
         setIsNotificationOpen(false);
-        handleMarkAsRead(notification.id);
       }
     };
   

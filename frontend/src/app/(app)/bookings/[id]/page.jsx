@@ -1,7 +1,7 @@
 // src/app/(app)/bookings/[id]/page.jsx -  Booking Detail Page
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,9 +23,12 @@ import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '..
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
 import { formatSavedMethod } from '../../../../lib/payment-display';
 import {
+  getDisplayStatusLabel,
+  getRecurringDisplayStatus,
   getPayableSeriesBookings,
   getRecurringLabel,
   getRecurringSeriesBookings,
+  getRecurringStatusSummary,
   getSeriesTotalAmount,
   isRecurringBooking,
 } from '../../../../lib/recurring-bookings';
@@ -37,6 +40,34 @@ const rescheduleSchema = z.object({
   reason: z.string().optional(),
 });
 
+const isCancellableBooking = (booking, isLearner) => {
+  if (!isLearner || !booking) return false;
+  if (!['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status)) return false;
+
+  const paymentStatus = booking?.payment?.status || 'PENDING';
+  const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
+  const isAcceptedBooking = booking?.status === 'ACCEPTED';
+  const timeDelta = new Date(booking?.scheduledAt) - new Date();
+
+  return !isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24;
+};
+
+const invalidateBookingViews = async ({ queryClient, currentUserId, id, bookingTutorId }) => {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] }),
+    queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] }),
+    queryClient.invalidateQueries({ queryKey: ['myBookings'] }),
+    queryClient.invalidateQueries({ queryKey: ['myBookings', 'dashboard', currentUserId] }),
+    queryClient.invalidateQueries({ queryKey: ['myBookings', 'calendar', currentUserId] }),
+    queryClient.invalidateQueries({ queryKey: ['tutor-requests'] }),
+    queryClient.invalidateQueries({ queryKey: ['tutor-bookings'] }),
+    queryClient.invalidateQueries({ queryKey: ['tutor-bookings-all'] }),
+    queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] }),
+    bookingTutorId
+      ? queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] })
+      : Promise.resolve(),
+  ]);
+};
 export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
@@ -44,6 +75,7 @@ export default function BookingDetailPage() {
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
 
   const from = (searchParams.get('from') || '').toLowerCase();
   const returnTo = searchParams.get('returnTo') || '';
@@ -54,6 +86,7 @@ export default function BookingDetailPage() {
     'tutor-requests': { href: '/tutor/requests', label: 'Back' },
     'tutor-dashboard': { href: '/tutor/dashboard', label: 'Back' },
     dashboard: { href: '/dashboard', label: 'Back' },
+    notifications: { href: '/notifications', label: 'Back' },
     search: { href: '/search', label: 'Back' },
     bookings: { href: '/bookings', label: 'Back' },
   };
@@ -102,48 +135,56 @@ export default function BookingDetailPage() {
 
     return query ? `/tutors/${bookingTutorId}?${query}` : `/tutors/${bookingTutorId}`;
   })();
-  const scheduledAt = booking?.scheduledAt;
   const paymentStatus = booking?.payment?.status || 'PENDING';
   const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
   const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
   const isRefunded = paymentStatus === 'REFUNDED';
   const isProcessingPayment = paymentStatus === 'PROCESSING';
   const isFailedPayment = paymentStatus === 'FAILED';
-  const timeDelta = new Date(scheduledAt) - new Date();
   const isAcceptedBooking = booking?.status === 'ACCEPTED';
-  const canSetupPaymentMethod =
-    isLearner &&
-    booking?.status === 'PENDING' &&
-    ['PENDING', 'FAILED'].includes(paymentStatus);
-  const canCancel =
-    isLearner &&
-    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
-    (!isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24);
+  const recurring = isRecurringBooking(booking);
+  const canCancel = !recurring && isCancellableBooking(booking, isLearner);
 
   const cancelMutation = useMutation({
-    mutationFn: () => bookingApi.cancel(id),
-    onSuccess: (response) => {
+    mutationFn: (targetId) => bookingApi.cancel(targetId),
+    onSuccess: async (response) => {
       const refunded = response?.data?.data?.payment?.status === 'REFUNDED';
       toast.success(refunded ? 'Booking cancelled and payment refunded' : 'Booking cancelled');
-      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      if (bookingTutorId) {
-        queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] });
-      }
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');
     },
   });
 
+  const cancelSeriesMutation = useMutation({
+    mutationFn: async (targetIds) => {
+      const results = await Promise.allSettled(targetIds.map((targetId) => bookingApi.cancel(targetId)));
+      const successCount = results.filter((result) => result.status === 'fulfilled').length;
+      const failedCount = results.length - successCount;
+      return { successCount, failedCount };
+    },
+    onSuccess: async ({ successCount, failedCount }) => {
+      if (successCount > 0 && failedCount > 0) {
+        toast.success(`${successCount} sessions cancelled. ${failedCount} could not be cancelled.`);
+      } else if (successCount > 0) {
+        toast.success(`${successCount} sessions cancelled.`);
+      } else {
+        toast.error('No sessions could be cancelled.');
+      }
+
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
+    },
+    onError: () => {
+      toast.error('Failed to cancel recurring booking');
+    },
+  });
+
   const acceptMutation = useMutation({
-    mutationFn: () => bookingApi.accept(id),
-    onSuccess: (response) => {
-      toast.success(response?.data?.message || 'Booking accepted!');
-      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+    mutationFn: (targetId) => bookingApi.accept(targetId),
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Session accepted!');
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to accept');
@@ -151,27 +192,59 @@ export default function BookingDetailPage() {
   });
 
   const declineMutation = useMutation({
-    mutationFn: () => bookingApi.decline(id),
-    onSuccess: (response) => {
-      toast.success(response?.data?.message || 'Booking declined');
-      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      if (bookingTutorId) {
-        queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] });
-      }
+    mutationFn: (targetId) => bookingApi.decline(targetId),
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Session declined');
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to decline');
     },
   });
 
+  const bulkSeriesDecisionMutation = useMutation({
+    mutationFn: async ({ acceptedIds, declinedIds }) => {
+      const acceptedResults = await Promise.allSettled(
+        acceptedIds.map((targetId) => bookingApi.accept(targetId))
+      );
+      const declinedResults = await Promise.allSettled(
+        declinedIds.map((targetId) => bookingApi.decline(targetId))
+      );
+
+      return {
+        acceptedSuccessCount: acceptedResults.filter((result) => result.status === 'fulfilled').length,
+        acceptedFailureCount: acceptedResults.filter((result) => result.status === 'rejected').length,
+        declinedSuccessCount: declinedResults.filter((result) => result.status === 'fulfilled').length,
+        declinedFailureCount: declinedResults.filter((result) => result.status === 'rejected').length,
+      };
+    },
+    onSuccess: async ({ acceptedSuccessCount, acceptedFailureCount, declinedSuccessCount, declinedFailureCount }) => {
+      const handledCount = acceptedSuccessCount + declinedSuccessCount;
+      const failedCount = acceptedFailureCount + declinedFailureCount;
+
+      if (handledCount > 0 && failedCount > 0) {
+        toast.success(
+          `${acceptedSuccessCount} accepted, ${declinedSuccessCount} declined. ${failedCount} could not be updated.`
+        );
+      } else if (handledCount > 0) {
+        toast.success(`${acceptedSuccessCount} accepted, ${declinedSuccessCount} declined.`);
+      } else {
+        toast.error('No sessions were updated.');
+      }
+
+      setSelectedSeriesBookingIds([]);
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
+    },
+    onError: () => {
+      toast.error('Failed to update selected sessions');
+    },
+  });
+
   const completeMutation = useMutation({
     mutationFn: () => bookingApi.complete(id),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Session marked as complete');
-      queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to complete');
@@ -185,6 +258,44 @@ export default function BookingDetailPage() {
   } = useForm({
     resolver: zodResolver(rescheduleSchema),
   });
+
+  const totalAmount =
+    booking?.totalAmount ??
+    ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
+  const recurringStatus = getRecurringStatusSummary(booking);
+  const displayStatus = recurring ? getRecurringDisplayStatus(booking) : booking?.status;
+  const pendingRecurringBookings = recurringBookings.filter((seriesBooking) => seriesBooking.status === 'PENDING');
+  const pendingRecurringBookingIds = pendingRecurringBookings.map((seriesBooking) => seriesBooking.id);
+  const pendingRecurringBookingIdsKey = pendingRecurringBookingIds.join('|');
+  const allPendingRecurringSelected =
+    pendingRecurringBookingIds.length > 0 &&
+    pendingRecurringBookingIds.every((seriesBookingId) => selectedSeriesBookingIds.includes(seriesBookingId));
+  const cancellableRecurringBookings = recurringBookings.filter((seriesBooking) =>
+    isCancellableBooking(seriesBooking, isLearner)
+  );
+  const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
+  const paymentSetupSeriesAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
+  const fullSeriesAmount = getSeriesTotalAmount(recurringBookings);
+  const recurringDisplayAmount = paymentSetupSeriesAmount || fullSeriesAmount || totalAmount;
+  const canSetupPaymentMethod =
+    isLearner &&
+    (
+      recurring
+        ? paymentSetupSeriesBookings.length > 0
+        : booking?.status === 'PENDING' && ['PENDING', 'FAILED'].includes(paymentStatus)
+    );
+
+  useEffect(() => {
+    setSelectedSeriesBookingIds((currentSelection) => {
+      const nextSelection = currentSelection.filter((seriesBookingId) => pendingRecurringBookingIds.includes(seriesBookingId));
+      return nextSelection.length === currentSelection.length &&
+        nextSelection.every((seriesBookingId, index) => seriesBookingId === currentSelection[index])
+        ? currentSelection
+        : nextSelection;
+    });
+  }, [booking?.id, pendingRecurringBookingIdsKey]);
 
   if (!currentUserId) {
     return (
@@ -252,17 +363,9 @@ export default function BookingDetailPage() {
       </div>
     );
   }
-  const totalAmount =
-    booking?.totalAmount ??
-    ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
-  const recurring = isRecurringBooking(booking);
-  const recurringLabel = getRecurringLabel(booking);
-  const recurringBookings = getRecurringSeriesBookings(booking);
-  const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
-  const paymentSetupSeriesAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
 
   return (
-    <div className="relative max-w-2xl mx-auto space-y-5">
+    <div className="relative w-full space-y-5">
       {paymentMethodResult === 'saved' && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
           Payment method saved. We will charge it automatically once the tutor accepts this booking.
@@ -275,13 +378,11 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(booking.status)}`}>
-        {booking.status === 'UNPAID' && <ExclamationTriangleIcon className="w-5 h-5" />}
-        {booking.status === 'PENDING' && <ExclamationTriangleIcon className="w-5 h-5" />}
-        {booking.status === 'ACCEPTED' && <CheckCircleIcon className="w-5 h-5" />}
-        {booking.status === 'COMPLETED' && <CheckCircleIcon className="w-5 h-5" />}
-        {booking.status === 'CANCELLED' && <XCircleIcon className="w-5 h-5" />}
-        Booking Status: <strong className="flex-1">{formatBookingStatus(booking.status)}</strong>
+      <div className={`rounded-lg px-4 py-3 flex items-center gap-2 text-sm font-medium ${getStatusClass(displayStatus)}`}>
+        {(displayStatus === 'UNPAID' || displayStatus === 'PENDING') && <ExclamationTriangleIcon className="w-5 h-5" />}
+        {(displayStatus === 'ACCEPTED' || displayStatus === 'COMPLETED') && <CheckCircleIcon className="w-5 h-5" />}
+        {(displayStatus === 'CANCELLED' || displayStatus === 'DECLINED') && <XCircleIcon className="w-5 h-5" />}
+        Booking Status: <strong className="flex-1">{getDisplayStatusLabel(booking)}</strong>
         {showBackButton && (
           <BackButton href={backHref} label={backLabel} />
         )}
@@ -359,7 +460,7 @@ export default function BookingDetailPage() {
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Total Amount</p>
             <p className="font-bold text-gray-900 text-base">
-              {formatCurrency(totalAmount, booking.currency || 'AUD')}
+              {formatCurrency(recurring ? recurringDisplayAmount : totalAmount, booking.currency || 'AUD')}
             </p>
           </div>
         </div>
@@ -375,17 +476,60 @@ export default function BookingDetailPage() {
                   </p>
                   <h3 className="mt-1 font-semibold text-gray-900">{recurringLabel}</h3>
                   <p className="mt-1 text-sm text-gray-600">
-                    Tutor accept/decline actions apply to all pending sessions in this series.
+                    Tutors can review each session in this series separately.
                     Learner cancellation still applies to this session only.
                   </p>
+                  <p className="mt-2 text-sm font-medium text-sky-800">
+                    {recurringStatus.acceptedCount} accepted · {recurringStatus.pendingCount} pending · {recurringStatus.declinedCount} declined · {recurringStatus.cancelledCount} cancelled
+                  </p>
                 </div>
-                {paymentSetupSeriesBookings.length > 0 && isLearner && (
-                  <Link
-                    href={`/bookings/${id}/payment?returnTo=${encodeURIComponent(bookingDetailHref)}`}
-                    className="btn-secondary btn-sm shrink-0"
-                  >
-                    Set Up Series Payment
-                  </Link>
+                {isTutor && pendingRecurringBookingIds.length > 0 && (
+                  <div className="min-w-[280px] flex-1">
+                    <p className="text-xs text-sky-700">
+                      Tick the sessions you want to accept. Any pending session left unticked will be declined.
+                    </p>
+                    <div className="ml-auto mt-2 flex w-fit items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSeriesBookingIds(
+                            allPendingRecurringSelected ? [] : pendingRecurringBookingIds
+                          );
+                        }}
+                        disabled={bulkSeriesDecisionMutation.isPending}
+                        className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {allPendingRecurringSelected ? 'Clear selection' : 'Select all'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const declinedIds = pendingRecurringBookingIds.filter(
+                            (seriesBookingId) => !selectedSeriesBookingIds.includes(seriesBookingId)
+                          );
+                          if (
+                            !window.confirm(
+                              `Accept ${selectedSeriesBookingIds.length} selected session(s) and decline ${declinedIds.length} unselected session(s)?`
+                            )
+                          ) {
+                            return;
+                          }
+
+                          bulkSeriesDecisionMutation.mutate({
+                            acceptedIds: selectedSeriesBookingIds,
+                            declinedIds,
+                          });
+                        }}
+                        disabled={bulkSeriesDecisionMutation.isPending}
+                        className="btn-primary btn-sm gap-1.5"
+                      >
+                        <CheckCircleIcon className="w-4 h-4" />
+                        {bulkSeriesDecisionMutation.isPending
+                          ? 'Updating...'
+                          : `Accept selected (${selectedSeriesBookingIds.length})`}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -393,33 +537,81 @@ export default function BookingDetailPage() {
                 <div className="mt-4 space-y-2">
                   {recurringBookings.map((seriesBooking) => {
                     const isCurrent = seriesBooking.id === booking.id;
+                    const isPendingSeriesBooking = seriesBooking.status === 'PENDING';
+                    const canCancelSeriesBooking = isCancellableBooking(seriesBooking, isLearner);
+                    const isCancellingThis = cancelMutation.isPending && cancelMutation.variables === seriesBooking.id;
                     return (
-                      <Link
+                      <div
                         key={seriesBooking.id}
-                        href={`/bookings/${seriesBooking.id}?returnTo=${encodeURIComponent(backHref)}&from=${from || 'bookings'}`}
                         className={`block rounded-xl border px-3 py-2 text-sm transition-colors ${
                           isCurrent
                             ? 'border-sky-200 bg-white'
                             : 'border-white/70 bg-white/70 hover:border-sky-200 hover:bg-white'
                         }`}
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-medium text-gray-900">
-                            {formatDate(seriesBooking.scheduledAt)}
-                            {isCurrent ? ' · current' : ''}
-                          </span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusClass(seriesBooking.status)}`}>
-                            {formatBookingStatus(seriesBooking.status)}
-                          </span>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex min-w-0 flex-1 items-start gap-3 rounded-lg">
+                            {isTutor && isPendingSeriesBooking && (
+                              <label className="mt-0.5 inline-flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSeriesBookingIds.includes(seriesBooking.id)}
+                                  onChange={(event) => {
+                                    setSelectedSeriesBookingIds((currentSelection) =>
+                                      event.target.checked
+                                        ? [...currentSelection, seriesBooking.id]
+                                        : currentSelection.filter((seriesBookingId) => seriesBookingId !== seriesBooking.id)
+                                    );
+                                  }}
+                                  disabled={bulkSeriesDecisionMutation.isPending}
+                                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                              </label>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium text-gray-900">
+                                {formatDate(seriesBooking.scheduledAt)}
+                                {isCurrent ? ' · current' : ''}
+                              </span>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusClass(seriesBooking.status)}`}>
+                                {formatBookingStatus(seriesBooking.status)}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                              <span>{formatDuration(seriesBooking.duration)}</span>
+                              <span>
+                                {paymentSetupSeriesBookings.some((item) => item.id === seriesBooking.id)
+                                  ? 'Included in series total'
+                                  : 'Already paid'}
+                              </span>
+                              <span>
+                                Payment: {seriesBooking.payment?.status || 'PENDING'}
+                              </span>
+                            </div>
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            {isLearner && canCancelSeriesBooking && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm('Cancel this session?')) {
+                                    cancelMutation.mutate(seriesBooking.id);
+                                  }
+                                }}
+                                disabled={isCancellingThis || cancelSeriesMutation.isPending || bulkSeriesDecisionMutation.isPending}
+                                className="btn-danger btn-sm gap-1.5"
+                              >
+                                <XCircleIcon className="w-4 h-4" />
+                                {isCancellingThis ? 'Cancelling...' : 'Cancel'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                          <span>{formatDuration(seriesBooking.duration)}</span>
-                          <span>{formatCurrency(seriesBooking.totalAmount, seriesBooking.currency || booking.currency || 'AUD')}</span>
-                          <span>
-                            Payment: {seriesBooking.payment?.status || 'PENDING'}
-                          </span>
-                        </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -449,7 +641,7 @@ export default function BookingDetailPage() {
                 </p>
                 <div className="flex items-end gap-3">
                   <h3 className="text-3xl font-bold tracking-tight text-gray-900">
-                    {formatCurrency(totalAmount, booking.currency || 'AUD')}
+                    {formatCurrency(recurring ? recurringDisplayAmount : totalAmount, booking.currency || 'AUD')}
                   </h3>
                 </div>
                 {savedMethod && !isFailedPayment && (
@@ -460,19 +652,19 @@ export default function BookingDetailPage() {
                 <p className="max-w-xl text-sm leading-6 text-gray-600">
                   {isFailedPayment
                     ? recurring
-                      ? 'One or more session payments failed after tutor approval. Please update your payment method for this recurring series.'
-                      : 'Payment could not be completed after tutor approval. Please update your payment method to try again.'
+                      ? 'One or more session payments in this recurring booking failed. Please update your payment method and try again.'
+                      : 'Payment could not be completed. Please update your payment method to try again.'
                     : savedMethod
                       ? recurring
-                        ? `We will use ${formatSavedMethod(savedMethod)} for this series when the tutor accepts the sessions.`
-                        : `We will charge your saved ${formatSavedMethod(savedMethod)} automatically if the tutor accepts this booking.`
+                        ? `We can charge ${formatSavedMethod(savedMethod)} for the remaining sessions in this recurring booking right away.`
+                        : `We can charge your saved ${formatSavedMethod(savedMethod)} for this booking right away.`
                       : recurring
-                        ? 'Save a payment method now so we can charge each session in this recurring series automatically after tutor acceptance.'
-                        : 'Save a payment method now so we can charge it automatically if the tutor accepts this booking.'}
+                        ? 'Save a payment method now to pay the remaining sessions in this recurring booking together.'
+                        : 'Save a payment method now to pay for this booking.'}
                 </p>
                 {recurring && paymentSetupSeriesBookings.length > 0 && (
                   <p className="text-sm font-semibold text-sky-800">
-                    Series total: {formatCurrency(paymentSetupSeriesAmount, booking.currency || 'AUD')}
+                    Series total: {formatCurrency(recurringDisplayAmount, booking.currency || 'AUD')}
                   </p>
                 )}
               </div>
@@ -486,15 +678,12 @@ export default function BookingDetailPage() {
                     <CheckCircleIcon className="w-4 h-4" />
                     {isFailedPayment || savedMethod
                       ? recurring
-                        ? 'Update Series Payment'
-                        : 'Update Payment Method'
+                        ? 'Pay Remaining Series'
+                        : 'Pay Booking'
                       : recurring
-                        ? 'Set Up Series Payment'
-                        : 'Set Up Payment Method'}
+                        ? 'Pay Series'
+                        : 'Pay Booking'}
                   </Link>
-                  <p className="text-xs text-gray-500 sm:text-right">
-                    Stripe test mode is used here. No real payment will be charged.
-                  </p>
                 </div>
               )}
             </div>
@@ -517,7 +706,7 @@ export default function BookingDetailPage() {
       <div className="flex flex-wrap gap-3">
         <div className='text-gray-700 text-sm mb-2 mt-2'>
           {recurring
-            ? 'Tutor accept/decline actions apply to all pending sessions in this series. Learner cancellation applies to this session only.'
+            ? 'Recurring bookings stay grouped as one order. Tutors and learners can handle each session directly in the list below.'
             : isAcceptedBooking && isPaidBooking
               ? 'Accepted bookings must be cancelled at least 48 hours in advance.'
               : 'You can cancel this booking before the tutor confirms it.'}
@@ -527,7 +716,7 @@ export default function BookingDetailPage() {
             type="button"
             onClick={() => {
               if (window.confirm('Cancel this booking?')) {
-                cancelMutation.mutate();
+                cancelMutation.mutate(id);
               }
             }}
             disabled={cancelMutation.isPending}
@@ -538,25 +727,41 @@ export default function BookingDetailPage() {
           </button>
         )}
 
-        {isTutor && booking.status === 'PENDING' && (
+        {recurring && isLearner && cancellableRecurringBookings.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Cancel ${cancellableRecurringBookings.length} session(s) in this recurring booking?`)) {
+                cancelSeriesMutation.mutate(cancellableRecurringBookings.map((seriesBooking) => seriesBooking.id));
+              }
+            }}
+            disabled={cancelSeriesMutation.isPending}
+            className="btn-danger gap-2"
+          >
+            <XCircleIcon className="w-4 h-4" />
+            {cancelSeriesMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
+          </button>
+        )}
+
+        {isTutor && !recurring && booking.status === 'PENDING' && (
           <>
             <button
               type="button"
-              onClick={() => acceptMutation.mutate()}
+              onClick={() => acceptMutation.mutate(id)}
               disabled={acceptMutation.isPending}
               className="btn-primary gap-2"
             >
               <CheckCircleIcon className="w-4 h-4" />
-              {acceptMutation.isPending ? 'Accepting...' : recurring ? 'Accept Series' : 'Accept'}
+              {acceptMutation.isPending ? 'Accepting...' : 'Accept'}
             </button>
             <button
               type="button"
-              onClick={() => declineMutation.mutate()}
+              onClick={() => declineMutation.mutate(id)}
               disabled={declineMutation.isPending}
               className="btn-danger gap-2"
             >
               <XCircleIcon className="w-4 h-4" />
-              {declineMutation.isPending ? 'Declining...' : recurring ? 'Decline Series' : 'Decline'}
+              {declineMutation.isPending ? 'Declining...' : 'Decline'}
             </button>
             <button
               type="button"
