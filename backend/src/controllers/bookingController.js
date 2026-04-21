@@ -487,13 +487,13 @@ exports.cancelBooking = async (req, res) => {
   }
 
   // learners can cancel before tutor confirmation at any time.
-  // the 48 hours rule only applies after the tutor has accepted the booking.
+  // the 24 hours rule only applies after the tutor has accepted the booking.
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
   const hour2 = (scheduledTime - now) / (1000 * 60 * 60);
   const isPaidBooking = isPaidPaymentStatus(booking?.payment?.status);
-  if (isLearner && isPaidBooking && booking.status === 'ACCEPTED' && hour2 < 48) {
-    throw new AppError('Cannot cancel an accepted booking within 48 hours of the session', 400);
+  if (isLearner && isPaidBooking && booking.status === 'ACCEPTED' && hour2 < 24) {
+    throw new AppError('Cannot cancel an accepted booking within 24 hours of the session', 400);
   }
 
   // TODO: Will the refunded money be deducted by the platform fee and the teacher's fee?
@@ -848,4 +848,5 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
+
 

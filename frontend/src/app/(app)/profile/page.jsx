@@ -39,6 +39,18 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
+const formatIpAddress = (value) => {
+  const text = String(value || '').trim();
+  if (!text || text.toLowerCase() === 'unknown') return '';
+  return text;
+};
+
+const formatLocationLabel = (value) => {
+  const text = String(value || '').trim();
+  if (!text || text.toLowerCase() === 'unknown') return '';
+  return text;
+};
+
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
