@@ -166,8 +166,8 @@ export const bookingApi = {
     pay: (id) => {
         return api.patch(`/bookings/${id}/payment/pay`);
     },
-    cancel: (id, reason, refundToBalance = false) => {
-        return api.post(`/bookings/${id}/cancel`, { reason, refundToBalance });
+    cancel: (id, reason) => {
+        return api.post(`/bookings/${id}/cancel`, { reason });
     },
     accept: (id, data) => {
         return api.patch(`/bookings/${id}/accept`, data);

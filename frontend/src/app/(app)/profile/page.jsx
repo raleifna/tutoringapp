@@ -49,8 +49,6 @@ export default function ProfilePage() {
 
   const currentIpAddress = formatIpAddress(user?.ipAddress);
   const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
-  const currentBalance = user?.balance || 0;
-  const currentUserId = user?.id || '';
 
   const savedMethodQuery = useQuery({
     queryKey: ['savedPaymentMethod', user?.id],
@@ -181,13 +179,7 @@ export default function ProfilePage() {
               <span className="badge bg-gray-100 text-gray-700 text-xs">
                 Region: {currentLocationLabel}
               </span>
-            )}
-            
-              {/* Cancel balance temp */}
-              {/* <span className="badge bg-gray-100 text-gray-700 text-xs">
-                Balance: {currentBalance}
-              </span> */}
-            
+            )}            
           </div>
         </div>
       </div>

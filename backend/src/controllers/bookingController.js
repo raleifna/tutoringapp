@@ -459,7 +459,7 @@ exports.getBooking = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   const stripe = getStripe();
-  const { reason, refundToBalance = false } = req.body;
+  const { reason } = req.body;
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
@@ -498,13 +498,9 @@ exports.cancelBooking = async (req, res) => {
 
   // TODO: Will the refunded money be deducted by the platform fee and the teacher's fee?
   const paidAmount = parseFloat(booking.payment?.amount || 0);
-  const newBalance = parseFloat(booking.learner.balance || 0) + paidAmount;
-
-  console.log("refundToBalance:" + refundToBalance);
-  console.log("new balance:" + newBalance + ", paid amount:" + paidAmount + ", old balance: " + booking.learner.balance);
 
   // Refound to stripe
-  if (isPaidPaymentStatus(booking?.payment?.status) && !refundToBalance) {
+  if (isPaidPaymentStatus(booking?.payment?.status)) {
     if (!booking.payment) {
       throw new AppError('Payment not found', 404);
     }
@@ -533,12 +529,7 @@ exports.cancelBooking = async (req, res) => {
                 refundAmount: booking.payment.amount,
                 refundedAt: new Date(),
               },
-            },
-            ...(refundToBalance ? {learner: {
-              update: {
-                balance: newBalance,
-              }
-            }} : {}),
+            }
           }
         : booking?.payment
           ? {

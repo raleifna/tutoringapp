@@ -34,7 +34,6 @@ async function updateMyProfile(req, res) {
             timezone: user.timezone,
             role: user.role,
             status: user.status,
-            balance: user.balance,
         },
     });
 }
