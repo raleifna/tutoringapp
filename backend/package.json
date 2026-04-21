@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.15.0",
   "main": "server.js",
   "scripts": {
-    "db:push": "prisma db push",
+    "db:push": "prisma db push --accept-data-loss",
     "db:seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "start": "pnpm run db:push && node server.js",
@@ -19,6 +19,7 @@
     "express-async-errors": "^3.1.1",
     "express-validator": "^7.3.1",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
     "multer": "1.4.5-lts.2",
     "nodemailer": "^8.0.5",

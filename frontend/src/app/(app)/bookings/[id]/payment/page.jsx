@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { AddressElement, Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   CheckCircleIcon,
@@ -13,82 +13,40 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { bookingApi, paymentApi } from '../../../../../lib/api-entry';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../../lib/formatters';
+import { formatPaymentStatus, formatSavedMethod, getPaymentStatusClass } from '../../../../../lib/payment-display';
+import {
+  getPayableSeriesBookings,
+  getRecurringLabel,
+  getRecurringSeriesBookings,
+  getSeriesTotalAmount,
+  isRecurringBooking,
+} from '../../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+const addressElementOptions = {
+  mode: 'billing',
+  defaultValues: {
+    address: {
+      country: 'AU',
+    },
+  },
 };
+const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getPaymentStatusClass = (status) => {
-  if (status === 'PAID' || status === 'COMPLETED') {
-    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-  }
-  if (status === 'PROCESSING') {
-    return 'bg-blue-50 text-blue-700 border border-blue-200';
-  }
-  if (status === 'FAILED') {
-    return 'bg-red-50 text-red-700 border border-red-200';
-  }
-  if (status === 'REFUNDED') {
-    return 'bg-gray-100 text-gray-700 border border-gray-200';
-  }
-  if (status === 'CANCELLED') {
-    return 'bg-gray-100 text-gray-700 border border-gray-200';
-  }
-  return 'bg-amber-50 text-amber-700 border border-amber-200';
-};
-
-const formatPaymentStatus = (status) => {
-  if (status === 'PAID' || status === 'COMPLETED') return 'Paid';
-  if (status === 'PROCESSING') return 'Processing';
-  if (status === 'FAILED') return 'Payment Failed';
-  if (status === 'REFUNDED') return 'Refunded';
-  if (status === 'CANCELLED') return 'Cancelled';
-  return 'Pending';
-};
-
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
+const paymentElementOptions = {
+  business: {
+    name: 'TutorConnect',
+  },
+  fields: {
+    billingDetails: {
+      address: 'never',
+    },
+  },
 };
 
 function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFuture, onSaved }) {
@@ -96,14 +54,14 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
   const elements = useElements();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitLabel = saveForFuture ? 'Save and Use Card' : 'Use This Card';
+  const submitLabel = saveForFuture ? 'Save Card and Pay' : 'Use Card and Pay';
 
   const successHref = useMemo(() => {
-    if (!returnTo) return `/bookings/${bookingId}?paymentMethod=saved`;
+    if (!returnTo) return `/bookings/${bookingId}?payment=success`;
 
     const [pathname, queryString = ''] = returnTo.split('?');
     const params = new URLSearchParams(queryString);
-    params.set('paymentMethod', 'saved');
+    params.set('payment', 'success');
     const query = params.toString();
 
     return query ? `${pathname}?${query}` : pathname;
@@ -149,13 +107,14 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
         bookingId,
         saveAsDefault: saveForFuture,
       });
+      await bookingApi.pay(bookingId);
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Payment method was confirmed, but we could not save it yet');
+      toast.error(error?.response?.data?.message || 'Payment could not be completed');
       setIsSubmitting(false);
       return;
     }
 
-    toast.success(saveForFuture ? 'Payment method saved' : 'Card selected for this booking');
+    toast.success('Payment successful');
     onSaved?.();
     router.push(successHref);
   };
@@ -163,7 +122,10 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <PaymentElement />
+        <div className="space-y-4">
+          <AddressElement options={addressElementOptions} />
+          <PaymentElement options={paymentElementOptions} />
+        </div>
       </div>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Link href={returnTo || `/bookings/${bookingId}`} className="btn-secondary text-center">
@@ -209,6 +171,10 @@ export default function BookingPaymentPage() {
 
   const booking = data?.data?.data;
   const paymentStatus = booking?.payment?.status || 'PENDING';
+  const recurring = isRecurringBooking(booking);
+  const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
+  const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
   const savedMethodQuery = useQuery({
     queryKey: ['savedPaymentMethod', currentUserId],
     queryFn: () => paymentApi.getSavedMethod(),
@@ -217,19 +183,48 @@ export default function BookingPaymentPage() {
   const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
   const canUpdatePaymentMethod =
     user?.role === 'LEARNER' &&
-    ['PENDING', 'ACCEPTED'].includes(booking?.status) &&
-    ['PENDING', 'FAILED'].includes(paymentStatus);
+    (
+      recurring
+        ? paymentSetupSeriesBookings.length > 0
+        : ['PENDING', 'ACCEPTED'].includes(booking?.status) && ['PENDING', 'FAILED'].includes(paymentStatus)
+    );
 
   const useSavedMethodMutation = useMutation({
-    mutationFn: () => paymentApi.useSavedMethodForBooking(id),
-    onSuccess: async () => {
-      toast.success('Saved payment method selected for this booking');
+    mutationFn: async () => {
+      await paymentApi.useSavedMethodForBooking(id);
+      return bookingApi.pay(id);
+    },
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Payment successful');
       await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      router.push(returnTo || `/bookings/${id}?paymentMethod=saved`);
+      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      router.push(returnTo || `/bookings/${id}?payment=success`);
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not use saved payment method');
+      toast.error(err?.response?.data?.message || 'Could not complete payment');
+    },
+  });
+
+  const localTestPaymentMutation = useMutation({
+    mutationFn: async () => {
+      await paymentApi.completeSetupIntent({
+        setupIntentId: `local_setup_${currentUserId || id}`,
+        bookingId: id,
+        saveAsDefault: true,
+      });
+      return bookingApi.pay(id);
+    },
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Payment successful');
+      await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
+      await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
+      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
+      router.push(returnTo || `/bookings/${id}?payment=success`);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Could not complete payment');
     },
   });
 
@@ -245,6 +240,7 @@ export default function BookingPaymentPage() {
   });
 
   useEffect(() => {
+    if (!stripeEnabled) return;
     if (!canUpdatePaymentMethod || setupMode !== 'new') return;
     if (setupIntentData?.clientSecret) return;
     if (setupIntentMutation.isPending) return;
@@ -311,10 +307,14 @@ export default function BookingPaymentPage() {
   const totalAmount =
     booking?.totalAmount ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const seriesTotalAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
+  const fullSeriesAmount = getSeriesTotalAmount(recurringBookings);
+  const amountToPayNow = recurring ? seriesTotalAmount || fullSeriesAmount || totalAmount : totalAmount;
 
   const elementsOptions = setupIntentData?.clientSecret
     ? {
         clientSecret: setupIntentData.clientSecret,
+        locale: 'en',
         appearance: {
           theme: 'stripe',
         },
@@ -322,11 +322,13 @@ export default function BookingPaymentPage() {
     : null;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
-          <h1 className="text-2xl font-bold text-gray-900">Set Up Payment</h1>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {recurring ? 'Pay Series' : 'Pay Booking'}
+          </h1>
         </div>
         {showBackButton && <BackButton href={returnTo} />}
       </div>
@@ -336,6 +338,9 @@ export default function BookingPaymentPage() {
           <div>
             <p className="text-sm text-gray-500">Booking ID</p>
             <p className="font-medium text-gray-900">{booking.id}</p>
+            {recurring && (
+              <p className="mt-1 text-xs font-medium text-sky-700">{recurringLabel}</p>
+            )}
           </div>
           <span
             className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusClass(paymentStatus)}`}
@@ -365,18 +370,65 @@ export default function BookingPaymentPage() {
           </div>
         </div>
 
+        {recurring && recurringBookings.length > 0 && (
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs text-sky-700 uppercase tracking-wide font-semibold">
+                  Sessions in this series
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Paying here charges the whole recurring booking together. Later changes can still be refunded per session.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700">
+                  {recurringBookings.length} sessions
+                </p>
+                <p className="mt-2 text-lg font-bold text-sky-900">
+                  {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {recurringBookings.map((seriesBooking) => {
+                const needsSetup = paymentSetupSeriesBookings.some((item) => item.id === seriesBooking.id);
+                return (
+                  <div
+                    key={seriesBooking.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{formatDate(seriesBooking.scheduledAt)}</p>
+                      <p className="text-xs text-gray-500">{formatDuration(seriesBooking.duration)}</p>
+                    </div>
+                    <p className={`text-xs font-medium ${needsSetup ? 'text-sky-700' : 'text-emerald-700'}`}>
+                      {needsSetup ? 'Included in total' : 'Already paid'}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Charge Later</p>
+              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Pay Now</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(totalAmount, booking.currency || 'AUD')}
+                {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
               </p>
+              {recurring && (
+                <p className="mt-1 text-sm text-blue-700">
+                  {paymentSetupSeriesBookings.length} session{paymentSetupSeriesBookings.length === 1 ? '' : 's'} included
+                </p>
+              )}
             </div>
             <CreditCardIcon className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-sm text-blue-700 mt-3">
-            No money is charged when you save a payment method. We will only charge after the tutor accepts this booking.
+            Payment will be processed now. If a session is later cancelled, the refund will be applied to that session.
           </p>
         </div>
 
@@ -412,17 +464,13 @@ export default function BookingPaymentPage() {
           </div>
         )}
 
-        {!stripePromise && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
-            Stripe publishable key is missing. Please check your environment variables.
-          </div>
-        )}
-
         {canUpdatePaymentMethod ? (
           savedMethod && setupMode === 'saved' ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-sm text-emerald-800 mb-3">
-                This booking will use your saved {formatSavedMethod(savedMethod)} after the tutor accepts it.
+                {recurring
+                  ? `We will charge your saved ${formatSavedMethod(savedMethod)} for this recurring booking now.`
+                  : `We will charge your saved ${formatSavedMethod(savedMethod)} for this booking now.`}
               </p>
               <div className="flex justify-end">
                 <button
@@ -432,7 +480,28 @@ export default function BookingPaymentPage() {
                   className="btn-primary gap-2"
                 >
                   <CheckCircleIcon className="w-4 h-4" />
-                  {useSavedMethodMutation.isPending ? 'Confirming...' : 'Confirm Saved Method'}
+                  {useSavedMethodMutation.isPending ? 'Paying...' : recurring ? 'Pay Series Now' : 'Pay Now'}
+                </button>
+              </div>
+            </div>
+          ) : !stripeEnabled ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm text-blue-800 mb-3">
+                {recurring
+                  ? 'Pay this booking now.'
+                  : 'Pay this booking now.'}
+              </p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => localTestPaymentMutation.mutate()}
+                  disabled={localTestPaymentMutation.isPending}
+                  className="btn-primary gap-2"
+                >
+                  <CheckCircleIcon className="w-4 h-4" />
+                  {localTestPaymentMutation.isPending
+                    ? 'Paying...'
+                    : 'Pay Now'}
                 </button>
               </div>
             </div>
@@ -453,7 +522,7 @@ export default function BookingPaymentPage() {
                   <span>
                     <span className="font-medium text-gray-900">Save this card for future use?</span>
                     <span className="block text-xs text-gray-500 mt-1">
-                      If you leave this unticked, we will only use the new card for this booking.
+                      If you leave this unticked, we will only use the new card for this payment flow.
                     </span>
                   </span>
                 </label>
@@ -484,7 +553,9 @@ export default function BookingPaymentPage() {
           </div>
         ) : paymentStatus === 'PAID' || paymentStatus === 'COMPLETED' ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-            Payment has already been confirmed for this booking.
+            {recurring
+              ? 'Payment has already been confirmed for this booking in the recurring series.'
+              : 'Payment has already been confirmed for this booking.'}
           </div>
         ) : (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">

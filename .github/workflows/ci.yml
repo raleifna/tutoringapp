@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Arc]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Frontend Tests & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter tutorconnect-frontend...
+
+      - name: Run tests
+        run: pnpm --filter tutorconnect-frontend test
+
+      - name: Build
+        run: pnpm --filter tutorconnect-frontend build
+        env:
+          NEXT_PUBLIC_API_URL: /api/v1
+          NEXT_PUBLIC_SOCKET_URL: ''
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''
+
+  backend:
+    name: Backend Install & Generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter tutorconnect-backend...
+
+      - name: Prisma generate
+        run: pnpm --filter tutorconnect-backend exec prisma generate

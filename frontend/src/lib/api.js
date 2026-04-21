@@ -1,5 +1,4 @@
-// axios instance
-import axios from 'axios';
+import api from './api-services/client';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').replace(/\/$/, '');
 
@@ -184,105 +183,29 @@ export const bookingApi = {
     },
 };
 
+export { adminApi } from './api-services/admin';
+export { authApi } from './api-services/auth';
+export { bookingApi } from './api-services/booking';
+export { messageApi } from './api-services/message';
+export { notificationApi } from './api-services/notification';
+export { subjectApi } from './api-services/subject';
+export { tutorApi } from './api-services/tutor';
+export { userApi } from './api-services/user';
+
 export const paymentApi = {
-    getSavedMethod: () => {
-        return api.get('/payments/method');
-    },
-    setDefaultMethod: (paymentMethodId) => {
-        return api.patch('/payments/method/default', { paymentMethodId });
-    },
-    deleteSavedMethod: () => {
-        return api.delete('/payments/method');
-    },
-    deleteMethod: (paymentMethodId) => {
-        return api.delete(`/payments/method/${paymentMethodId}`);
-    },
-    createSetupIntent: () => {
-        return api.post('/payments/setup-intent');
-    },
-    completeSetupIntent: (payload) => {
-        const data = typeof payload === 'string' ? { setupIntentId: payload } : payload;
-        return api.post('/payments/complete-setup-intent', data);
-    },
-    useSavedMethodForBooking: (bookingId) => {
-        return api.post(`/payments/bookings/${bookingId}/use-saved-method`);
-    },
+  getSavedMethod: () => api.get('/payments/method'),
+  setDefaultMethod: (paymentMethodId) =>
+    api.patch('/payments/method/default', { paymentMethodId }),
+  deleteSavedMethod: () => api.delete('/payments/method'),
+  deleteMethod: (paymentMethodId) => api.delete(`/payments/method/${paymentMethodId}`),
+  createSetupIntent: () => api.post('/payments/setup-intent'),
+  completeSetupIntent: (payload) =>
+    api.post(
+      '/payments/complete-setup-intent',
+      typeof payload === 'string' ? { setupIntentId: payload } : payload
+    ),
+  useSavedMethodForBooking: (bookingId) =>
+    api.post(`/payments/bookings/${bookingId}/use-saved-method`),
 };
 
-export const messageApi = {
-    getConversations: () => {
-        return api.get('/messages/conversations');
-    },
-    createConversation: (userId) => {
-        return api.post('/messages/conversations', { userId });
-    },
-    getMessages: (conversationId, params) => {
-        return api.get(`/messages/conversations/${conversationId}`, { params });
-    },
-    sendMessage: (conversationId, data) => {
-        return api.post(`/messages/conversations/${conversationId}`, data);
-    },
-    markAsRead: (conversationId) => {
-        return api.patch(`/messages/conversations/${conversationId}/read`);
-    },
-    getUnreadCount: () => {
-        return api.get('/messages/unread-count');
-    },
-};
-
-// admin APIs
-export const adminApi = {
-    getDashboard: () => api.get('/admin/dashboard'),
-    getAnalytics: (params) => api.get('/admin/analytics', { params }),
-    getUsers: (params) => api.get('/admin/users', { params }),
-    getUser: (id) => api.get(`/admin/users/${id}`),
-    updateUserStatus: (id, data) => api.patch(`/admin/users/${id}/status`, data),
-    getPendingTutors: (params) => api.get('/admin/tutors/pending', { params }),
-    approveTutor: (id) => api.patch(`/admin/tutors/${id}/approve`),
-    rejectTutor: (id, reason) =>
-      api.patch(`/admin/tutors/${id}/reject`, typeof reason === 'object' ? reason : { reason }),
-    returnTutor: (id, feedback) =>
-      api.patch(`/admin/tutors/${id}/return`, typeof feedback === 'object' ? feedback : { feedback }),
-    getBookings: (params) => api.get('/admin/bookings', { params }),
-    getActions: (params) => api.get('/admin/actions', { params }),
-    createSubject: (data) => api.post('/admin/subjects', data),
-    updateSubject: (id, data) => api.put(`/admin/subjects/${id}`, data),
-    deleteSubject: (id) => api.delete(`/admin/subjects/${id}`),
-};
-
-// subject APIs
-export const subjectApi = {
-    getAll: (params) => {
-        return api.get('/subjects', { params });
-    },
-    getCategories: () => {
-        return api.get('/subjects/categories');
-    },
-};
-
-// user APIs
-export const userApi = {
-    updateProfile: (data) => {
-        return api.put('/users/me', data);
-    },
-    uploadAvatar: (formData) => {
-        return api.post('/users/me/avatar', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            },
-        });
-    },
-};
-
-// notification APIs
-export const notificationApi = {
-    search: (params) => {
-        return api.get('/notifications', { params });
-    },
-    markAsRead: (ids) => {
-        return api.put(`/notifications/read?ids=${ids}`);
-    },
-    addTestsData: () => {
-        return api.post('/notifications/test');
-    },
-};
+export default api;

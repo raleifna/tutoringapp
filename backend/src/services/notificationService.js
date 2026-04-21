@@ -1,6 +1,6 @@
-import { prisma } from '../config/database.js';
+const { prisma } = require('../config/database');
 
-export async function notify(receiverId, type, title, message, link) {
+async function notify(receiverId, type, title, message, link) {
   await prisma.notification.create({
     data: {
       userId: receiverId,
@@ -9,27 +9,65 @@ export async function notify(receiverId, type, title, message, link) {
       message,
       read: false,
       timestamp: new Date(),
-      link
-    }
+      link,
+    },
   });
 }
 
-export async function notifyAdmin(type, title, message, link) {
-  const admins = await prisma.user.findMany({
-    where: { role: 'admin' }
+async function notifyOrRefresh(receiverId, type, title, message, link) {
+  const existingNotification = await prisma.notification.findFirst({
+    where: {
+      userId: receiverId,
+      type,
+      title,
+      link,
+    },
+    orderBy: {
+      timestamp: 'desc',
+    },
   });
 
-  const notifications = admins.map(admin => ({
+  if (existingNotification) {
+    await prisma.notification.update({
+      where: {
+        id: existingNotification.id,
+      },
+      data: {
+        message,
+        read: false,
+        timestamp: new Date(),
+      },
+    });
+    return;
+  }
+
+  await notify(receiverId, type, title, message, link);
+}
+
+async function notifyAdmin(type, title, message, link) {
+  const admins = await prisma.user.findMany({
+    where: { role: 'ADMIN' },
+  });
+
+  const notifications = admins.map((admin) => ({
     userId: admin.id,
     type,
     title,
     message,
     read: false,
     timestamp: new Date(),
-    link
+    link,
   }));
 
+  if (!notifications.length) return;
+
   await prisma.notification.createMany({
-    data: notifications
+    data: notifications,
   });
 }
+
+module.exports = {
+  notify,
+  notifyOrRefresh,
+  notifyAdmin,
+};

@@ -1,13 +1,15 @@
+// for token
 const crypto = require('crypto');
-
 const { prisma } = require('../config/database');
 const { sendVerificationEmail } = require('../services/emailService');
+const { hashPassword, comparePassword } = require('../utils/passwords');
+const { createAccessToken, createRefreshToken, verifyRefreshToken } = require('../utils/tokens');
 
 const toBoolean = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
         const normalized = value.trim().toLowerCase();
-        return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+        return normalized === 'true' || normalized === '1';
     }
     return false;
 };
@@ -62,6 +64,7 @@ const authUserSelect = {
     email: true,
     firstName: true,
     lastName: true,
+    timezone: true,
     role: true,
     status: true,
     avatar: true,
@@ -85,11 +88,13 @@ const authUserSelectWithPassword = {
     password: true,
 };
 
+// user authentication and registration logic
 const serializeAuthUser = (user, ipAddress = null) => ({
     id: user.id,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+    timezone: user.timezone || 'UTC',
     role: user.role,
     status: user.status,
     avatar: user.avatar || null,
@@ -120,7 +125,15 @@ const createEmailVerificationExpiry = () => {
     return expiresAt;
 };
 
-const isEmailVerificationRequired = () => String(process.env.EMAIL_VERIFICATION_REQUIRED || 'true') !== 'false';
+const isEmailVerificationRequired = () => {
+    const setting = process.env.EMAIL_VERIFICATION_REQUIRED;
+
+    if (setting === 'false') {
+        return false;
+    }
+
+    return true;
+};
 
 async function register(req, res) {
     const {
@@ -145,6 +158,7 @@ async function register(req, res) {
     const uploadedVerificationFiles = Array.isArray(req.files) ? req.files : [];
     const emailVerificationToken = createEmailVerificationToken();
     const emailVerificationExpiry = createEmailVerificationExpiry();
+    const hashedPassword = hashPassword(password);
 
     if (!normalizedEmail || !password || !normalizedFirstName || !normalizedLastName) {
         return res.status(400).json({
@@ -195,7 +209,7 @@ async function register(req, res) {
     const user = await prisma.user.create({
         data: {
             email: normalizedEmail,
-            password,
+            password: hashedPassword,
             firstName: normalizedFirstName,
             lastName: normalizedLastName,
             role: normalizedRole,
@@ -267,7 +281,9 @@ async function login(req, res) {
         select: authUserSelectWithPassword,
     });
 
-    if (!user || user.password !== password) {
+    const passwordMatches = user ? comparePassword(password, user.password) : false;
+
+    if (!user || !passwordMatches) {
         return res.status(401).json({
             success: false,
             message: 'Invalid email or password.',
@@ -294,8 +310,8 @@ async function login(req, res) {
     return res.status(200).json({
         success: true,
         message: 'Login successful.',
-        accessToken: `demo-token-${user.id}`,
-        refreshToken: `demo-refresh-${user.id}`,
+        accessToken: createAccessToken(authenticatedUser),
+        refreshToken: createRefreshToken(authenticatedUser),
         user: serializeAuthUser(authenticatedUser, ipAddress),
     });
 }
@@ -424,17 +440,20 @@ async function refreshToken(req, res) {
         });
     }
 
-    if (!refreshToken.startsWith('demo-refresh-')) {
+    let payload;
+
+    try {
+        payload = verifyRefreshToken(refreshToken);
+    } catch (error) {
         return res.status(401).json({
             success: false,
             message: 'Invalid refresh token.',
         });
     }
 
-    const userId = refreshToken.replace('demo-refresh-', '');
-
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: payload.id },
+        select: authUserSelect,
     });
 
     if (!user) {
@@ -447,7 +466,7 @@ async function refreshToken(req, res) {
     return res.status(200).json({
         success: true,
         message: 'Token refreshed.',
-        accessToken: `demo-token-${user.id}`,
+        accessToken: createAccessToken(user),
     });
 }
 

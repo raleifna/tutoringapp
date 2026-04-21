@@ -15,7 +15,10 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
+import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
 
 const OPERATION_TABS = [
@@ -26,37 +29,6 @@ const OPERATION_TABS = [
 
 const BOOKING_STATUSES = ['', 'UNPAID', 'PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'RESCHEDULED'];
 const EMPTY_SUBJECT_FORM = { name: '', category: '', description: '' };
-
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: currency || 'AUD',
-    maximumFractionDigits: 2,
-  }).format(value);
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
 
 const getBookingStatusColor = (status) => {
   if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
@@ -327,7 +299,14 @@ function AdminOperationsContent() {
                       <div className="space-y-3">
                         <div>
                           <p className="text-xs uppercase tracking-wide text-gray-400">Session</p>
-                          <h3 className="font-semibold text-gray-900 mt-1">{booking.subject}</h3>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-gray-900">{booking.subject}</h3>
+                            {isRecurringBooking(booking) && (
+                              <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                                {getRecurringLabel(booking)}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500 mt-1">
                             {formatDate(booking.scheduledAt)} · {formatDuration(booking.duration)} ·{' '}
                             {booking.sessionType?.replace('_', ' ')}

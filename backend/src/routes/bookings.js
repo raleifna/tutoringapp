@@ -34,6 +34,12 @@ const bookingRules = [
     .optional()
     .isIn(['ONE_OFF', 'WEEKLY', 'FORTNIGHTLY', 'MONTHLY'])
     .withMessage('Invalid recurring type'),
+  body('recurringGroupId')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 120 })
+    .withMessage('Invalid recurring group ID'),
   body('meetingTool')
     .optional()
     .isIn(['GOOGLE_MEET', 'ZOOM', 'MICROSOFT_TEAMS', 'SKYPE', 'OTHER'])
@@ -48,7 +54,6 @@ router.patch('/:id/payment/pay', authorize('LEARNER'), bookingController.payForB
 router.post('/:id/cancel', bookingController.cancelBooking);
 router.patch('/:id/accept', authorize('TUTOR'), bookingController.acceptBooking);
 router.patch('/:id/decline', authorize('TUTOR'), bookingController.declineBooking);
-router.patch('/:id/reschedule', authorize('TUTOR'), bookingController.rescheduleBooking);
 router.patch('/:id/complete', authorize('TUTOR'), bookingController.completeBooking);
 
 module.exports = router;

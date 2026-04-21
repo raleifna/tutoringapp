@@ -4,25 +4,38 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { AddressElement, Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { CheckCircleIcon, CreditCardIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import BackButton from '../../../../components/BackButton';
 import { paymentApi } from '../../../../lib/api-entry';
+import { formatSavedMethod } from '../../../../lib/payment-display';
 import { useAuthStore } from '../../../../lib/store';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
+const addressElementOptions = {
+  mode: 'billing',
+  defaultValues: {
+    address: {
+      country: 'AU',
+    },
+  },
+};
 
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
+const paymentElementOptions = {
+  business: {
+    name: 'TutorConnect',
+  },
+  fields: {
+    billingDetails: {
+      address: 'never',
+    },
+  },
 };
 
 function PaymentMethodForm({ clientSecret, onSaved, returnTo }) {
@@ -79,7 +92,10 @@ function PaymentMethodForm({ clientSecret, onSaved, returnTo }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <PaymentElement />
+        <div className="space-y-4">
+          <AddressElement options={addressElementOptions} />
+          <PaymentElement options={paymentElementOptions} />
+        </div>
       </div>
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Link href={returnTo} className="btn-secondary text-center">
@@ -135,7 +151,24 @@ export default function ProfilePaymentMethodPage() {
     },
   });
 
+  const localSaveMethodMutation = useMutation({
+    mutationFn: () =>
+      paymentApi.completeSetupIntent({
+        setupIntentId: `local_setup_${currentUserId}`,
+        saveAsDefault: true,
+      }),
+    onSuccess: async () => {
+      toast.success('Local test payment method saved');
+      await fetchMe();
+      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Could not save payment method');
+    },
+  });
+
   useEffect(() => {
+    if (!stripeEnabled) return;
     if (!currentUserId) return;
     if (setupIntentData?.clientSecret) return;
     if (setupIntentMutation.isPending) return;
@@ -152,6 +185,7 @@ export default function ProfilePaymentMethodPage() {
 
     return {
       clientSecret: setupIntentData.clientSecret,
+      locale: 'en',
       appearance: {
         theme: 'stripe',
       },
@@ -183,7 +217,7 @@ export default function ProfilePaymentMethodPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
@@ -295,13 +329,24 @@ export default function ProfilePaymentMethodPage() {
           </div>
         )}
 
-        {!stripePromise && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
-            Stripe publishable key is missing. Please check your environment variables.
+        {!stripeEnabled ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm text-blue-800 mb-3">
+              Save a local test card once, and the booking flow can reuse it for series payments and refunds.
+            </p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => localSaveMethodMutation.mutate()}
+                disabled={localSaveMethodMutation.isPending}
+                className="btn-primary gap-2"
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+                {localSaveMethodMutation.isPending ? 'Saving...' : 'Save Local Test Card'}
+              </button>
+            </div>
           </div>
-        )}
-
-        {setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
+        ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
             Preparing Stripe payment form...
           </div>

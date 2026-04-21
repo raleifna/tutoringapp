@@ -1,4 +1,3 @@
-// src/app/(auth)/register/page.jsx - Registration Page
 'use client';
 
 import { Suspense, useState } from 'react';
@@ -6,64 +5,16 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '../../../lib/api-entry';
-
-const MAX_VERIFICATION_FILES = 5;
-const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
-
-const registerSchema = z
-  .object({
-    firstName: z.string().min(2, 'First name must be at least 2 characters'),
-    lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-    email: z.string().email('Invalid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Must contain an uppercase letter')
-      .regex(/[a-z]/, 'Must contain a lowercase letter')
-      .regex(/[0-9]/, 'Must contain a number'),
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
-    role: z.enum(['LEARNER', 'TUTOR']),
-    isMinor: z.boolean().optional(),
-    parentName: z.string().optional(),
-    parentEmail: z.union([z.literal(''), z.string().email('Invalid parent email')]).optional(),
-    parentPhone: z.string().optional(),
-    tutorEducationSummary: z.string().optional(),
-    tutorExperienceYears: z.string().optional(),
-    tutorSupportingNotes: z.string().optional(),
-    agreeToTerms: z.boolean().refine((v) => v === true, 'You must agree to the terms'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
-  .superRefine((data, ctx) => {
-    if (data.role === 'LEARNER' && data.isMinor && !data.parentName?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Parent/guardian name is required for minors',
-        path: ['parentName'],
-      });
-    }
-
-    if (data.role === 'TUTOR' && !data.tutorEducationSummary?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Education summary is required for tutors',
-        path: ['tutorEducationSummary'],
-      });
-    }
-  });
-
-const getErrorMessage = (error) => {
-  const message = error?.response?.data?.message;
-  if (Array.isArray(message)) return message[0];
-  return message || 'Registration failed';
-};
+import {
+  buildRegisterPayload,
+  getRegisterDefaultValues,
+  getRegisterErrorMessage,
+  registerSchema,
+  validateVerificationFiles,
+} from '../../../lib/register-form';
 
 function RegisterContent() {
   const searchParams = useSearchParams();
@@ -77,8 +28,8 @@ function RegisterContent() {
   const [verificationUrl, setVerificationUrl] = useState('');
   const [verificationFiles, setVerificationFiles] = useState([]);
   const [verificationFileError, setVerificationFileError] = useState('');
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
-  const defaultRole = searchParams.get('role') === 'TUTOR' ? 'TUTOR' : 'LEARNER';
   const {
     register,
     handleSubmit,
@@ -87,7 +38,7 @@ function RegisterContent() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: defaultRole, agreeToTerms: false, isMinor: false },
+    defaultValues: getRegisterDefaultValues(searchParams.get('role')),
   });
 
   const selectedRole = watch('role');
@@ -103,23 +54,10 @@ function RegisterContent() {
 
   const handleVerificationFilesChange = (event) => {
     const files = Array.from(event.target.files || []);
-
-    if (files.length > MAX_VERIFICATION_FILES) {
+    const errorMessage = validateVerificationFiles(files);
+    if (errorMessage) {
       setVerificationFiles([]);
-      setVerificationFileError(`Upload up to ${MAX_VERIFICATION_FILES} files`);
-      return;
-    }
-
-    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-      setVerificationFiles([]);
-      setVerificationFileError('Each file must be 5MB or smaller');
-      return;
-    }
-
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-      setVerificationFiles([]);
-      setVerificationFileError('Total file size must stay within 25MB');
+      setVerificationFileError(errorMessage);
       return;
     }
 
@@ -128,46 +66,12 @@ function RegisterContent() {
   };
 
   const onSubmit = async (values) => {
-    const { confirmPassword, agreeToTerms, ...rawData } = values;
+    const { payload, rawData } = buildRegisterPayload(values, verificationFiles);
 
     if (rawData.role === 'TUTOR' && verificationFiles.length === 0) {
       setVerificationFileError('Please upload at least one verification file');
       return;
     }
-
-    const payload =
-      rawData.role === 'TUTOR'
-        ? (() => {
-            const formData = new FormData();
-            [
-              ['firstName', rawData.firstName],
-              ['lastName', rawData.lastName],
-              ['email', rawData.email],
-              ['password', rawData.password],
-              ['role', rawData.role],
-              ['tutorEducationSummary', rawData.tutorEducationSummary],
-              ['tutorExperienceYears', rawData.tutorExperienceYears],
-              ['tutorSupportingNotes', rawData.tutorSupportingNotes],
-            ].forEach(([key, value]) => {
-              if (value !== undefined && value !== null && value !== '') {
-                formData.append(key, value);
-              }
-            });
-
-            verificationFiles.forEach((file) => formData.append('verificationFiles', file));
-            return formData;
-          })()
-        : {
-            firstName: rawData.firstName,
-            lastName: rawData.lastName,
-            email: rawData.email,
-            password: rawData.password,
-            role: rawData.role,
-            isMinor: rawData.isMinor,
-            parentName: rawData.parentName,
-            parentEmail: rawData.parentEmail,
-            parentPhone: rawData.parentPhone,
-          };
 
     setIsLoading(true);
     try {
@@ -177,7 +81,7 @@ function RegisterContent() {
       setVerificationUrl(response?.data?.verificationUrl || '');
       setRegistered(true);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(getRegisterErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +128,7 @@ function RegisterContent() {
                   setVerificationUrl(response?.data?.verificationUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
-                  toast.error(getErrorMessage(error));
+                  toast.error(getRegisterErrorMessage(error));
                 } finally {
                   setIsResending(false);
                 }
@@ -309,7 +213,7 @@ function RegisterContent() {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 className="input pr-10"
-                placeholder="At least 8 characters"
+                placeholder="At least 8 characters and contain a special character"
               />
               <button
                 type="button"
@@ -431,7 +335,12 @@ function RegisterContent() {
           )}
 
           <label className="flex items-start gap-2 text-sm text-gray-600">
-            <input type="checkbox" {...register('agreeToTerms')} className="mt-1 rounded border-gray-300" />
+            <input type="checkbox" {...register('agreeToTerms')} className="mt-1 rounded border-gray-300" onClick={(e) => {
+                  if (!watch('agreeToTerms')) {
+                    e.preventDefault();
+                    setIsPrivacyModalOpen(true);
+                  }
+                }} />
             <span>I agree to the terms and privacy policy.</span>
           </label>
           {errors.agreeToTerms && <p className="error-text -mt-2">{errors.agreeToTerms.message}</p>}
@@ -452,6 +361,84 @@ function RegisterContent() {
           </Link>
         </p>
       </div>
+      {isPrivacyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
+              <h2 className="text-xl font-bold text-gray-900">Privacy Policy</h2>
+              <button
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+              <div className="space-y-4 text-sm text-gray-600">
+                <p className="font-semibold text-gray-900 text-base">Welcome to TutorConnect.</p>
+                <p>We value your privacy and are committed to protecting your personal information. This policy explains how we collect, use, store, and share your data when you use our platform.</p>
+
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">We may collect basic information such as:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>your name</li>
+                    <li>email address</li>
+                    <li>account details</li>
+                    <li>booking and session information</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">We use this information to:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>create and manage your account</li>
+                    <li>connect learners with tutors</li>
+                    <li>handle bookings and payments</li>
+                    <li>improve our platform and user experience</li>
+                  </ul>
+                </div>
+
+                <p>We apply appropriate security measures to protect your data.</p>
+
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">In some cases, we may request access to certain device features, such as:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>camera</li>
+                    <li>storage</li>
+                    <li>notifications</li>
+                  </ul>
+                </div>
+
+                <p>These permissions are only used to support platform features, and you can manage them in your device settings.</p>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPrivacyModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setValue('agreeToTerms', true, { shouldValidate: true });
+                  setIsPrivacyModalOpen(false);
+                }}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-sm"
+              >
+                I Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,19 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { getBookingStatusClass } from '../../../../lib/booking-status';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import {
+  getDisplayStatusLabel,
+  getRecurringDisplayBookings,
+  getRecurringDisplayStatus,
+  getRecurringLabel,
+  getRecurringStatusSummary,
+  isRecurringBooking,
+  matchesBookingDisplayStatus,
+} from '../../../../lib/recurring-bookings';
+import { cn, getPositivePageNumber } from '../../../../lib/utils';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -27,55 +40,6 @@ const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
 const getInitialStatus = (value) => {
   const next = String(value || '').toUpperCase();
   return STATUS_VALUES.has(next) ? next : 'PENDING';
-};
-
-const getPageNumber = (value) => {
-  const next = Number.parseInt(String(value || '1'), 10);
-  return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
 };
 
 export default function TutorRequestsPage() {
@@ -94,7 +58,7 @@ function TutorRequestsContent() {
   const [activeStatus, setActiveStatus] = useState(() =>
     getInitialStatus(statusParam)
   );
-  const [page, setPage] = useState(() => getPageNumber(pageParam));
+  const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
   const queryClient = useQueryClient();
   const currentRequestsHref = (() => {
     const params = new URLSearchParams();
@@ -107,22 +71,28 @@ function TutorRequestsContent() {
   useEffect(() => {
     const next = getInitialStatus(statusParam);
     setActiveStatus(next);
-    setPage(getPageNumber(pageParam));
+    setPage(getPositivePageNumber(pageParam));
   }, [pageParam, statusParam]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['tutor-requests', activeStatus, page],
-    queryFn: () => bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 }),
+    queryKey: ['tutor-requests'],
+    queryFn: () => bookingApi.getTutorBookings({ limit: 200 }),
   });
 
   const bookings = data?.data?.data?.bookings || [];
-  const pagination = data?.data?.data?.pagination;
+  const displayBookings = getRecurringDisplayBookings(bookings).filter((booking) =>
+    matchesBookingDisplayStatus(booking, activeStatus)
+  );
+  const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
 
   const acceptMutation = useMutation({
     mutationFn: (id) => bookingApi.accept(id),
-    onSuccess: () => {
-      toast.success('Booking accepted!');
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking accepted!');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to accept');
@@ -134,6 +104,7 @@ function TutorRequestsContent() {
     onSuccess: (response) => {
       toast.success(response?.data?.message || 'Booking declined');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to decline');
@@ -195,7 +166,7 @@ function TutorRequestsContent() {
             </div>
           ))}
         </div>
-      ) : bookings.length === 0 ? (
+      ) : displayBookings.length === 0 ? (
         <div className="text-center py-16 bg-white border border-gray-200 rounded-xl">
           <CalendarDaysIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h3 className="font-medium text-gray-900 mb-2">
@@ -205,9 +176,12 @@ function TutorRequestsContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => {
+          {paginatedBookings.map((booking) => {
             const learner = booking.learner;
             const detailHref = `/bookings/${booking.id}?returnTo=${encodeURIComponent(currentRequestsHref)}&from=tutor-requests`;
+            const recurring = isRecurringBooking(booking);
+            const displayStatus = recurring ? getRecurringDisplayStatus(booking) : booking.status;
+            const recurringStatus = getRecurringStatusSummary(booking);
             return (
               <div
                 key={booking.id}
@@ -224,7 +198,7 @@ function TutorRequestsContent() {
               >
                 <div className="flex items-start gap-4">
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, { fallbackName: 'Learner' })}
                     alt={learner?.firstName || 'Learner'}
                     className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                   />
@@ -234,19 +208,22 @@ function TutorRequestsContent() {
                         <h3 className="font-semibold text-gray-900 text-sm">
                           {learner?.firstName} {learner?.lastName}
                         </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{booking.subject}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-gray-500">{booking.subject}</p>
+                          {isRecurringBooking(booking) && (
+                            <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                              {getRecurringLabel(booking)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span
                         className={cn(
                           'badge text-xs flex-shrink-0',
-                          booking.status === 'PENDING' && 'bg-yellow-50 text-yellow-700',
-                          booking.status === 'ACCEPTED' && 'bg-green-50 text-green-700',
-                          booking.status === 'COMPLETED' && 'bg-gray-100 text-gray-600',
-                          (booking.status === 'CANCELLED' || booking.status === 'DECLINED') &&
-                            'bg-red-50 text-red-700'
+                          getBookingStatusClass(displayStatus)
                         )}
                       >
-                        {booking.status}
+                        {getDisplayStatusLabel(booking)}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
@@ -263,6 +240,12 @@ function TutorRequestsContent() {
                       </span>
                       <span>{booking.sessionType?.replace('_', '-')}</span>
                     </div>
+                    {(recurringStatus.isPartiallyAccepted || recurringStatus.cancelledCount > 0 || recurringStatus.declinedCount > 0) && (
+                      <p className="mt-2 text-xs font-medium text-emerald-700">
+                        {recurringStatus.isPartiallyAccepted ? 'Partially accepted · ' : ''}
+                        {recurringStatus.acceptedCount} accepted · {recurringStatus.pendingCount} pending · {recurringStatus.declinedCount} declined · {recurringStatus.cancelledCount} cancelled
+                      </p>
+                    )}
                     {booking.notes && (
                       <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded px-2 py-1.5 italic">
                         &quot;{booking.notes}&quot;
@@ -272,7 +255,7 @@ function TutorRequestsContent() {
                 </div>
 
                 <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-                  {booking.status === 'PENDING' && (
+                  {!recurring && booking.status === 'PENDING' && (
                     <>
                       <button
                         type="button"
@@ -283,7 +266,8 @@ function TutorRequestsContent() {
                         disabled={acceptMutation.isPending}
                         className="btn-primary btn-sm gap-1.5 flex-1"
                       >
-                        <CheckCircleIcon className="w-4 h-4" /> Accept
+                        <CheckCircleIcon className="w-4 h-4" />
+                        Accept
                       </button>
                       <button
                         type="button"
@@ -294,11 +278,12 @@ function TutorRequestsContent() {
                         disabled={declineMutation.isPending}
                         className="btn-danger btn-sm gap-1.5 flex-1"
                       >
-                        <XCircleIcon className="w-4 h-4" /> Decline
+                        <XCircleIcon className="w-4 h-4" />
+                        Decline
                       </button>
                     </>
                   )}
-                  {booking.status === 'ACCEPTED' && (
+                  {!recurring && booking.status === 'ACCEPTED' && (
                     <button
                       type="button"
                       onClick={(event) => {
@@ -316,7 +301,7 @@ function TutorRequestsContent() {
                     onClick={(event) => event.stopPropagation()}
                     className="btn-secondary btn-sm ml-auto"
                   >
-                    View Details
+                    {recurring ? 'Review Series' : 'View Details'}
                   </Link>
                 </div>
               </div>
@@ -325,23 +310,23 @@ function TutorRequestsContent() {
         </div>
       )}
 
-      {pagination && pagination.totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => setPage((p) => p - 1)}
-            disabled={page <= 1}
+            disabled={currentPage <= 1}
             className="btn-secondary btn-sm disabled:opacity-40"
           >
             ← Previous
           </button>
           <span className="text-sm text-gray-600">
-            Page {page} of {pagination.totalPages}
+            Page {currentPage} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            disabled={page >= pagination.totalPages}
+            disabled={currentPage >= totalPages}
             className="btn-secondary btn-sm disabled:opacity-40"
           >
             Next →

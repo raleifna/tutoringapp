@@ -2,136 +2,44 @@
 import { create } from 'zustand';
 import { authApi } from './api-entry';
 import {
-  applyIpContextFallback,
-  fetchClientIpContext,
-  isPrivateIpAddress,
-  preserveClientIpContext,
-} from './ip-location';
-
-const STORAGE_KEYS = {
-  USER: 'user',
-  ACCESS_TOKEN: 'accessToken',
-  REFRESH_TOKEN: 'refreshToken',
-};
-
-const getStoredValue = (key) => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(key);
-};
-
-const getStoredUser = () => {
-  const rawUser = getStoredValue(STORAGE_KEYS.USER);
-  if (!rawUser || rawUser === 'undefined') return null;
-  try {
-    return JSON.parse(rawUser);
-  } catch {
-    return null;
-  }
-};
-
-const saveAuthToStorage = ({ user, accessToken, refreshToken }) => {
-  if (typeof window === 'undefined') return;
-
-  if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-  else localStorage.removeItem(STORAGE_KEYS.USER);
-
-  if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-  else localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-
-  if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-  else localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
-const clearAuthStorage = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEYS.USER);
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
+  clearAuthStorage,
+  getStoredUser,
+  getStoredValue,
+  saveAuthToStorage,
+  STORAGE_KEYS,
+} from './auth-storage';
 // ==================== AUTH STORE ====================
 export const useAuthStore = create((set, get) => ({
   user: getStoredUser(),
   accessToken: getStoredValue(STORAGE_KEYS.ACCESS_TOKEN),
   refreshToken: getStoredValue(STORAGE_KEYS.REFRESH_TOKEN),
   isLoading: false,
-  isResolvingIpContext: false,
 
   setAuth: ({ user, accessToken, refreshToken }) => {
-    const nextUser = applyIpContextFallback(user);
-    saveAuthToStorage({ user: nextUser, accessToken, refreshToken });
-    set({ user: nextUser, accessToken, refreshToken });
+    saveAuthToStorage({ user, accessToken, refreshToken });
+    set({ user, accessToken, refreshToken });
   },
 
   setUser: (user) => {
-    const nextUser = applyIpContextFallback(user);
     saveAuthToStorage({
-      user: nextUser,
+      user,
       accessToken: get().accessToken,
       refreshToken: get().refreshToken,
     });
-    set({ user: nextUser });
-  },
-
-  refreshClientIpContext: async () => {
-    const currentUser = get().user;
-    if (!currentUser || typeof window === 'undefined') return currentUser;
-    if (get().isResolvingIpContext) return currentUser;
-
-    set({ isResolvingIpContext: true });
-
-    let nextUser = currentUser;
-    try {
-      const ipContext = await fetchClientIpContext();
-      nextUser = ipContext
-        ? { ...currentUser, ...ipContext, ipLocationLookupFailed: false }
-        : applyIpContextFallback(currentUser);
-    } catch {
-      nextUser = { ...applyIpContextFallback(currentUser), ipLocationLookupFailed: true };
-    }
-
-    saveAuthToStorage({
-      user: nextUser,
-      accessToken: get().accessToken,
-      refreshToken: get().refreshToken,
-    });
-    set({ user: nextUser, isResolvingIpContext: false });
-    return nextUser;
-  },
-
-  ensureClientIpContext: async () => {
-    const currentUser = get().user;
-    if (!currentUser) return currentUser;
-
-    const hasClientLocation =
-      currentUser.ipLocationSource === 'client' &&
-      !!currentUser.ipLocationLabel &&
-      !isPrivateIpAddress(currentUser.ipAddress);
-
-    if (hasClientLocation || currentUser.ipLocationLookupFailed) {
-      return currentUser;
-    }
-
-    return get().refreshClientIpContext();
+    set({ user });
   },
 
   initializeAuth: async () => {
-    const { accessToken, user, fetchMe, logout, ensureClientIpContext } = get();
+    const { accessToken, user, fetchMe, logout } = get();
     if (!accessToken) return null;
 
-    // If user already exists in storage, UI can use it immediately.
     if (user) {
-      fetchMe()
-        .then((currentUser) => {
-          if (currentUser) ensureClientIpContext().catch(() => {});
-        })
-        .catch(() => {});
+      fetchMe().catch(() => {});
       return user;
     }
 
     const currentUser = await fetchMe();
     if (!currentUser) await logout();
-    else ensureClientIpContext().catch(() => {});
     return currentUser;
   },
 
@@ -150,13 +58,12 @@ export const useAuthStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       const { data } = await authApi.getMe();
-      const nextUser = preserveClientIpContext(data.user, get().user);
       saveAuthToStorage({
-        user: nextUser,
+        user: data.user,
         accessToken: get().accessToken,
         refreshToken: get().refreshToken,
       });
-      set({ user: nextUser, isLoading: false });
+      set({ user: data.user, isLoading: false });
       return nextUser;
     } catch {
       set({ isLoading: false });

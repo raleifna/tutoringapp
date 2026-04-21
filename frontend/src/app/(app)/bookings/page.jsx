@@ -7,7 +7,23 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
+import { getBookingStatusClass } from '../../../lib/booking-status';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../lib/formatters';
+import {
+  getDisplayStatusLabel,
+  getBookingDisplayStatus,
+  getRecurringDisplayBookings,
+  getRecurringDisplayStatus,
+  getRecurringLabel,
+  getRecurringSeriesBookings,
+  getRecurringStatusSummary,
+  getSeriesTotalAmount,
+  isRecurringBooking,
+  matchesBookingDisplayStatus,
+} from '../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../lib/store';
+import { getPositivePageNumber } from '../../../lib/utils';
 import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [
@@ -26,82 +42,6 @@ const getInitialStatus = (value) => {
   return STATUS_VALUES.has(next) ? next : '';
 };
 
-const getPageNumber = (value) => {
-  const next = Number.parseInt(String(value || '1'), 10);
-  return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  if (avatar) return avatar;
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Tutor';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) {
-    return `${value / 60} hr`;
-  }
-  return `${value} mins`;
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const getBookingStatusClass = (status) => {
-  if (status === 'UNPAID') return 'bg-orange-50 text-orange-700 border border-orange-200';
-  if (status === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
-  if (status === 'ACCEPTED') return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (status === 'COMPLETED') return 'bg-green-50 text-green-700 border border-green-200';
-  if (status === 'CANCELLED') return 'bg-gray-100 text-gray-700 border border-gray-200';
-  if (status === 'DECLINED') return 'bg-red-50 text-red-700 border border-red-200';
-  return 'bg-gray-100 text-gray-700 border border-gray-200';
-};
-
-const formatBookingStatus = (status) => {
-  if (status === 'UNPAID') return 'Unpaid';
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'ACCEPTED') return 'Accepted';
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'CANCELLED') return 'Cancelled';
-  if (status === 'DECLINED') return 'Declined';
-  if (status === 'RESCHEDULED') return 'Rescheduled';
-  return status || 'Unknown';
-};
-
-// export default function BookingsPage() {
-//   return (
-//     <Suspense fallback={<BookingsPageFallback />}>
-//       <BookingsPageContent />
-//     </Suspense>
-//   );
-// }
-
 function BookingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -111,7 +51,7 @@ function BookingsPageContent() {
   const { user } = useAuthStore();
   const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
-  const [page, setPage] = useState(() => getPageNumber(pageParam));
+  const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
   const isTutor = user?.role === 'TUTOR';
   const showBackButton = Boolean(fromParam);
   const fallbackBackHrefMap = {
@@ -126,7 +66,7 @@ function BookingsPageContent() {
 
   useEffect(() => {
     setActiveStatus(getInitialStatus(statusParam));
-    setPage(getPageNumber(pageParam));
+    setPage(getPositivePageNumber(pageParam));
   }, [pageParam, statusParam]);
 
   const handleBack = () => {
@@ -134,19 +74,22 @@ function BookingsPageContent() {
   };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['bookings', currentUserId, activeStatus, page, isTutor],
+    queryKey: ['bookings', currentUserId, isTutor],
     queryFn: () =>
       isTutor
-        ? bookingApi.getTutorBookings({ status: activeStatus, page, limit: 10 })
-        : bookingApi.getMyBookings({ status: activeStatus, page, limit: 10 }),
+        ? bookingApi.getTutorBookings({ limit: 200 })
+        : bookingApi.getMyBookings({ limit: 200 }),
     enabled: !!currentUserId,
     keepPreviousData: true,
   });
 
   const bookings = data?.data?.data?.bookings || [];
   const sortedBookings = [...bookings].sort((a, b) => {
-    const statusPriority = (status) => (status === 'UNPAID' ? 0 : 1);
-    const priorityDiff = statusPriority(a?.status) - statusPriority(b?.status);
+    const statusPriority = (booking) => {
+      const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+      return displayStatus === 'UNPAID' ? 0 : 1;
+    };
+    const priorityDiff = statusPriority(a) - statusPriority(b);
     if (priorityDiff !== 0) return priorityDiff;
 
     const createdAtA = new Date(a?.createdAt || 0).getTime();
@@ -157,9 +100,12 @@ function BookingsPageContent() {
     const scheduledAtB = new Date(b?.scheduledAt || 0).getTime();
     return scheduledAtB - scheduledAtA;
   });
-  const pagination = data?.data?.data?.pagination;
-  const totalPages = pagination?.totalPages || 1;
-  const currentPage = pagination?.page || page;
+  const displayBookings = getRecurringDisplayBookings(sortedBookings).filter((booking) =>
+    matchesBookingDisplayStatus(booking, activeStatus)
+  );
+  const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
   const currentBookingsHref = (() => {
     const params = new URLSearchParams();
     if (fromParam) params.set('from', fromParam);
@@ -229,7 +175,7 @@ function BookingsPageContent() {
             </div>
           ))}
         </div>
-      ) : !isError && bookings.length === 0 ? (
+      ) : !isError && displayBookings.length === 0 ? (
         <div className="text-center py-16 bg-white border border-gray-200 rounded-xl">
           <CalendarDaysIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h3 className="font-medium text-gray-900 mb-2">No bookings found</h3>
@@ -244,7 +190,7 @@ function BookingsPageContent() {
         </div>
       ) : (
         <div className="space-y-3">
-          {sortedBookings.map((booking) => (
+          {paginatedBookings.map((booking) => (
             <BookingCard
               key={booking.id}
               booking={booking}
@@ -306,9 +252,15 @@ function BookingCard({ booking, isTutor, returnTo }) {
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
   const otherLastName = other?.lastName || '';
   const sessionType = booking?.sessionType ? String(booking.sessionType).replace('_', '-') : 'Session';
+  const recurringLabel = getRecurringLabel(booking);
+  const recurringBookings = getRecurringSeriesBookings(booking);
   const totalAmount =
-    booking?.totalAmount ??
+    (isRecurringBooking(booking)
+      ? getSeriesTotalAmount(recurringBookings)
+      : booking?.totalAmount) ??
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
+  const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
+  const recurringStatus = getRecurringStatusSummary(booking);
   const bookingDetailHref = returnTo
     ? `/bookings/${booking.id}?returnTo=${encodeURIComponent(returnTo)}`
     : `/bookings/${booking.id}`;
@@ -342,14 +294,14 @@ function BookingCard({ booking, isTutor, returnTo }) {
               className="group rounded-full transition-transform hover:scale-[1.03]"
             >
               <img
-                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+                src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
                 alt={otherFirstName}
                 className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-0 transition-shadow group-hover:shadow-md group-hover:ring-2 group-hover:ring-sky-100"
               />
             </Link>
           ) : (
             <img
-              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName)}
+              src={getAvatarUrl(other?.avatar, otherFirstName, otherLastName, { fallbackName: 'Tutor' })}
               alt={otherFirstName}
               className="w-12 h-12 rounded-full object-cover flex-shrink-0"
             />
@@ -358,12 +310,19 @@ function BookingCard({ booking, isTutor, returnTo }) {
             <h3 className="font-semibold text-gray-900 text-sm">
               Session with: {otherFirstName} {otherLastName}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">{booking?.subject || 'Session'}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-gray-500">{booking?.subject || 'Session'}</p>
+              {isRecurringBooking(booking) && (
+                <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                  {recurringLabel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(booking?.status)}`}>
-            {formatBookingStatus(booking?.status)}
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${getBookingStatusClass(displayStatus)}`}>
+            {getDisplayStatusLabel(booking)}
           </span>
         </div>
       </div>

@@ -9,6 +9,8 @@ import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
+import { TUTOR_SESSION_TYPES } from '../../../../lib/tutor-options';
+import { cn } from '../../../../lib/utils';
 
 const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
@@ -23,8 +25,6 @@ const DAY_OPTIONS = [
   { value: '6', label: 'Saturday' },
   { value: '0', label: 'Sunday' },
 ];
-
-const SESSION_TYPES = ['ONLINE', 'IN_PERSON', 'HYBRID'];
 
 const LEVELS = [
   { value: 'beginner', label: 'Beginner' },
@@ -60,10 +60,6 @@ const getApplicationNotes = (items) => {
         .map((item) => item.text)
         .join('\n')
     : '';
-};
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
 };
 
 export default function TutorProfilePage() {
@@ -403,7 +399,7 @@ export default function TutorProfilePage() {
 
   if (profileLoading || subjectsLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 animate-pulse">
+      <div className="w-full space-y-4 animate-pulse">
         <div className="h-10 bg-gray-200 rounded w-1/3" />
         <div className="card p-6 h-48" />
       </div>
@@ -412,7 +408,7 @@ export default function TutorProfilePage() {
 
   if (profileError || subjectsError || !profile) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <div className="card p-6">
           <h1 className="page-title">Tutor Profile</h1>
           <p className="text-sm text-gray-600 mt-3">
@@ -426,7 +422,7 @@ export default function TutorProfilePage() {
   }
 
   return (
-    <div className="relative max-w-3xl mx-auto space-y-5">
+    <div className="relative w-full space-y-5">
       <div>
         <div className='flex'>
           <h1 className="page-title flex-1">Tutor Profile</h1>
@@ -671,7 +667,7 @@ export default function TutorProfilePage() {
           <div>
             <label className="label">Session Types</label>
             <div className="flex gap-3 flex-wrap">
-              {SESSION_TYPES.map((type) => (
+              {TUTOR_SESSION_TYPES.map((type) => (
                 <button
                   key={type}
                   type="button"

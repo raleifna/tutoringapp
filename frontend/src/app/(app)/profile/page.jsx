@@ -17,6 +17,8 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { authApi, paymentApi, userApi } from '../../../lib/api-entry';
+import { getAvatarUrl } from '../../../lib/avatar';
+import { formatSavedMethod } from '../../../lib/payment-display';
 import { useAuthStore } from '../../../lib/store';
 
 const profileSchema = z.object({
@@ -37,38 +39,6 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
-
-const formatIpAddress = (value) => {
-  const ipAddress = String(value || '').trim();
-  return ipAddress || null;
-};
-
-const formatLocationLabel = (value) => {
-  const locationLabel = String(value || '').trim();
-  return locationLabel || null;
-};
-
-const formatSavedMethod = (paymentMethod) => {
-  if (!paymentMethod?.last4) return 'No payment method saved';
-
-  const brand = String(paymentMethod.brand || 'card');
-  const label = brand.charAt(0).toUpperCase() + brand.slice(1);
-
-  return `${label} ending in ${paymentMethod.last4}`;
-};
-
 export default function ProfilePage() {
   const { user, fetchMe } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -76,17 +46,17 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const currentIpAddress = formatIpAddress(user?.ipAddress);
   const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
   const currentBalance = user?.balance || 0;
   const currentUserId = user?.id || '';
 
   const savedMethodQuery = useQuery({
-    queryKey: ['savedPaymentMethod', currentUserId],
+    queryKey: ['savedPaymentMethod', user?.id],
     queryFn: () => paymentApi.getSavedMethod(),
-    enabled: !!currentUserId && user?.role === 'LEARNER',
+    enabled: user?.role === 'LEARNER' && !!user?.id,
   });
-
   const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
 
   const {
@@ -162,14 +132,17 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="relative max-w-2xl mx-auto space-y-6">
+    <div className="relative w-full space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title flex-1">My Profile</h1>
       </div>
       <div className="card flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="relative">
           <img
-            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName)}
+            src={getAvatarUrl(user?.avatar, user?.firstName, user?.lastName, {
+              fallbackName: 'User',
+              ignoreTemporary: true,
+            })}
             alt={user?.firstName || 'User'}
             className="w-20 h-20 rounded-full object-cover"
           />

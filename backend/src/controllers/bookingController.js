@@ -1,7 +1,7 @@
 const { prisma } = require('../config/database');
-const { getStripe } = require('../config/stripe');
+const { getStripe, isStripeConfigured } = require('../config/stripe');
 const { AppError } = require('../middleware/errorHandler');
-const { notify, notifyAdmin } = require('../services/notificationService');
+const { notify, notifyOrRefresh, notifyAdmin } = require('../services/notificationService');
 
 const bookingInclude = {
   learner: {
@@ -18,6 +18,223 @@ const bookingInclude = {
 
 const isPaidPaymentStatus = (status) => ['PAID', 'COMPLETED'].includes(String(status || '').toUpperCase());
 
+const tutorVisibleBookingWhere = {
+  OR: [
+    {
+      status: {
+        not: 'CANCELLED',
+      },
+    },
+    {
+      status: 'CANCELLED',
+      statusHistory: {
+        some: {
+          status: 'ACCEPTED',
+        },
+      },
+    },
+  ],
+};
+
+const buildRecurringSeries = (bookings) => {
+  if (!bookings.length) return null;
+
+  const sortedBookings = [...bookings].sort(
+    (left, right) => new Date(left.scheduledAt) - new Date(right.scheduledAt)
+  );
+  const totalAmount = sortedBookings.reduce(
+    (sum, booking) => sum + Number(booking.totalAmount || 0),
+    0
+  );
+  const chargeableAmount = sortedBookings
+    .filter((booking) => !isPaidPaymentStatus(booking.payment?.status))
+    .reduce((sum, booking) => sum + Number(booking.totalAmount || 0), 0);
+  const paidCount = sortedBookings.filter((booking) => isPaidPaymentStatus(booking.payment?.status)).length;
+  const pendingPaymentCount = sortedBookings.filter(
+    (booking) => ['PENDING', 'FAILED'].includes(String(booking.payment?.status || 'PENDING').toUpperCase())
+  ).length;
+
+  return {
+    recurringGroupId: sortedBookings[0].recurringGroupId,
+    recurringType: sortedBookings[0].recurringType,
+    totalSessions: sortedBookings.length,
+    paidCount,
+    pendingPaymentCount,
+    totalAmount,
+    chargeableAmount,
+    currency: sortedBookings[0].currency || 'AUD',
+    firstScheduledAt: sortedBookings[0].scheduledAt,
+    lastScheduledAt: sortedBookings[sortedBookings.length - 1].scheduledAt,
+    bookings: sortedBookings.map((booking) => ({
+      id: booking.id,
+      subject: booking.subject,
+      status: booking.status,
+      scheduledAt: booking.scheduledAt,
+      duration: booking.duration,
+      totalAmount: booking.totalAmount,
+      currency: booking.currency,
+      payment: booking.payment
+        ? {
+            id: booking.payment.id,
+            status: booking.payment.status,
+            amount: booking.payment.amount,
+            currency: booking.payment.currency,
+            stripePaymentMethodId: booking.payment.stripePaymentMethodId || null,
+          }
+        : null,
+    })),
+  };
+};
+
+const attachRecurringSeries = async (bookings, baseWhere = {}) => {
+  const recurringGroupIds = [
+    ...new Set(
+      bookings
+        .map((booking) => booking.recurringGroupId)
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!recurringGroupIds.length) return bookings;
+
+  const seriesBookings = await prisma.booking.findMany({
+    where: {
+      ...baseWhere,
+      recurringGroupId: { in: recurringGroupIds },
+    },
+    include: { payment: true },
+    orderBy: { scheduledAt: 'asc' },
+  });
+
+  const seriesByGroup = seriesBookings.reduce((accumulator, booking) => {
+    if (!accumulator[booking.recurringGroupId]) accumulator[booking.recurringGroupId] = [];
+    accumulator[booking.recurringGroupId].push(booking);
+    return accumulator;
+  }, {});
+
+  return bookings.map((booking) => {
+    if (!booking.recurringGroupId) return booking;
+
+    return {
+      ...booking,
+      recurringSeries: buildRecurringSeries(seriesByGroup[booking.recurringGroupId] || []),
+    };
+  });
+};
+
+const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration) => {
+  const requestedStart = new Date(scheduledAt);
+  if (Number.isNaN(requestedStart.getTime())) {
+    throw new AppError('Valid date-time required', 400);
+  }
+
+  const requestedEnd = new Date(requestedStart.getTime() + duration * 60 * 1000);
+  const lookupStart = new Date(requestedStart.getTime() - 8 * 60 * 60 * 1000);
+  const existingBookings = await prisma.booking.findMany({
+    where: {
+      tutorId,
+      status: { notIn: ['CANCELLED', 'DECLINED'] },
+      scheduledAt: {
+        gte: lookupStart,
+        lt: requestedEnd,
+      },
+    },
+    select: {
+      id: true,
+      scheduledAt: true,
+      duration: true,
+    },
+  });
+
+  const hasOverlap = existingBookings.some((booking) => {
+    const existingStart = new Date(booking.scheduledAt);
+    const existingEnd = new Date(existingStart.getTime() + Number(booking.duration || 0) * 60 * 1000);
+    return existingStart < requestedEnd && existingEnd > requestedStart;
+  });
+
+  if (hasOverlap) {
+    throw new AppError('This time slot has already been booked', 409);
+  }
+};
+
+const getPayableSeriesBookingsForLearner = async (booking, learnerId) => {
+  if (!booking.recurringGroupId) {
+    return ['PENDING', 'ACCEPTED'].includes(booking.status) &&
+      ['PENDING', 'FAILED'].includes(String(booking.payment?.status || 'PENDING').toUpperCase())
+      ? [booking]
+      : [];
+  }
+
+  return prisma.booking.findMany({
+    where: {
+      recurringGroupId: booking.recurringGroupId,
+      learnerId,
+      status: { in: ['PENDING', 'ACCEPTED'] },
+      payment: {
+        is: {
+          status: { in: ['PENDING', 'FAILED'] },
+        },
+      },
+    },
+    include: {
+      payment: true,
+      learner: true,
+    },
+    orderBy: { scheduledAt: 'asc' },
+  });
+};
+
+const syncRecurringLearnerNotification = async (booking) => {
+  if (!booking?.recurringGroupId) return;
+
+  const seriesBookings = await prisma.booking.findMany({
+    where: {
+      recurringGroupId: booking.recurringGroupId,
+      learnerId: booking.learnerId,
+    },
+    select: {
+      id: true,
+      status: true,
+      scheduledAt: true,
+    },
+    orderBy: {
+      scheduledAt: 'asc',
+    },
+  });
+
+  if (!seriesBookings.length) return;
+
+  const counts = seriesBookings.reduce((summary, seriesBooking) => {
+    const status = String(seriesBooking.status || 'PENDING').toUpperCase();
+    summary[status] = (summary[status] || 0) + 1;
+    return summary;
+  }, {});
+
+  const acceptedCount = (counts.ACCEPTED || 0) + (counts.COMPLETED || 0);
+  const declinedCount = counts.DECLINED || 0;
+  const cancelledCount = counts.CANCELLED || 0;
+  const pendingCount = counts.PENDING || 0;
+  const rootBookingId = seriesBookings[0].id;
+  const parts = [];
+
+  if (acceptedCount > 0) parts.push(`${acceptedCount} accepted`);
+  if (declinedCount > 0) parts.push(`${declinedCount} declined`);
+  if (cancelledCount > 0) parts.push(`${cancelledCount} cancelled`);
+  if (pendingCount > 0) parts.push(`${pendingCount} pending`);
+
+  const message = parts.length
+    ? `Your recurring booking was updated: ${parts.join(' · ')}.`
+    : 'Your recurring booking was updated.';
+
+  await notifyOrRefresh(
+    booking.learnerId,
+    'booking',
+    'Recurring Booking Updated',
+    message,
+    `/bookings/${rootBookingId}`
+  );
+};
+
 exports.createBooking = async (req, res) => {
   const {
     tutorId,
@@ -27,8 +244,8 @@ exports.createBooking = async (req, res) => {
     duration,
     sessionType,
     notes,
-    hourlyRate,
     recurringType = 'ONE_OFF',
+    recurringGroupId,
     meetingTool,
   } = req.body;
 
@@ -58,9 +275,18 @@ exports.createBooking = async (req, res) => {
 
   const parsedDuration = parseInt(duration, 10);
   const durationHours = parsedDuration / 60;
-  const rate =
-    hourlyRate !== undefined ? parseFloat(hourlyRate) : parseFloat(tutorProfile.hourlyRate);
+  const rate = parseFloat(tutorProfile.hourlyRate);
   const totalAmount = rate * durationHours;
+  const shouldNotifyTutorForRecurringRequest = recurringGroupId
+    ? (await prisma.booking.count({
+        where: {
+          learnerId: req.user.id,
+          tutorId: tutorProfile.id,
+          recurringGroupId,
+        },
+      })) === 0
+    : true;
+  await ensureTutorSlotIsAvailable(tutorProfile.id, scheduledAt, parsedDuration);
 
   const booking = await prisma.booking.create({
     data: {
@@ -76,6 +302,7 @@ exports.createBooking = async (req, res) => {
       notes,
       status: 'PENDING',
       recurringType: recurringType || 'ONE_OFF',
+      recurringGroupId: recurringGroupId || null,
       meetingTool: meetingTool || tutorProfile.preferredMeetingTool || null,
       payment: {
         create: {
@@ -93,8 +320,15 @@ exports.createBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  // notify tutor
-  await notify(tutorProfile.userId, 'booking', 'New Booking Request', `Please handle a booking request.`, `/bookings/${booking.id}`);
+  if (shouldNotifyTutorForRecurringRequest) {
+    await notify(
+      tutorProfile.userId,
+      'booking',
+      recurringGroupId ? 'New Recurring Booking Request' : 'New Booking Request',
+      recurringGroupId ? 'Please review the new recurring booking request.' : 'Please handle a booking request.',
+      `/bookings/${booking.id}`
+    );
+  }
 
   res.status(201).json({
     success: true,
@@ -125,10 +359,12 @@ exports.getMyBookings = async (req, res) => {
     prisma.booking.count({ where }),
   ]);
 
+  const bookingsWithSeries = await attachRecurringSeries(bookings, { learnerId: req.user.id });
+
   res.json({
     success: true,
     data: {
-      bookings,
+      bookings: bookingsWithSeries,
       pagination: {
         page: parsedPage,
         limit: parsedLimit,
@@ -152,21 +388,7 @@ exports.getTutorBookings = async (req, res) => {
   const skip = (parsedPage - 1) * parsedLimit;
   const where = {
     tutorId: tutorProfile.id,
-    OR: [
-      {
-        status: {
-          not: 'CANCELLED',
-        },
-      },
-      {
-        status: 'CANCELLED',
-        statusHistory: {
-          some: {
-            status: 'ACCEPTED',
-          },
-        },
-      },
-    ],
+    ...tutorVisibleBookingWhere,
     ...(status && { status }),
   };
 
@@ -181,10 +403,15 @@ exports.getTutorBookings = async (req, res) => {
     prisma.booking.count({ where }),
   ]);
 
+  const bookingsWithSeries = await attachRecurringSeries(bookings, {
+    tutorId: tutorProfile.id,
+    ...tutorVisibleBookingWhere,
+  });
+
   res.json({
     success: true,
     data: {
-      bookings,
+      bookings: bookingsWithSeries,
       pagination: {
         page: parsedPage,
         limit: parsedLimit,
@@ -220,7 +447,14 @@ exports.getBooking = async (req, res) => {
     throw new AppError('Access denied', 403);
   }
 
-  res.json({ success: true, data: booking });
+  const recurringSeriesBaseWhere = isLearner
+    ? { learnerId: req.user.id }
+    : isTutor
+      ? { tutorId: tutorProfile.id, ...tutorVisibleBookingWhere }
+      : {};
+  const [bookingWithSeries] = await attachRecurringSeries([booking], recurringSeriesBaseWhere);
+
+  res.json({ success: true, data: bookingWithSeries });
 };
 
 exports.cancelBooking = async (req, res) => {
@@ -284,7 +518,7 @@ exports.cancelBooking = async (req, res) => {
 
     console.log("refund:" + refund);
     console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
-  }
+
 
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
@@ -320,7 +554,6 @@ exports.cancelBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  // notify tutor
   await notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
 
   res.json({
@@ -337,7 +570,6 @@ exports.cancelBooking = async (req, res) => {
 
 exports.acceptBooking = async (req, res) => {
   const { meetingLink } = req.body;
-  const stripe = getStripe();
   const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
   if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
 
@@ -350,116 +582,38 @@ exports.acceptBooking = async (req, res) => {
   });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
-  const selectedPaymentMethodId =
-    booking.payment?.stripePaymentMethodId || booking.learner?.stripeDefaultPaymentMethodId;
-
-  if (!booking.learner?.stripeCustomerId || !selectedPaymentMethodId) {
-    throw new AppError('Learner must save a payment method before this booking can be accepted', 400);
-  }
-
-  let paymentStatus = 'PROCESSING';
-  let paymentIntent = null;
-  let failureReason = null;
-
-  try {
-    paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(Number(booking.totalAmount || 0) * 100),
-      currency: String(booking.currency || booking.payment?.currency || 'AUD').toLowerCase(),
-      customer: booking.learner.stripeCustomerId,
-      payment_method: selectedPaymentMethodId,
-      confirm: true,
-      off_session: true,
-      metadata: {
-        bookingId: booking.id,
-        learnerId: booking.learnerId,
-        tutorProfileId: tutorProfile.id,
-      },
-    });
-
-    if (paymentIntent.status === 'succeeded') {
-      paymentStatus = 'PAID';
-    } else if (paymentIntent.status === 'requires_payment_method') {
-      paymentStatus = 'FAILED';
-      failureReason = 'Payment method was declined';
-    }
-  } catch (error) {
-    paymentIntent = error?.raw?.payment_intent || null;
-    paymentStatus = 'FAILED';
-    failureReason =
-      error?.raw?.message || error?.message || 'Stripe payment could not be processed';
+  if (!isPaidPaymentStatus(booking.payment?.status)) {
+    throw new AppError('This session must be paid before it can be accepted', 400);
   }
 
   const updated = await prisma.booking.update({
-    where: { id: req.params.id },
+    where: { id: booking.id },
     data: {
       status: 'ACCEPTED',
       meetingLink,
-      payment: booking.payment
-        ? {
-            update: {
-              status: paymentStatus,
-              stripeCustomerId: booking.learner.stripeCustomerId,
-              stripePaymentMethodId: selectedPaymentMethodId,
-              stripePaymentIntentId: paymentIntent?.id || booking.payment.stripePaymentIntentId,
-              processedAt: new Date(),
-              paidAt: paymentStatus === 'PAID' ? new Date() : null,
-              failedAt: paymentStatus === 'FAILED' ? new Date() : null,
-              failureReason,
-            },
-          }
-        : {
-            create: {
-              userId: booking.learnerId,
-              amount: booking.totalAmount,
-              currency: booking.currency || 'AUD',
-              status: paymentStatus,
-              stripeCustomerId: booking.learner.stripeCustomerId,
-              stripePaymentMethodId: selectedPaymentMethodId,
-              stripePaymentIntentId: paymentIntent?.id || null,
-              processedAt: new Date(),
-              paidAt: paymentStatus === 'PAID' ? new Date() : null,
-              failedAt: paymentStatus === 'FAILED' ? new Date() : null,
-              failureReason,
-              description: `${booking.subject} session payment`,
-            },
-          },
       statusHistory: { create: { status: 'ACCEPTED' } },
     },
     include: bookingInclude,
   });
 
-  // notify student
-  await notify(
-    booking.learnerId,
-    'booking',
-    'Booking Accepted',
-    paymentStatus === 'FAILED'
-      ? 'Your booking was accepted, but the payment could not be completed. Please update your payment method.'
-      : paymentStatus === 'PAID'
-        ? 'Your booking was accepted and payment has been confirmed.'
-        : 'Your booking was accepted and payment is now being processed.',
-    `/bookings/${updated.id}`
-  );
-
-  if (paymentStatus === 'FAILED') {
+  if (booking.recurringGroupId) {
+    await syncRecurringLearnerNotification(booking);
+  } else {
     await notify(
       booking.learnerId,
-      'payment',
-      'Payment Failed',
-      failureReason || 'Please update your payment method and try again.',
-      `/bookings/${updated.id}/payment?returnTo=${encodeURIComponent(`/bookings/${updated.id}`)}`
+      'booking',
+      'Booking Accepted',
+      'This session was accepted and payment has already been confirmed.',
+      `/bookings/${updated.id}`
     );
   }
 
   res.json({
     success: true,
-    message:
-      paymentStatus === 'FAILED'
-        ? 'Booking accepted, but payment failed'
-        : paymentStatus === 'PAID'
-          ? 'Booking accepted and payment confirmed'
-          : 'Booking accepted and payment is processing',
+    message: 'Session accepted',
     data: updated,
+    affectedCount: 1,
+    seriesBookings: [updated],
   });
 };
 
@@ -470,13 +624,13 @@ exports.declineBooking = async (req, res) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
-    include: { payment: true },
+    include: { payment: true, learner: true },
   });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
 
   const updated = await prisma.booking.update({
-    where: { id: req.params.id },
+    where: { id: booking.id },
     data: {
       status: 'DECLINED',
       declineReason: reason,
@@ -496,44 +650,27 @@ exports.declineBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  // notify student
-  await notify(booking.learnerId, 'booking', 'Booking Declined', `A booking has been declined.`, `/bookings/${updated.id}`);
-
   res.json({
     success: true,
-    message:
-      isPaidPaymentStatus(booking?.payment?.status)
-        ? 'Booking declined and payment refunded'
-        : 'Booking declined',
+    message: isPaidPaymentStatus(booking?.payment?.status)
+      ? 'Session declined and payment refunded'
+      : 'Session declined',
     data: updated,
+    affectedCount: 1,
+    seriesBookings: [updated],
   });
-};
 
-exports.rescheduleBooking = async (req, res) => {
-  const { scheduledAt, reason } = req.body;
-  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
-  if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
-
-  const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
-  if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
-  if (!['PENDING', 'ACCEPTED'].includes(booking.status)) {
-    throw new AppError('Cannot reschedule this booking', 400);
+  if (booking.recurringGroupId) {
+    await syncRecurringLearnerNotification(booking);
+  } else {
+    await notify(
+      booking.learnerId,
+      'booking',
+      'Booking Declined',
+      'One session has been declined.',
+      `/bookings/${updated.id}`
+    );
   }
-
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      scheduledAt: new Date(scheduledAt),
-      status: 'RESCHEDULED',
-      statusHistory: { create: { status: 'RESCHEDULED', reason } },
-    },
-    include: bookingInclude,
-  });
-
-  // notify student
-  await notify(booking.learnerId, 'booking', 'Booking Rescheduled', `A booking has been rescheduled.`, `/bookings/${updated.id}`);
-
-   res.json({ success: true, message: 'Booking rescheduled', data: updated });
 };
 
 exports.completeBooking = async (req, res) => {
@@ -544,24 +681,166 @@ exports.completeBooking = async (req, res) => {
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'ACCEPTED') throw new AppError('Booking must be accepted first', 400);
 
-  const updated = await prisma.booking.update({
-    where: { id: req.params.id },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      statusHistory: { create: { status: 'COMPLETED' } },
-    },
-    include: bookingInclude,
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    const completedBooking = await tx.booking.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        statusHistory: { create: { status: 'COMPLETED' } },
+      },
+      include: bookingInclude,
+    });
 
-  await prisma.tutorProfile.update({
-    where: { id: tutorProfile.id },
-    data: { totalSessions: { increment: 1 } },
+    await tx.tutorProfile.update({
+      where: { id: tutorProfile.id },
+      data: { totalSessions: { increment: 1 } },
+    });
+
+    return completedBooking;
   });
 
   res.json({ success: true, message: 'Booking marked as completed', data: updated });
 };
 
 exports.payForBooking = async (req, res) => {
-  throw new AppError('Manual payment is no longer required. Save a payment method and wait for tutor approval.', 400);
+  const stripe = isStripeConfigured() ? getStripe() : null;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      payment: true,
+      learner: true,
+    },
+  });
+
+  if (!booking || booking.learnerId !== req.user.id) {
+    throw new AppError('Booking not found', 404);
+  }
+
+  const payableBookings = await getPayableSeriesBookingsForLearner(booking, req.user.id);
+  if (!payableBookings.length) {
+    throw new AppError('This booking has already been paid', 400);
+  }
+
+  const selectedPaymentMethodId =
+    payableBookings.find((item) => item.payment?.stripePaymentMethodId)?.payment?.stripePaymentMethodId ||
+    booking.learner?.stripeDefaultPaymentMethodId;
+  const stripeCustomerId =
+    payableBookings.find((item) => item.payment?.stripeCustomerId)?.payment?.stripeCustomerId ||
+    booking.learner?.stripeCustomerId;
+
+  if (!stripeCustomerId || !selectedPaymentMethodId) {
+    throw new AppError('Please save a payment method before paying for this booking', 400);
+  }
+
+  const totalAmount = payableBookings.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+  let paymentStatus = 'PROCESSING';
+  let paymentIntent = null;
+  let failureReason = null;
+
+  try {
+    if (!stripe) {
+      paymentIntent = { id: `local_pi_${Date.now()}` };
+      paymentStatus = 'PAID';
+    } else {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: String(
+          booking.currency || booking.payment?.currency || payableBookings[0]?.currency || 'AUD'
+        ).toLowerCase(),
+        customer: stripeCustomerId,
+        payment_method: selectedPaymentMethodId,
+        confirm: true,
+        off_session: true,
+        metadata: {
+          bookingId: booking.id,
+          learnerId: booking.learnerId,
+          recurringGroupId: booking.recurringGroupId || '',
+          bookingCount: String(payableBookings.length),
+        },
+      });
+
+      if (paymentIntent.status === 'succeeded') {
+        paymentStatus = 'PAID';
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        paymentStatus = 'FAILED';
+        failureReason = 'Payment method was declined';
+      }
+    }
+  } catch (error) {
+    paymentIntent = error?.raw?.payment_intent || null;
+    paymentStatus = 'FAILED';
+    failureReason =
+      error?.raw?.message || error?.message || 'Stripe payment could not be processed';
+  }
+
+  const processedAt = new Date();
+  const updatedBookings = await prisma.$transaction(
+    payableBookings.map((targetBooking) =>
+      prisma.booking.update({
+        where: { id: targetBooking.id },
+        data: {
+          payment: targetBooking.payment
+            ? {
+                update: {
+                  status: paymentStatus,
+                  stripeCustomerId,
+                  stripePaymentMethodId: selectedPaymentMethodId,
+                  stripePaymentIntentId: paymentIntent?.id || targetBooking.payment.stripePaymentIntentId,
+                  processedAt,
+                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
+                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
+                  failureReason,
+                },
+              }
+            : {
+                create: {
+                  userId: targetBooking.learnerId,
+                  amount: targetBooking.totalAmount,
+                  currency: targetBooking.currency || 'AUD',
+                  status: paymentStatus,
+                  stripeCustomerId,
+                  stripePaymentMethodId: selectedPaymentMethodId,
+                  stripePaymentIntentId: paymentIntent?.id || null,
+                  processedAt,
+                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
+                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
+                  failureReason,
+                  description: `${targetBooking.subject} session payment`,
+                },
+              },
+        },
+        include: bookingInclude,
+      })
+    )
+  );
+
+  const updated = updatedBookings.find((item) => item.id === booking.id) || updatedBookings[0];
+  const isSeriesPayment = updatedBookings.length > 1;
+
+  await notify(
+    booking.learnerId,
+    'payment',
+    isSeriesPayment ? 'Recurring Booking Paid' : 'Booking Paid',
+    paymentStatus === 'PAID'
+      ? isSeriesPayment
+        ? `${updatedBookings.length} sessions in your recurring booking have been paid successfully.`
+        : 'Your booking has been paid successfully.'
+      : 'We could not process your payment. Please update your payment method and try again.',
+    `/bookings/${updated.id}`
+  );
+
+  res.json({
+    success: true,
+    message:
+      paymentStatus === 'PAID'
+        ? isSeriesPayment
+          ? `${updatedBookings.length} sessions paid successfully`
+          : 'Booking paid successfully'
+        : 'Payment failed',
+    data: updated,
+    affectedCount: updatedBookings.length,
+    seriesBookings: updatedBookings,
+  });
 };

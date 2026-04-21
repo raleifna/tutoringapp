@@ -8,7 +8,7 @@ async function updateMyProfile(req, res) {
         });
     }
 
-    const { firstName, lastName, bio, phone } = req.body;
+    const { firstName, lastName, bio, phone, timezone } = req.body;
 
     const user = await prisma.user.update({
         where: { id: req.user.id },
@@ -17,6 +17,7 @@ async function updateMyProfile(req, res) {
             ...(lastName !== undefined ? { lastName } : {}),
             ...(bio !== undefined ? { bio } : {}),
             ...(phone !== undefined ? { phone } : {}),
+            ...(timezone !== undefined ? { timezone } : {}),
         },
     });
 
@@ -30,6 +31,7 @@ async function updateMyProfile(req, res) {
             lastName: user.lastName,
             bio: user.bio,
             phone: user.phone,
+            timezone: user.timezone,
             role: user.role,
             status: user.status,
             balance: user.balance,

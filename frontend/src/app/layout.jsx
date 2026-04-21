@@ -1,10 +1,6 @@
-// src/app/layout.jsx - Root Layout
 import Providers from '../components/providers/Provider';
 import './globals.css';
-import { Inter } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata = {
   title: {
@@ -38,10 +34,11 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" translate="no" className="notranslate">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="google" content="notranslate" />
       </head>
       <body className="min-h-screen">
         <Providers>

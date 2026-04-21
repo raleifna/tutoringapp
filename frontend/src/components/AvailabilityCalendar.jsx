@@ -1,12 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { formatMonthDay as formatDate } from '../lib/formatters';
 import { DAY_ORDER, DAY_LABELS, HOURS, buildCellKey, cellsToSlots, getSlotDate, getWeekStart, slotsToCells } from '../lib/availability-calendar';
-
-const formatDate = (dayOfWeek, weekOffset) =>
-  new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' }).format(
-    getSlotDate(dayOfWeek, 0, weekOffset)
-  );
 
 const formatWeekRange = (weekOffset) => {
   const start = getWeekStart(new Date(), weekOffset);
@@ -25,6 +21,7 @@ export default function AvailabilityCalendar({
   selectedKeys = [],
   currentWeekSlots = [],
   hasCurrentWeekOverride = false,
+  bookedSlots = [],
   fixedWeekOffset,
   hideWeekNavigation = false,
   title,
@@ -34,6 +31,31 @@ export default function AvailabilityCalendar({
   const baseCells = useMemo(() => slotsToCells(slots), [slots]);
   const overrideCells = useMemo(() => slotsToCells(currentWeekSlots), [currentWeekSlots]);
   const cells = hasCurrentWeekOverride && weekOffset === 0 ? overrideCells : baseCells;
+  const bookedCells = useMemo(() => {
+    const weekStart = getWeekStart(new Date(), weekOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    const nextCells = new Set();
+
+    bookedSlots.forEach((slot) => {
+      const start = new Date(slot?.scheduledAt);
+      if (Number.isNaN(start.getTime())) return;
+
+      const duration = Number(slot?.duration || 60);
+      const end = new Date(start.getTime() + duration * 60 * 1000);
+      const cursor = new Date(start);
+      cursor.setMinutes(0, 0, 0);
+
+      while (cursor < end) {
+        if (cursor >= weekStart && cursor < weekEnd) {
+          nextCells.add(buildCellKey(cursor.getDay(), cursor.getHours()));
+        }
+        cursor.setHours(cursor.getHours() + 1);
+      }
+    });
+
+    return nextCells;
+  }, [bookedSlots, weekOffset]);
   const activeSelections = selectedKeys.length ? selectedKeys : selectedKey ? [selectedKey] : [];
   const heading =
     title || (mode === 'edit' ? 'Weekly availability preview' : 'Pick a slot');
@@ -47,7 +69,7 @@ export default function AvailabilityCalendar({
       return;
     }
 
-    if (mode === 'select' && cells.has(key)) {
+    if (mode === 'select' && cells.has(key) && !bookedCells.has(key)) {
       onSelect?.({
         key: `${weekOffset}:${key}`,
         dayOfWeek,
@@ -80,7 +102,7 @@ export default function AvailabilityCalendar({
           {DAY_ORDER.map((dayOfWeek) => (
             <div key={dayOfWeek} className="rounded-lg bg-gray-50 p-2 text-center font-medium text-gray-600">
               <div>{DAY_LABELS[dayOfWeek]}</div>
-              <div className="text-[11px] text-gray-400">{formatDate(dayOfWeek, weekOffset)}</div>
+              <div className="text-[11px] text-gray-400">{formatDate(getSlotDate(dayOfWeek, 0, weekOffset))}</div>
             </div>
           ))}
           {HOURS.map((hour) => (
@@ -89,6 +111,7 @@ export default function AvailabilityCalendar({
               hour={hour}
               mode={mode}
               cells={cells}
+              bookedCells={bookedCells}
               selectedKeys={activeSelections}
               weekOffset={weekOffset}
               onClick={handleClick}
@@ -100,7 +123,7 @@ export default function AvailabilityCalendar({
   );
 }
 
-function FragmentRow({ hour, mode, cells, selectedKeys, weekOffset, onClick }) {
+function FragmentRow({ hour, mode, cells, bookedCells, selectedKeys, weekOffset, onClick }) {
   return (
     <>
           <div className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-400">
@@ -109,9 +132,10 @@ function FragmentRow({ hour, mode, cells, selectedKeys, weekOffset, onClick }) {
       {DAY_ORDER.map((dayOfWeek) => {
         const key = buildCellKey(dayOfWeek, hour);
         const active = cells.has(key);
-        const disabled = mode === 'select' && (!active || getSlotDate(dayOfWeek, hour, weekOffset) < new Date());
+        const booked = mode === 'select' && bookedCells.has(key);
+        const disabled = mode === 'select' && (!active || booked || getSlotDate(dayOfWeek, hour, weekOffset) < new Date());
         const selected = selectedKeys.includes(`${weekOffset}:${key}`);
-        const label = selected ? 'Selected' : active ? 'Available' : '';
+        const label = selected ? 'Selected' : booked ? 'Booked' : active ? 'Available' : '';
         return (
           <button
             key={key}
@@ -121,6 +145,8 @@ function FragmentRow({ hour, mode, cells, selectedKeys, weekOffset, onClick }) {
             className={`flex h-9 items-center justify-center rounded-lg border px-2 text-center transition-colors ${
               selected
                 ? 'border-primary-600 bg-primary-100 text-primary-700'
+                : booked
+                  ? 'border-gray-300 bg-gray-100 text-gray-500'
                 : active
                   ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                   : 'border-gray-200 bg-white text-gray-300'

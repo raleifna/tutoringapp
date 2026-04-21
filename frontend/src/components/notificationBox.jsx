@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { notificationApi } from '../lib/api-entry';
+import { formatTimeAgo } from '../lib/formatters';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
@@ -12,52 +13,49 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 
-const formatTimeAgo = (timestamp) => {
-  // timestamp is string, convert to Date object
-  if (typeof timestamp === 'string') {
-    timestamp = new Date(timestamp);
-  }
+const appendNotificationContext = (href) => {
+  if (!href) return href;
 
-  const now = new Date();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+  const separator = href.includes('?') ? '&' : '?';
+  const hasFrom = href.includes('from=');
+  const hasReturnTo = href.includes('returnTo=');
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+  let nextHref = href;
+  if (!hasFrom) nextHref += `${separator}from=notifications`;
+  if (!hasReturnTo) nextHref += `${nextHref.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent('/notifications')}`;
+  return nextHref;
 };
-
 
 const NotificationBox = ({ currentUserId }) => {
 
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   // ============= notifications ===============
-    const { data: notificationsData, refetch: fetchNotifications } = useQuery({
+    const { data: notificationsData } = useQuery({
       queryKey: ['notifications', currentUserId],
       queryFn: () => notificationApi.search({ 
         page: 1, 
-        limit: 10 
+        limit: 10
       }),
       enabled: !!currentUserId,
       keepPreviousData: true,
     });
 
-    const recentNotifications = notificationsData?.data?.data?.notifications || [];  
+    const recentNotifications = notificationsData?.data?.data?.notifications || [];
     const unreadCount = recentNotifications.filter(n => !n.read).length;
-  
+
     const handleNotificationClick = () => {
       setIsNotificationOpen(!isNotificationOpen);
     };
   
-    const handleMarkAsRead = async (notificationId) => {
+    const handleMarkAsRead = async (notificationId, { silent = false } = {}) => {
       try {
         await notificationApi.markAsRead(notificationId);
-        fetchNotifications();
-        toast.success('Notification marked as read');
+        await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
+        if (!silent) {
+          toast.success('Notification marked as read');
+        }
       } catch (error) {
         toast.error('Failed to mark notification as read');
       }
@@ -66,18 +64,20 @@ const NotificationBox = ({ currentUserId }) => {
     const handleMarkAllAsRead = async () => {
       try {
         await notificationApi.markAsRead('all');
-        fetchNotifications();
+        await queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] });
         toast.success('All notifications marked as read');
       } catch (error) {
         toast.error('Failed to mark all notifications as read');
       }
     };
   
-    const handleNotificationAction = (notification) => {
+    const handleNotificationAction = async (notification) => {
       if (notification.link) {
-        router.push(notification.link);
+        if (!notification.read) {
+          await handleMarkAsRead(notification.id, { silent: true });
+        }
+        router.push(appendNotificationContext(notification.link));
         setIsNotificationOpen(false);
-        handleMarkAsRead(notification.id);
       }
     };
   

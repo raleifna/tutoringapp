@@ -15,63 +15,38 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
+import { getAvatarUrl } from '../../../../lib/avatar';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import {
+  getRecurringDisplayBookings,
+  getRecurringLabel,
+  isRecurringBooking,
+} from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
-
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
-};
-
-const formatCurrency = (amount, currency = 'AUD') => {
-  const value = Number(amount || 0);
-  if (Number.isNaN(value)) return '$0';
-  try {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: currency || 'AUD',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value}`;
-  }
-};
-
-const formatDate = (dateTime) => {
-  if (!dateTime) return '-';
-  const date = new Date(dateTime);
-  if (Number.isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('en-AU', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const formatDuration = (minutes) => {
-  const value = Number(minutes || 0);
-  if (!value) return '0 mins';
-  if (value % 60 === 0) return `${value / 60} hr`;
-  return `${value} mins`;
-};
-
-const getAvatarUrl = (avatar, firstName, lastName) => {
-  const avatarValue = String(avatar || '');
-  if (
-    avatarValue &&
-    !avatarValue.startsWith('blob:') &&
-    !avatarValue.includes('mock.local/avatar/')
-  ) {
-    return avatarValue;
-  }
-  const name = `${firstName || ''} ${lastName || ''}`.trim() || 'Learner';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0ea5e9&color=fff`;
-};
+import BookingCalendar from '../../../../components/BookingCalendar';
+import { cn } from '../../../../lib/utils';
 
 export default function TutorDashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+
+  const formattedTime = time.toLocaleTimeString({
+    timeZone: timeZone,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -81,7 +56,7 @@ export default function TutorDashboardPage() {
 
   const { data: requestsData, isLoading: requestsLoading } = useQuery({
     queryKey: ['tutor-requests', currentUserId, 'PENDING'],
-    queryFn: () => bookingApi.getTutorBookings({ status: 'PENDING', limit: 5 }),
+    queryFn: () => bookingApi.getTutorBookings({ status: 'PENDING', limit: 200 }),
     enabled: mounted && !!currentUserId,
   });
 
@@ -104,15 +79,15 @@ export default function TutorDashboardPage() {
     retry: false,
   });
 
-  const requests = requestsData?.data?.data?.bookings || [];
+  const pendingRequestBookings = requestsData?.data?.data?.bookings || [];
+  const requests = getRecurringDisplayBookings(pendingRequestBookings);
+  const pendingRequestPreview = requests.slice(0, 5);
   const upcomingBookings = upcomingData?.data?.data?.bookings || [];
   const allBookings = allBookingsData?.data?.data?.bookings || [];
   const myProfile = myProfileData?.data?.data || null;
   const tutorProfileId = myProfile?.id || user?.tutorProfileId || user?.tutorProfile?.id || null;
   const tutorProfileStatus = myProfile?.status || user?.tutorProfile?.status || null;
   const hasTutorProfile = Boolean(tutorProfileId);
-  const shouldWaitForTutorProfile =
-    mounted && user?.role === 'TUTOR' && !!currentUserId && myProfileLoading && !user?.tutorProfile;
 
   const completedBookings = allBookings.filter((booking) => booking.status === 'COMPLETED');
   const totalEarnings = completedBookings.reduce(
@@ -128,7 +103,7 @@ export default function TutorDashboardPage() {
   const stats = [
     {
       label: 'Pending Requests',
-      value: requestsData?.data?.data?.pagination?.total || 0,
+      value: requests.length,
       icon: ClockIcon,
       color: 'text-yellow-600 bg-yellow-50',
       href: '/tutor/requests?status=PENDING',
@@ -165,7 +140,7 @@ export default function TutorDashboardPage() {
     return <div className="space-y-5" />;
   }
 
-  if (shouldWaitForTutorProfile) {
+  if (mounted && user?.role === 'TUTOR' && !!currentUserId && myProfileLoading && !user?.tutorProfile) {
     return <div className="space-y-5" />;
   }
 
@@ -196,14 +171,19 @@ export default function TutorDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="relative rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5">
-        <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
-        <h1 className="text-xl font-bold">{displayName}</h1>
-        <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
-        <div className="mt-4 pr-12 sm:pr-0">
-          <button onClick={handleLogout} className="btn-secondary">
-            Log out
-          </button>
+      <div className="flex rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 p-4 text-white sm:p-5 items-center">
+        <div className='flex-1'>
+          <p className="text-primary-200 text-xs font-medium mb-0.5">Good day 👋</p>
+          <h1 className="text-xl font-bold">{displayName}</h1>
+          <p className="text-primary-200 text-sm mt-1">Welcome back, {user?.firstName}! Here's your overview.</p>
+          <div className="mt-4 pr-12 sm:pr-0">
+            <button onClick={handleLogout} className="btn-secondary">
+              Log out
+            </button>
+          </div>
+        </div>
+        <div className='text-xl font-bold'>
+          {formattedTime}
         </div>
       </div>
 
@@ -229,7 +209,7 @@ export default function TutorDashboardPage() {
 
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-900">Pending Requests</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Pending Requests</h2>
           <Link
             href="/tutor/requests"
             className="text-sm text-primary-600 hover:underline flex items-center gap-1"
@@ -247,8 +227,9 @@ export default function TutorDashboardPage() {
           <p className="text-gray-400 text-sm py-4 text-center">No pending requests</p>
         ) : (
           <div className="space-y-2">
-            {requests.map((booking) => {
+            {pendingRequestPreview.map((booking) => {
               const learner = booking.learner;
+              const recurring = isRecurringBooking(booking);
               return (
                 <Link
                   key={booking.id}
@@ -256,7 +237,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
@@ -264,9 +248,16 @@ export default function TutorDashboardPage() {
                     <p className="font-medium text-sm text-gray-900">
                       {learner?.firstName} {learner?.lastName}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {booking.subject} · {formatDate(booking.scheduledAt)}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-gray-500">
+                        {booking.subject} · {formatDate(booking.scheduledAt)}
+                      </p>
+                      {recurring && (
+                        <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                          {getRecurringLabel(booking)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="mt-0.5 shrink-0 rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700">
                     Pending
@@ -280,7 +271,7 @@ export default function TutorDashboardPage() {
 
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-900">Upcoming Sessions</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Upcoming Sessions</h2>
           <Link
             href="/bookings?from=tutor-dashboard"
             className="text-sm text-primary-600 hover:underline flex items-center gap-1"
@@ -295,7 +286,7 @@ export default function TutorDashboardPage() {
             ))}
           </div>
         ) : upcomingBookings.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4 text-center">No upcoming sessions</p>
+          <p className="text-sm font-semibold text-gray-900">No upcoming sessions</p>
         ) : (
           <div className="space-y-2">
             {upcomingBookings.map((booking) => {
@@ -307,7 +298,10 @@ export default function TutorDashboardPage() {
                   className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                 >
                   <img
-                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName)}
+                    src={getAvatarUrl(learner?.avatar, learner?.firstName, learner?.lastName, {
+                      fallbackName: 'Learner',
+                      ignoreTemporary: true,
+                    })}
                     alt=""
                     className="w-9 h-9 rounded-full object-cover"
                   />
@@ -330,54 +324,65 @@ export default function TutorDashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          {
-            label: 'Manage Profile',
-            desc: 'Update subjects, rates, availability',
-            href: '/tutor/profile',
-            color: 'bg-primary-600',
-          },
-          {
-            label: 'Booking Requests',
-            desc: 'Accept or decline requests',
-            href: '/tutor/requests',
-            color: 'bg-green-600',
-          },
-          {
-            label: 'Messages',
-            desc: 'Open learner chats',
-            href: '/messages',
-            color: 'bg-blue-600',
-          },
-          {
-            label: 'View as Learner',
-            desc: 'See your public profile',
-            href: viewAsLearnerNavHref,
-            color: 'bg-purple-600',
-          },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className="card p-5 hover:shadow-md transition-shadow group"
-          >
-            <div
-              className={cn(
-                'w-10 h-10 rounded-lg mb-3 flex items-center justify-center',
-                item.color
-              )}
+      <div className="card p-4">
+        <BookingCalendar
+          bookings={allBookings}
+          isTutor={true}
+          returnTo="/tutor/dashboard"
+        />
+      </div>
+
+      <div className="card p-5">
+        <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            {
+              label: 'Manage Profile',
+              desc: 'Update subjects, rates, availability',
+              href: '/tutor/profile',
+              color: 'bg-primary-600',
+            },
+            {
+              label: 'Booking Requests',
+              desc: 'Accept or decline requests',
+              href: '/tutor/requests',
+              color: 'bg-green-600',
+            },
+            {
+              label: 'Messages',
+              desc: 'Open learner chats',
+              href: '/messages',
+              color: 'bg-blue-600',
+            },
+            {
+              label: 'View as Learner',
+              desc: 'See your public profile',
+              href: viewAsLearnerNavHref,
+              color: 'bg-purple-600',
+            },
+          ].map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="card p-5 hover:shadow-md transition-shadow group"
             >
-              {item.label === 'Messages' ? (
-                <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
-              ) : (
-                <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
-              )}
-            </div>
-            <h3 className="font-semibold text-gray-900 text-sm">{item.label}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
-          </Link>
-        ))}
+              <div
+                className={cn(
+                  'w-10 h-10 rounded-lg mb-3 flex items-center justify-center',
+                  item.color
+                )}
+              >
+                {item.label === 'Messages' ? (
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+                ) : (
+                  <ArrowRightIcon className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform" />
+                )}
+              </div>
+              <h3 className="font-semibold text-gray-900 text-sm">{item.label}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

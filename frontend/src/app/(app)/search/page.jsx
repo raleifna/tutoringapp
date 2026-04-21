@@ -13,106 +13,14 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { subjectApi, tutorApi } from '../../../lib/api-entry';
+import {
+  getDefaultSearchFilters,
+  parseSearchFilters,
+  SEARCH_LOCATION_OPTIONS,
+  SEARCH_SESSION_TYPES,
+  SEARCH_SORT_OPTIONS,
+} from '../../../lib/search-filters';
 import BackButton from '../../../components/BackButton';
-
-const SESSION_TYPES = [
-  { value: '', label: 'Any type' },
-  { value: 'ONLINE', label: 'Online' },
-  { value: 'IN_PERSON', label: 'In person' },
-  { value: 'HYBRID', label: 'Hybrid' },
-];
-
-const SORT_OPTIONS = [
-  { value: 'rating', label: 'Highest rated' },
-  { value: 'rate_asc', label: 'Price low to high' },
-  { value: 'rate_desc', label: 'Price high to low' },
-  { value: 'experience', label: 'Most experienced' },
-];
-
-const SORT_VALUES = new Set(SORT_OPTIONS.map((item) => item.value));
-const SESSION_TYPE_VALUES = new Set(SESSION_TYPES.map((item) => item.value));
-
-const getPageNumber = (value) => {
-  const next = Number.parseInt(String(value || '1'), 10);
-  return Number.isFinite(next) && next > 0 ? next : 1;
-};
-
-const getInitialSort = (value) => {
-  const next = String(value || 'rating');
-  return SORT_VALUES.has(next) ? next : 'rating';
-};
-
-const getInitialSessionType = (value) => {
-  const next = String(value || '').toUpperCase();
-  return SESSION_TYPE_VALUES.has(next) ? next : '';
-};
-
-export const locationOptions = [
-  {
-    value: 'United States',
-    label: 'United States',
-    children: [
-      {
-        value: 'California',
-        label: 'California',
-        children: [
-          { value: 'Los Angeles', label: 'Los Angeles' },
-          { value: 'San Francisco', label: 'San Francisco' }
-        ]
-      },
-      {
-        value: 'New York',
-        label: 'New York',
-        children: [
-          { value: 'New York City', label: 'New York City' },
-          { value: 'Buffalo', label: 'Buffalo' }
-        ]
-      }
-    ]
-  },
-  {
-    value: 'United Kingdom',
-    label: 'United Kingdom',
-    children: [
-      {
-        value: 'England',
-        label: 'England',
-        children: [
-          { value: 'London', label: 'London' },
-          { value: 'Manchester', label: 'Manchester' }
-        ]
-      }
-    ]
-  },
-  {
-    value: 'China',
-    label: 'China',
-    children: [
-      {
-        value: 'Guangdong',
-        label: 'Guangdong',
-        children: [
-          { value: 'Guangzhou', label: 'Guangzhou' },
-          { value: 'Shenzhen', label: 'Shenzhen' }
-        ]
-      }
-    ]
-  },
-  {
-    value: 'Australia',
-    label: 'Australia',
-    children: [
-      {
-        value: 'New South Wales',
-        label: 'New South Wales',
-        children: [
-          { value: 'Sydney', label: 'Sydney' },
-          { value: 'Newcastle', label: 'Newcastle' }
-        ]
-      }
-    ]
-  }
-];
 
 const LocationCascader = ({ value, updateFilter }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -145,13 +53,13 @@ const LocationCascader = ({ value, updateFilter }) => {
     if (!option.children || option.children.length === 0) {
       setSelectedPath(newActivePath);
       setIsOpen(false); 
-      const locationString = newActivePath.map(item => item.label).reverse()[0];
+      const locationString = newActivePath[newActivePath.length - 1]?.label || '';
       updateFilter('location', locationString);
     }
   };
   const getColumns = () => {
-    const columns = [locationOptions]; 
-    let currentOptions = locationOptions;
+    const columns = [SEARCH_LOCATION_OPTIONS];
+    let currentOptions = SEARCH_LOCATION_OPTIONS;
 
     activePath.forEach(selectedItem => {
       const option = currentOptions.find(opt => opt.value === selectedItem.value);
@@ -233,24 +141,10 @@ function SearchPageContent() {
   const from = (searchParams.get('from') || '').toLowerCase();
   const showBackButton = Boolean(from);
 
-  const [filters, setFilters] = useState({
-    subject: searchParams.get('subject') || '',
-    location: searchParams.get('location') || '',
-    sessionType: getInitialSessionType(searchParams.get('sessionType')),
-    sort: getInitialSort(searchParams.get('sort')),
-    page: getPageNumber(searchParams.get('page')),
-    limit: 10,
-  });
+  const [filters, setFilters] = useState(() => parseSearchFilters(searchParams));
 
   useEffect(() => {
-    setFilters({
-      subject: searchParams.get('subject') || '',
-      location: searchParams.get('location') || '',
-      sessionType: getInitialSessionType(searchParams.get('sessionType')),
-      sort: getInitialSort(searchParams.get('sort')),
-      page: getPageNumber(searchParams.get('page')),
-      limit: 10,
-    });
+    setFilters(parseSearchFilters(searchParams));
   }, [searchParams]);
 
   // Stage 2 priority #1: category list
@@ -295,14 +189,7 @@ function SearchPageContent() {
   };
 
   const clearFilters = () => {
-    setFilters({
-      subject: '',
-      location: '',
-      sessionType: '',
-      sort: 'rating',
-      page: 1,
-      limit: 10,
-    });
+    setFilters(getDefaultSearchFilters());
   };
 
   const handlePageChange = (nextPage) => {
@@ -337,7 +224,7 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-0 py-2 sm:px-2 sm:py-4">
+    <div className="w-full px-0 py-2 sm:py-4">
       <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="flex flex-wrap items-start gap-2">
           <AcademicCapIcon className="w-6 h-6 text-primary-600" />
@@ -375,7 +262,7 @@ function SearchPageContent() {
               onChange={(event) => updateFilter('sessionType', event.target.value)}
               className="input"
             >
-              {SESSION_TYPES.map((option) => (
+              {SEARCH_SESSION_TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -389,7 +276,7 @@ function SearchPageContent() {
               onChange={(event) => updateFilter('sort', event.target.value)}
               className="input"
             >
-              {SORT_OPTIONS.map((option) => (
+              {SEARCH_SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

@@ -1,0 +1,3 @@
+export const TUTOR_SESSION_TYPES = ['ONLINE', 'IN_PERSON', 'HYBRID'];
+
+export const BOOKING_DURATIONS = [30, 60, 90, 120, 150, 180];
