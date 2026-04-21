@@ -72,7 +72,7 @@ export default function BookingDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, fetchMe } = useAuthStore();
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
@@ -151,6 +151,7 @@ export default function BookingDetailPage() {
       const refunded = response?.data?.data?.payment?.status === 'REFUNDED';
       toast.success(refunded ? 'Booking cancelled and payment refunded' : 'Booking cancelled');
       await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
+      fetchMe();
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to cancel booking');
@@ -159,6 +160,8 @@ export default function BookingDetailPage() {
 
   const cancelSeriesMutation = useMutation({
     mutationFn: async (targetIds) => {
+      console.log("cancel orders: ", targetIds);
+
       const results = await Promise.allSettled(targetIds.map((targetId) => bookingApi.cancel(targetId)));
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
       const failedCount = results.length - successCount;
@@ -712,19 +715,22 @@ export default function BookingDetailPage() {
               : 'You can cancel this booking before the tutor confirms it.'}
         </div>
         {canCancel && (
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Cancel this booking?')) {
-                cancelMutation.mutate(id);
-              }
-            }}
-            disabled={cancelMutation.isPending}
-            className="btn-danger gap-2"
-          >
-            <XCircleIcon className="w-4 h-4" />
-            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking'}
-          </button>
+          <>
+          
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Cancel this booking?')) {
+                  cancelMutation.mutate(id);
+                }
+              }}
+              disabled={cancelMutation.isPending}
+              className="btn-danger gap-2"
+            >
+              <XCircleIcon className="w-4 h-4" />
+              {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Booking'}
+            </button>          
+          </>
         )}
 
         {recurring && isLearner && cancellableRecurringBookings.length > 0 && (

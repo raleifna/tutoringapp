@@ -458,6 +458,7 @@ exports.getBooking = async (req, res) => {
 };
 
 exports.cancelBooking = async (req, res) => {
+  const stripe = getStripe();
   const { reason } = req.body;
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
@@ -485,13 +486,47 @@ exports.cancelBooking = async (req, res) => {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
 
+  // learners can cancel before tutor confirmation at any time.
+  // the 48 hours rule only applies after the tutor has accepted the booking.
   const now = new Date();
   const scheduledTime = new Date(booking.scheduledAt);
-  const hoursUntilSession = (scheduledTime - now) / (1000 * 60 * 60);
+  const hour2 = (scheduledTime - now) / (1000 * 60 * 60);
   const isPaidBooking = isPaidPaymentStatus(booking?.payment?.status);
-  const isAcceptedBooking = booking.status === 'ACCEPTED';
-  if (isLearner && isPaidBooking && isAcceptedBooking && hoursUntilSession < 48) {
+  if (isLearner && isPaidBooking && booking.status === 'ACCEPTED' && hour2 < 48) {
     throw new AppError('Cannot cancel an accepted booking within 48 hours of the session', 400);
+  }
+
+  // TODO: Will the refunded money be deducted by the platform fee and the teacher's fee?
+  const paidAmount = parseFloat(booking.payment?.amount || 0);
+
+  // Refound to stripe
+  if (isPaidPaymentStatus(booking?.payment?.status)) {
+    if (!booking.payment) {
+      throw new AppError('Payment not found', 404);
+    }
+    if (!booking.payment.stripePaymentIntentId) {
+      throw new AppError('Stripe payment intent ID not found', 404);
+    }
+
+    try {
+  
+      const refund = await stripe.refunds.create({
+        payment_intent: booking.payment.stripePaymentIntentId,
+      });
+
+      console.log("refund:" + refund);
+      console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
+      
+    } catch (err) {
+      // If have refound, just set ok
+      if (err.type === 'StripeInvalidRequestError') {
+        if (err.code === 'charge_already_refunded') {
+          console.log("charge already refunded");
+        }
+      } else {
+        throw err;
+      }
+    }
   }
 
   const updated = await prisma.booking.update({
@@ -507,7 +542,7 @@ exports.cancelBooking = async (req, res) => {
                 refundAmount: booking.payment.amount,
                 refundedAt: new Date(),
               },
-            },
+            }
           }
         : booking?.payment
           ? {
@@ -813,3 +848,4 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
+
