@@ -46,10 +46,6 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const currentIpAddress = formatIpAddress(user?.ipAddress);
-  const currentLocationLabel = formatLocationLabel(user?.ipLocationLabel);
-
   const savedMethodQuery = useQuery({
     queryKey: ['savedPaymentMethod', user?.id],
     queryFn: () => paymentApi.getSavedMethod(),
@@ -170,16 +166,6 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-500">{user?.email}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="badge bg-primary-50 text-primary-700 text-xs">{user?.role}</span>
-            {currentIpAddress && (
-              <span className="badge bg-gray-100 text-gray-700 text-xs">
-                Current IP: {currentIpAddress}
-              </span>
-            )}
-            {currentLocationLabel && (
-              <span className="badge bg-gray-100 text-gray-700 text-xs">
-                Region: {currentLocationLabel}
-              </span>
-            )}            
           </div>
         </div>
       </div>
