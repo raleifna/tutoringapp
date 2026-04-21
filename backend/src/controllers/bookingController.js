@@ -514,7 +514,7 @@ exports.cancelBooking = async (req, res) => {
 
     console.log("refund:" + refund);
     console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
-
+  }
 
   const updated = await prisma.booking.update({
     where: { id: req.params.id },
@@ -835,4 +835,4 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
-}
+
