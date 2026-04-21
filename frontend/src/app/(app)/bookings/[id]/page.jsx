@@ -719,7 +719,7 @@ export default function BookingDetailPage() {
               type="button"
               onClick={() => {
                 if (window.confirm('Cancel this booking?')) {
-                  cancelMutation.mutate();
+                  cancelMutation.mutate(id);
                 }
               }}
               disabled={cancelMutation.isPending}
