@@ -30,8 +30,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tutorconnect}:${POSTGRES_PASSWORD:-tutorconnect_pass}@postgres:5432/${POSTGRES_DB:-tutorconnect}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-dev-jwt-refresh-secret-change-me}
       EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
       EMAIL_FROM: ${EMAIL_FROM:-TutorConnect <no-reply@example.com>}
       SMTP_HOST: ${SMTP_HOST:-}
