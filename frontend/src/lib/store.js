@@ -58,12 +58,13 @@ export const useAuthStore = create((set, get) => ({
     try {
       set({ isLoading: true });
       const { data } = await authApi.getMe();
+      const nextUser = data.user;
       saveAuthToStorage({
-        user: data.user,
+        user: nextUser,
         accessToken: get().accessToken,
         refreshToken: get().refreshToken,
       });
-      set({ user: data.user, isLoading: false });
+      set({ user: nextUser, isLoading: false });
       return nextUser;
     } catch {
       set({ isLoading: false });

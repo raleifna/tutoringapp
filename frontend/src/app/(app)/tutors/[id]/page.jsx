@@ -300,13 +300,13 @@ export default function TutorDetailPage() {
           .join(', ');
         const extraCount = failureCount > 3 ? ` +${failureCount - 3} more` : '';
         toast(
-          `Created ${successCount} of ${totalCount} booking requests. Failed: ${failedDates}${extraCount}.`
+          `Booked ${successCount} of ${totalCount} sessions. Conflicts: ${failedDates}${extraCount}.`
         );
       } else {
         toast.success(
           totalCount > 1
-            ? `${totalCount} booking requests sent!`
-            : 'Booking request sent!'
+            ? `${totalCount} sessions booked successfully.`
+            : 'Session booked successfully.'
         );
       }
 
@@ -775,7 +775,8 @@ export default function TutorDetailPage() {
                     {conflictingPreviewDates.length > 0 && (
                       <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                         {conflictingPreviewDates.length} selected session
-                        {conflictingPreviewDates.length === 1 ? ' is' : 's are'} already booked and may be skipped if submitted.
+                        {conflictingPreviewDates.length === 1 ? ' has' : 's have'} a time conflict. If you continue,
+                        only the available sessions will be booked.
                       </p>
                     )}
                   </div>
