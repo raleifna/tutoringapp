@@ -835,3 +835,4 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
+}
