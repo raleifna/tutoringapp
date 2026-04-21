@@ -508,12 +508,25 @@ exports.cancelBooking = async (req, res) => {
       throw new AppError('Stripe payment intent ID not found', 404);
     }
 
-    const refund = await stripe.refunds.create({
-      payment_intent: booking.payment.stripePaymentIntentId,
-    });
+    try {
+  
+      const refund = await stripe.refunds.create({
+        payment_intent: booking.payment.stripePaymentIntentId,
+      });
 
-    console.log("refund:" + refund);
-    console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
+      console.log("refund:" + refund);
+      console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
+      
+    } catch (err) {
+      // If have refound, just set ok
+      if (err.type === 'StripeInvalidRequestError') {
+        if (err.code === 'charge_already_refunded') {
+          console.log("charge already refunded");
+        }
+      } else {
+        throw err;
+      }
+    }
   }
 
   const updated = await prisma.booking.update({

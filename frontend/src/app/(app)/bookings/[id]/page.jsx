@@ -160,6 +160,8 @@ export default function BookingDetailPage() {
 
   const cancelSeriesMutation = useMutation({
     mutationFn: async (targetIds) => {
+      console.log("cancel orders: ", targetIds);
+
       const results = await Promise.allSettled(targetIds.map((targetId) => bookingApi.cancel(targetId)));
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
       const failedCount = results.length - successCount;
