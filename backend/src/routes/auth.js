@@ -9,11 +9,10 @@ const {
     getMe,
 } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
-const { upload } = require('../middleware/upload');
 
 const router = express.Router();
 
-router.post('/register', upload.array('verificationFiles', 5), register);
+router.post('/register', register);
 router.post('/login', login);
 router.get('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerification);

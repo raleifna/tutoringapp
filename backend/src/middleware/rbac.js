@@ -38,4 +38,24 @@ const authorizeOwner = (paramName = 'userId') => {
   };
 };
 
-module.exports = { authorize, authorizeOwner };
+const authorizeActiveTutor = (req, res, next) => {
+  if (!req.user) {
+    throw new AppError('Authentication required', 401);
+  }
+
+  if (req.user.role !== 'TUTOR') {
+    throw new AppError('Access denied', 403);
+  }
+
+  const tutorProfile = req.user.tutorProfile;
+  const tutorStatus = String(tutorProfile?.status || '').toUpperCase();
+  const applicationSubmitted = Boolean(tutorProfile?.applicationSubmitted);
+
+  if (!applicationSubmitted || tutorStatus !== 'ACTIVE') {
+    throw new AppError('Your tutor account must be approved before using this feature.', 403);
+  }
+
+  next();
+};
+
+module.exports = { authorize, authorizeOwner, authorizeActiveTutor };

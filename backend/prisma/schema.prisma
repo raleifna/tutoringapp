@@ -166,6 +166,7 @@ model TutorProfile {
   id                String        @id @default(uuid())
   userId            String        @unique
   status            ProfileStatus @default(PENDING)
+  applicationSubmitted Boolean    @default(false)
   headline          String?
   hourlyRate        Decimal       @db.Decimal(10, 2) @default(0)
   currency          String        @default("AUD")
@@ -498,5 +499,4 @@ model Notification {
   @@index([userId])
   @@map("notifications")
 }
-
 

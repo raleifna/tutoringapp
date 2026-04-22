@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 
 const bookingController = require('../controllers/bookingController');
 const { authenticate } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { authorize, authorizeActiveTutor } = require('../middleware/rbac');
 const { validate } = require('../middleware/validate');
 
 const router = express.Router();
@@ -48,12 +48,12 @@ const bookingRules = [
 
 router.post('/', authorize('LEARNER'), bookingRules, validate, bookingController.createBooking);
 router.get('/my-bookings', bookingController.getMyBookings);
-router.get('/tutor/requests', authorize('TUTOR'), bookingController.getTutorBookings);
+router.get('/tutor/requests', authorize('TUTOR'), authorizeActiveTutor, bookingController.getTutorBookings);
 router.get('/:id', bookingController.getBooking);
 router.patch('/:id/payment/pay', authorize('LEARNER'), bookingController.payForBooking);
 router.post('/:id/cancel', bookingController.cancelBooking);
-router.patch('/:id/accept', authorize('TUTOR'), bookingController.acceptBooking);
-router.patch('/:id/decline', authorize('TUTOR'), bookingController.declineBooking);
-router.patch('/:id/complete', authorize('TUTOR'), bookingController.completeBooking);
+router.patch('/:id/accept', authorize('TUTOR'), authorizeActiveTutor, bookingController.acceptBooking);
+router.patch('/:id/decline', authorize('TUTOR'), authorizeActiveTutor, bookingController.declineBooking);
+router.patch('/:id/complete', authorize('TUTOR'), authorizeActiveTutor, bookingController.completeBooking);
 
 module.exports = router;

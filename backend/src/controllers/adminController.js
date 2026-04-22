@@ -25,7 +25,9 @@ exports.getDashboard = async (req, res) => {
     where: { role: { notIn: ELEVATED_ROLES }, createdAt: { gte: monthStart } },
   });
   const totalTutors = await prisma.tutorProfile.count();
-  const pendingTutors = await prisma.tutorProfile.count({ where: { status: 'PENDING' } });
+  const pendingTutors = await prisma.tutorProfile.count({
+    where: { status: 'PENDING', applicationSubmitted: true },
+  });
   const totalBookings = await prisma.booking.count();
   const bookingsThisMonth = await prisma.booking.count({ where: { createdAt: { gte: monthStart } } });
   const completedBookings = await prisma.booking.count({ where: { status: 'COMPLETED' } });
@@ -316,7 +318,10 @@ exports.updateUserStatus = async (req, res) => {
 exports.getPendingTutors = async (req, res) => {
   const { status = 'PENDING', page = 1, limit = 20 } = req.query;
   const pagination = parsePagination(page, limit);
-  const where = status ? { status } : {};
+  const where = {
+    applicationSubmitted: true,
+    ...(status ? { status } : {}),
+  };
 
   const [tutors, total] = await Promise.all([
     prisma.tutorProfile.findMany({
@@ -367,7 +372,7 @@ exports.approveTutor = async (req, res) => {
 
   await prisma.tutorProfile.update({
     where: { id: tutor.id },
-    data: { status: 'ACTIVE', isVerified: true, verifiedAt: new Date() },
+    data: { status: 'ACTIVE', applicationSubmitted: true, isVerified: true, verifiedAt: new Date() },
   });
 
   await prisma.adminAction.create({
@@ -398,7 +403,7 @@ exports.rejectTutor = async (req, res) => {
 
   await prisma.tutorProfile.update({
     where: { id: tutor.id },
-    data: { status: 'SUSPENDED', isVerified: false, verifiedAt: null },
+    data: { status: 'SUSPENDED', applicationSubmitted: true, isVerified: false, verifiedAt: null },
   });
 
   await prisma.adminAction.create({
@@ -433,7 +438,7 @@ exports.returnTutor = async (req, res) => {
 
   await prisma.tutorProfile.update({
     where: { id: tutor.id },
-    data: { status: 'SUSPENDED', isVerified: false, verifiedAt: null },
+    data: { status: 'SUSPENDED', applicationSubmitted: true, isVerified: false, verifiedAt: null },
   });
 
   await prisma.adminAction.create({

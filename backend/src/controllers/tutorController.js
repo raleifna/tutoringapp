@@ -174,6 +174,7 @@ const tutorProfileSelect = {
   id: true,
   userId: true,
   status: true,
+  applicationSubmitted: true,
   headline: true,
   hourlyRate: true,
   currency: true,
@@ -418,6 +419,7 @@ exports.updateApplication = async (req, res) => {
   const updated = await prisma.tutorProfile.update({
     where: { userId: req.user.id },
     data: {
+      applicationSubmitted: true,
       yearsExperience:
         tutorExperienceYears === undefined || tutorExperienceYears === ''
           ? profile.yearsExperience

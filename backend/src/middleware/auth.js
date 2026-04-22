@@ -26,6 +26,20 @@ async function authenticate(req, res, next) {
 
     const user = await prisma.user.findUnique({
         where: { id: payload.id },
+        select: {
+            id: true,
+            email: true,
+            role: true,
+            status: true,
+            tutorProfile: {
+                select: {
+                    id: true,
+                    status: true,
+                    applicationSubmitted: true,
+                    isVerified: true,
+                },
+            },
+        },
     });
 
     if (!user) {
@@ -40,6 +54,14 @@ async function authenticate(req, res, next) {
         email: user.email,
         role: user.role,
         status: user.status,
+        tutorProfile: user.tutorProfile
+            ? {
+                  id: user.tutorProfile.id,
+                  status: user.tutorProfile.status,
+                  applicationSubmitted: Boolean(user.tutorProfile.applicationSubmitted),
+                  isVerified: Boolean(user.tutorProfile.isVerified),
+              }
+            : null,
     };
 
     next();
@@ -63,6 +85,20 @@ async function optionalAuth(req, res, next) {
 
     const user = await prisma.user.findUnique({
         where: { id: payload.id },
+        select: {
+            id: true,
+            email: true,
+            role: true,
+            status: true,
+            tutorProfile: {
+                select: {
+                    id: true,
+                    status: true,
+                    applicationSubmitted: true,
+                    isVerified: true,
+                },
+            },
+        },
     });
 
     if (user) {
@@ -71,6 +107,14 @@ async function optionalAuth(req, res, next) {
             email: user.email,
             role: user.role,
             status: user.status,
+            tutorProfile: user.tutorProfile
+                ? {
+                      id: user.tutorProfile.id,
+                      status: user.tutorProfile.status,
+                      applicationSubmitted: Boolean(user.tutorProfile.applicationSubmitted),
+                      isVerified: Boolean(user.tutorProfile.isVerified),
+                  }
+                : null,
         };
     }
 
