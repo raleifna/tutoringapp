@@ -86,14 +86,13 @@ export default function HomePage() {
       <main className="mx-auto grid min-h-[calc(100vh-73px)] max-w-5xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
         <section className="rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-xl shadow-slate-200/50">
           <div className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
-            MVP First Demo
+            TutorConnect
           </div>
           <h1 className="mt-6 max-w-2xl text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
-            Keep the core flow: find a tutor, book a lesson, manage the session.
+            Find the right tutor, book lessons, and manage learning in one place.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
-            For the MVP first demo, this version focuses on the core flow: login, tutor search, tutor detail, and booking features.
-
+            TutorConnect helps learners discover tutors, request sessions, manage payments, and keep track of every booking.
           </p>
 
           <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/60">

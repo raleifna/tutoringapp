@@ -20,11 +20,6 @@ const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const addressElementOptions = {
   mode: 'billing',
-  defaultValues: {
-    address: {
-      country: 'AU',
-    },
-  },
 };
 
 const paymentElementOptions = {
@@ -107,7 +102,7 @@ function PaymentMethodForm({ clientSecret, onSaved, returnTo }) {
           className="btn-primary gap-2"
         >
           <CheckCircleIcon className="w-4 h-4" />
-          {isSubmitting ? 'Saving...' : 'Save Payment Method'}
+          {isSubmitting ? 'Saving...' : 'Save Card'}
         </button>
       </div>
     </form>
@@ -148,22 +143,6 @@ export default function ProfilePaymentMethodPage() {
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Could not delete payment method');
-    },
-  });
-
-  const localSaveMethodMutation = useMutation({
-    mutationFn: () =>
-      paymentApi.completeSetupIntent({
-        setupIntentId: `local_setup_${currentUserId}`,
-        saveAsDefault: true,
-      }),
-    onSuccess: async () => {
-      toast.success('Local test payment method saved');
-      await fetchMe();
-      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not save payment method');
     },
   });
 
@@ -221,7 +200,7 @@ export default function ProfilePaymentMethodPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment Method</p>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Payment Method</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Manage Payment Methods</h1>
         </div>
         <BackButton href={returnTo} />
       </div>
@@ -235,12 +214,17 @@ export default function ProfilePaymentMethodPage() {
                 {savedMethodQuery.isLoading ? 'Loading...' : formatSavedMethod(savedMethod)}
               </p>
               {savedMethod?.expMonth && savedMethod?.expYear ? (
-                <p className="text-sm text-blue-700 mt-2">
-                  Expires {String(savedMethod.expMonth).padStart(2, '0')}/{savedMethod.expYear}
-                </p>
+                <>
+                  <p className="text-sm text-blue-700 mt-2">
+                    Expires {String(savedMethod.expMonth).padStart(2, '0')}/{savedMethod.expYear}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-2">
+                    To update card details or expiry, add a replacement card and set it as your default.
+                  </p>
+                </>
               ) : (
                 <p className="text-sm text-blue-700 mt-2">
-                  Save a card here and we will reuse it for future booking charges after tutor approval.
+                  Add a card here and we will reuse it for future booking charges after tutor approval.
                 </p>
               )}
             </div>
@@ -253,7 +237,7 @@ export default function ProfilePaymentMethodPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900">Saved Cards</h3>
-                <p className="text-sm text-gray-500">You can keep multiple cards and choose which one is your default.</p>
+                <p className="text-sm text-gray-500">You can keep multiple cards, choose a default, or add a replacement card if details change.</p>
               </div>
             </div>
 
@@ -330,21 +314,8 @@ export default function ProfilePaymentMethodPage() {
         )}
 
         {!stripeEnabled ? (
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-sm text-blue-800 mb-3">
-              Save a local test card once, and the booking flow can reuse it for series payments and refunds.
-            </p>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => localSaveMethodMutation.mutate()}
-                disabled={localSaveMethodMutation.isPending}
-                className="btn-primary gap-2"
-              >
-                <CheckCircleIcon className="w-4 h-4" />
-                {localSaveMethodMutation.isPending ? 'Saving...' : 'Save Local Test Card'}
-              </button>
-            </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm">
+            Payment setup is currently unavailable. Please contact support or try again later.
           </div>
         ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">

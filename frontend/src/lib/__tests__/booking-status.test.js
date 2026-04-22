@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBookingStatus, getBookingStatusClass } from '../src/lib/booking-status.js';
+import { formatBookingStatus, getBookingStatusClass } from '../booking-status.js';
 
 describe('booking status helpers', () => {
   it('converts main booking status values to readable labels', () => {
@@ -11,7 +11,6 @@ describe('booking status helpers', () => {
     expect(formatBookingStatus('CANCELLED')).toBe('Cancelled');
     expect(formatBookingStatus('DECLINED')).toBe('Declined');
   });
-
 
   it('returns semantic styles for important statuses', () => {
     expect(getBookingStatusClass('UNPAID')).toContain('orange');

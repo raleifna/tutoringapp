@@ -30,11 +30,6 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   : null;
 const addressElementOptions = {
   mode: 'billing',
-  defaultValues: {
-    address: {
-      country: 'AU',
-    },
-  },
 };
 const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
@@ -199,28 +194,6 @@ export default function BookingPaymentPage() {
       await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      router.push(returnTo || `/bookings/${id}?payment=success`);
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not complete payment');
-    },
-  });
-
-  const localTestPaymentMutation = useMutation({
-    mutationFn: async () => {
-      await paymentApi.completeSetupIntent({
-        setupIntentId: `local_setup_${currentUserId || id}`,
-        bookingId: id,
-        saveAsDefault: true,
-      });
-      return bookingApi.pay(id);
-    },
-    onSuccess: async (response) => {
-      toast.success(response?.data?.message || 'Payment successful');
-      await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
       router.push(returnTo || `/bookings/${id}?payment=success`);
     },
     onError: (err) => {
@@ -485,25 +458,8 @@ export default function BookingPaymentPage() {
               </div>
             </div>
           ) : !stripeEnabled ? (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm text-blue-800 mb-3">
-                {recurring
-                  ? 'Pay this booking now.'
-                  : 'Pay this booking now.'}
-              </p>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => localTestPaymentMutation.mutate()}
-                  disabled={localTestPaymentMutation.isPending}
-                  className="btn-primary gap-2"
-                >
-                  <CheckCircleIcon className="w-4 h-4" />
-                  {localTestPaymentMutation.isPending
-                    ? 'Paying...'
-                    : 'Pay Now'}
-                </button>
-              </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm">
+              Payment setup is currently unavailable. Please try again later.
             </div>
           ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
