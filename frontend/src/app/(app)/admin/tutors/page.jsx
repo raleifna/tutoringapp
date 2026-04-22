@@ -295,6 +295,9 @@ function AdminTutorsContent() {
                                 <div className="text-sm font-medium text-blue-700">
                                   {item.originalName || text}
                                 </div>
+                                {item.description && (
+                                  <div className="mt-1 text-xs text-gray-600">{item.description}</div>
+                                )}
                                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-blue-700/80">
                                   <span>{formatMimeLabel(item.mimeType)}</span>
                                   <span>{formatBytes(item.size)}</span>

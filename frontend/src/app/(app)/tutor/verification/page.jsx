@@ -23,7 +23,14 @@ const getApplicationFiles = (items) =>
 const getApplicationNotes = (items) =>
   Array.isArray(items)
     ? items
-        .filter((item) => item && typeof item === 'object' && item.text && !item.url)
+        .filter(
+          (item) =>
+            item &&
+            typeof item === 'object' &&
+            item.text &&
+            !item.url &&
+            (!item.kind || item.kind === 'note')
+        )
         .map((item) => item.text)
         .join('\n')
     : '';
@@ -40,6 +47,9 @@ export default function TutorVerificationPage() {
   const user = useAuthStore((state) => state.user);
   const fetchMe = useAuthStore((state) => state.fetchMe);
   const [applicationSummary, setApplicationSummary] = useState('');
+  const [shortBio, setShortBio] = useState('');
+  const [workExperience, setWorkExperience] = useState('');
+  const [qualificationItems, setQualificationItems] = useState('');
   const [applicationNotes, setApplicationNotes] = useState('');
   const [applicationExperienceYears, setApplicationExperienceYears] = useState('0');
   const [applicationFiles, setApplicationFiles] = useState([]);
@@ -64,6 +74,23 @@ export default function TutorVerificationPage() {
       Array.isArray(profile.education)
         ? profile.education.map(formatEducationItem).filter(Boolean).join('\n')
         : profile.education || ''
+    );
+    setShortBio(profile.user?.bio || '');
+    setWorkExperience(
+      Array.isArray(profile.certifications)
+        ? profile.certifications
+            .filter((item) => item?.kind === 'experience' && item?.text)
+            .map((item) => item.text)
+            .join('\n')
+        : ''
+    );
+    setQualificationItems(
+      Array.isArray(profile.certifications)
+        ? profile.certifications
+            .filter((item) => item?.kind === 'qualification' && item?.text)
+            .map((item) => item.text)
+            .join('\n')
+        : ''
     );
     setApplicationNotes(getApplicationNotes(profile.certifications));
     setApplicationExperienceYears(String(profile.yearsExperience || 0));
@@ -116,12 +143,30 @@ export default function TutorVerificationPage() {
       return;
     }
 
-    setApplicationFiles(files);
+    const previousDescriptions = new Map(
+      applicationFiles.map((item) => [item.key, item.description])
+    );
+
+    setApplicationFiles(
+      files.map((file) => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        return {
+          key,
+          file,
+          description: previousDescriptions.get(key) || '',
+        };
+      })
+    );
     setApplicationFileError('');
   };
 
   const handleSubmit = () => {
     const summaryForSubmit = applicationSummary.trim();
+
+    if (!shortBio.trim()) {
+      toast.error('Short bio is required');
+      return;
+    }
 
     if (!summaryForSubmit) {
       toast.error('Education summary is required');
@@ -133,13 +178,32 @@ export default function TutorVerificationPage() {
       return;
     }
 
+    if (applicationFiles.some((item) => !item.description.trim())) {
+      setApplicationFileError('Add a short description for each uploaded verification file');
+      return;
+    }
+
     const formData = new FormData();
+    formData.append('shortBio', shortBio.trim());
+    formData.append('tutorWorkExperience', JSON.stringify(workExperience.split('\n').map((item) => item.trim()).filter(Boolean)));
+    formData.append(
+      'tutorQualificationItems',
+      JSON.stringify(qualificationItems.split('\n').map((item) => item.trim()).filter(Boolean))
+    );
+    formData.append(
+      'tutorEducationItems',
+      JSON.stringify(summaryForSubmit.split('\n').map((item) => item.trim()).filter(Boolean))
+    );
     formData.append('tutorEducationSummary', summaryForSubmit);
     formData.append('tutorExperienceYears', String(applicationExperienceYears || '0'));
     if (applicationNotes.trim()) {
       formData.append('tutorSupportingNotes', applicationNotes.trim());
     }
-    applicationFiles.forEach((file) => formData.append('verificationFiles', file));
+    formData.append(
+      'verificationFileDescriptions',
+      JSON.stringify(applicationFiles.map((item) => item.description.trim()))
+    );
+    applicationFiles.forEach((item) => formData.append('verificationFiles', item.file));
     applicationMutation.mutate(formData);
   };
 
@@ -182,13 +246,46 @@ export default function TutorVerificationPage() {
 
       <div className="card space-y-4 p-6">
         <div>
-          <label className="label">Education / Qualifications Summary</label>
+          <label className="label">Short Bio</label>
+          <textarea
+            value={shortBio}
+            onChange={(event) => setShortBio(event.target.value)}
+            rows={3}
+            className="input resize-none"
+            placeholder="Write a short public bio for students"
+          />
+        </div>
+
+        <div>
+          <label className="label">Teaching / Work Experience</label>
+          <textarea
+            value={workExperience}
+            onChange={(event) => setWorkExperience(event.target.value)}
+            rows={4}
+            className="input resize-none"
+            placeholder="One experience item per line"
+          />
+        </div>
+
+        <div>
+          <label className="label">Education</label>
           <textarea
             value={applicationSummary}
             onChange={(event) => setApplicationSummary(event.target.value)}
             rows={4}
             className="input resize-none"
-            placeholder="Summarise your qualifications and teaching background"
+            placeholder="One education item per line"
+          />
+        </div>
+
+        <div>
+          <label className="label">Certifications / Training</label>
+          <textarea
+            value={qualificationItems}
+            onChange={(event) => setQualificationItems(event.target.value)}
+            rows={4}
+            className="input resize-none"
+            placeholder="One certification or training item per line"
           />
         </div>
 
@@ -227,11 +324,25 @@ export default function TutorVerificationPage() {
           <p className="mt-1 text-xs text-gray-500">Up to 5 files, 5MB each, 25MB total</p>
           {applicationFileError && <p className="error-text">{applicationFileError}</p>}
           {applicationFiles.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {applicationFiles.map((file) => (
-                <span key={`${file.name}-${file.size}`} className="badge bg-blue-50 text-blue-700 text-xs">
-                  {file.name}
-                </span>
+            <div className="mt-3 space-y-3">
+              {applicationFiles.map((item) => (
+                <div key={item.key} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-medium text-gray-800">{item.file.name}</p>
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setApplicationFiles((current) =>
+                        current.map((entry) =>
+                          entry.key === item.key ? { ...entry, description: nextValue } : entry
+                        )
+                      );
+                    }}
+                    className="input mt-2"
+                    placeholder="What does this file verify?"
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -251,7 +362,10 @@ export default function TutorVerificationPage() {
                     rel="noreferrer"
                     className="block rounded-xl border border-blue-100 bg-white px-3 py-2 text-sm text-primary-700 hover:bg-blue-50"
                   >
-                    {text}
+                    <div>{text}</div>
+                    {item.description ? (
+                      <div className="mt-1 text-xs text-gray-500">{item.description}</div>
+                    ) : null}
                   </a>
                 ) : null;
               })}

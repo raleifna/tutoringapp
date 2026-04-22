@@ -194,7 +194,7 @@ async function register(req, res) {
                       tutorProfile: {
                           create: {
                               applicationSubmitted: false,
-                              status: 'PENDING',
+                              status: 'SUSPENDED',
                               yearsExperience: 0,
                               education: [],
                               certifications: [],

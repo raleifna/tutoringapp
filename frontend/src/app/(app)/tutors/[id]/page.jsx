@@ -71,6 +71,18 @@ const formatRate = (amount, currency = 'AUD') => {
   return `$${value} ${currency}`;
 };
 
+const getVerifiedQualificationItems = (tutor) => {
+  if (!Array.isArray(tutor?.certifications)) return [];
+
+  return tutor.certifications
+    .map((item) => {
+      if (!item || typeof item !== 'object') return '';
+      if (item.kind === 'file') return String(item.description || '').trim();
+      return String(item.text || item.name || '').trim();
+    })
+    .filter(Boolean);
+};
+
 const getBookingPeriod = (value) =>
   BOOKING_PERIOD_OPTIONS.find((option) => option.value === value) || BOOKING_PERIOD_OPTIONS[0];
 
@@ -181,6 +193,7 @@ export default function TutorDetailPage() {
   });
 
   const tutor = tutorData?.data?.data;
+  const verifiedQualificationItems = getVerifiedQualificationItems(tutor);
   const availabilityState = availabilityData?.data?.data || {};
   const availability = availabilityState?.availability || [];
   const currentWeekAvailability = availabilityState?.currentWeekEffectiveAvailability || availability;
@@ -588,11 +601,31 @@ export default function TutorDetailPage() {
                       <p className="font-medium text-gray-700 text-xs leading-relaxed">
                         {Array.isArray(tutor.education)
                           ? tutor.education
-                              .map((item) => [item?.degree, item?.field, item?.institution].filter(Boolean).join(', '))
+                              .map((item) =>
+                                [item?.degree, item?.field, item?.institution, item?.text]
+                                  .filter(Boolean)
+                                  .join(', ')
+                              )
                               .filter(Boolean)
                               .join(' | ')
                           : String(tutor.education)}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {tutor.isVerified && verifiedQualificationItems.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <CheckBadgeIcon className="w-4 h-4 text-primary-600 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Verified Qualifications</p>
+                      <div className="mt-1 space-y-1">
+                        {verifiedQualificationItems.map((item, index) => (
+                          <p key={`${item}-${index}`} className="font-medium text-gray-700 text-xs leading-relaxed">
+                            {item}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

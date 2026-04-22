@@ -17,6 +17,7 @@ export default function TutorReviewPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const fetchMe = useAuthStore((state) => state.fetchMe);
+  const logout = useAuthStore((state) => state.logout);
   const userAccessState = getTutorAccessState(user);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -93,6 +94,16 @@ export default function TutorReviewPage() {
       <div className="flex gap-3">
         <button type="button" onClick={() => fetchMe()} className="btn-primary">
           Refresh Status
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await logout();
+            router.push('/login');
+          }}
+          className="btn-secondary"
+        >
+          Log Out
         </button>
       </div>
     </div>

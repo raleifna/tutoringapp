@@ -104,6 +104,49 @@ const normalizeVerificationFiles = (items, hasVerificationFiles = false) => {
   return files;
 };
 
+const parseTextList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+    }
+  } catch {
+    // fall back to line-based parsing
+  }
+
+  return raw
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const buildTypedTextItems = (items, kind) =>
+  parseTextList(items).map((text) => ({
+    kind,
+    text,
+  }));
+
+const buildVerificationFilesWithDescriptions = (
+  files,
+  descriptions,
+  hasVerificationFiles = false
+) =>
+  normalizeVerificationFiles(files, hasVerificationFiles).map((item, index) => ({
+    ...item,
+    description: String(item?.description || parseTextList(descriptions)[index] || '').trim(),
+  }));
+
 const toPublicUser = (user) => {
   const { password, ...rest } = user || {};
   return rest;
@@ -388,22 +431,30 @@ const ensureTutorUserMap = () => {
 };
 
 const createEmptyTutorProfile = (user) => {
-  const educationSummary = String(user?.tutorEducationSummary || '')
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const shortBio = String(user?.shortBio || user?.bio || '').trim();
+  const educationSummary = parseTextList(user?.tutorEducationItems || user?.tutorEducationSummary);
   const yearsExperience = Number(user?.tutorExperienceYears || 0);
   const supportingNotes = String(user?.tutorSupportingNotes || '').trim();
-  const registrationFiles = normalizeVerificationFiles(
+  const registrationFiles = buildVerificationFilesWithDescriptions(
     user?.verificationFiles,
+    user?.verificationFileDescriptions,
     Boolean(user?.hasVerificationFiles)
   );
-  const hasSubmissionData = registrationFiles.length > 0 || educationSummary.length > 0;
-  const certifications = [...registrationFiles];
-
-  if (supportingNotes) {
-    certifications.push({ text: supportingNotes });
-  }
+  const workExperienceItems = buildTypedTextItems(user?.tutorWorkExperience, 'experience');
+  const qualificationItems = buildTypedTextItems(user?.tutorQualificationItems, 'qualification');
+  const noteItems = supportingNotes ? [{ kind: 'note', text: supportingNotes }] : [];
+  const hasSubmissionData =
+    Boolean(shortBio) ||
+    registrationFiles.length > 0 ||
+    educationSummary.length > 0 ||
+    workExperienceItems.length > 0 ||
+    qualificationItems.length > 0;
+  const certifications = [
+    ...registrationFiles,
+    ...workExperienceItems,
+    ...qualificationItems,
+    ...noteItems,
+  ];
 
   return {
     id: `mock_tutor_${Date.now()}`,
@@ -415,9 +466,10 @@ const createEmptyTutorProfile = (user) => {
       email: user.email || '',
       avatar: user.avatar || '',
     },
-    status: hasSubmissionData ? 'PENDING' : 'ACTIVE',
+    applicationSubmitted: hasSubmissionData,
+    status: hasSubmissionData ? 'PENDING' : 'SUSPENDED',
     headline: '',
-    bio: '',
+    bio: shortBio,
     hourlyRate: 50,
     currency: 'AUD',
     location: '',
@@ -489,19 +541,23 @@ const ensureTutorProfileForUser = (user) => {
 
   const isCustomTutor = String(user.id || '').startsWith('mock_user_');
   if (isCustomTutor) {
-    const registrationFiles = normalizeVerificationFiles(
+    const registrationFiles = buildVerificationFilesWithDescriptions(
       user?.verificationFiles,
+      user?.verificationFileDescriptions,
       Boolean(user?.hasVerificationFiles)
     );
+    const shortBio = String(user?.shortBio || user?.bio || '').trim();
     const supportNotes = String(user.tutorSupportingNotes || '').trim();
-    const summaryLines = String(user.tutorEducationSummary || '')
-      .split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const summaryLines = parseTextList(user?.tutorEducationItems || user?.tutorEducationSummary);
     const years = Number(user.tutorExperienceYears || 0);
+    const workExperienceItems = buildTypedTextItems(user?.tutorWorkExperience, 'experience');
+    const qualificationItems = buildTypedTextItems(user?.tutorQualificationItems, 'qualification');
 
     if ((!Array.isArray(profile.education) || profile.education.length === 0) && summaryLines.length > 0) {
       profile.education = summaryLines;
+    }
+    if (!String(profile.bio || '').trim() && shortBio) {
+      profile.bio = shortBio;
     }
     if ((!profile.yearsExperience || profile.yearsExperience === 0) && Number.isFinite(years) && years > 0) {
       profile.yearsExperience = years;
@@ -512,16 +568,17 @@ const ensureTutorProfileForUser = (user) => {
     const currentFileItems = currentCertifications
       .map((item, index) => toVerificationFileMeta(item, index))
       .filter(Boolean);
-    const currentNotes = [];
-    const noteSet = new Set();
+    const currentTextItems = [];
+    const textItemSet = new Set();
     currentCertifications.forEach((item) => {
       if (!item || typeof item !== 'object' || item.url || !item.text) return;
       const text = String(item.text).trim();
       if (!text) return;
-      const key = normalize(text);
-      if (noteSet.has(key)) return;
-      noteSet.add(key);
-      currentNotes.push({ text });
+      const kind = String(item.kind || 'note').trim().toLowerCase() || 'note';
+      const key = `${kind}:${normalize(text)}`;
+      if (textItemSet.has(key)) return;
+      textItemSet.add(key);
+      currentTextItems.push({ kind, text });
     });
 
     const mergedFiles = [...currentFileItems];
@@ -547,21 +604,22 @@ const ensureTutorProfileForUser = (user) => {
       mergedFiles.push(normalizedFile);
     });
 
-    if (supportNotes) {
-      const noteKey = normalize(supportNotes);
-      if (!noteSet.has(noteKey)) {
-        noteSet.add(noteKey);
-        currentNotes.push({ text: supportNotes });
-      }
-    }
+    [...workExperienceItems, ...qualificationItems, ...(supportNotes ? [{ kind: 'note', text: supportNotes }] : [])]
+      .forEach((item) => {
+        const key = `${item.kind}:${normalize(item.text)}`;
+        if (!item.text || textItemSet.has(key)) return;
+        textItemSet.add(key);
+        currentTextItems.push(item);
+      });
 
-    if (mergedFiles.length > 0 || currentNotes.length > 0) {
-      profile.certifications = [...mergedFiles, ...currentNotes];
+    if (mergedFiles.length > 0 || currentTextItems.length > 0) {
+      profile.certifications = [...mergedFiles, ...currentTextItems];
     }
     if (
-      profile.status === 'ACTIVE' &&
-      (registrationFiles.length > 0 || summaryLines.length > 0)
+      !profile.applicationSubmitted &&
+      (shortBio || registrationFiles.length > 0 || summaryLines.length > 0)
     ) {
+      profile.applicationSubmitted = true;
       profile.status = 'PENDING';
       profile.latestReviewAction = {
         action: 'SUBMITTED',
@@ -577,7 +635,12 @@ const ensureTutorProfileForUser = (user) => {
 
   const nextUser = updateUserRecord(user.id, {
     tutorProfileId: profileId,
-    tutorProfile: { id: profileId, status: profile.status },
+    bio: profile.bio || user.bio || '',
+    tutorProfile: {
+      id: profileId,
+      status: profile.status,
+      applicationSubmitted: Boolean(profile.applicationSubmitted),
+    },
   });
   updateStoredCurrentUser(nextUser || user);
 
@@ -1261,18 +1324,28 @@ const normalizeLevel = (value = '') => {
 const parseApplicationPayload = (payload) => {
   if (typeof FormData !== 'undefined' && payload instanceof FormData) {
     return {
+      shortBio: payload.get('shortBio') || '',
       tutorEducationSummary: payload.get('tutorEducationSummary') || '',
+      tutorEducationItems: payload.get('tutorEducationItems') || '',
       tutorExperienceYears: payload.get('tutorExperienceYears') || '',
+      tutorWorkExperience: payload.get('tutorWorkExperience') || '',
+      tutorQualificationItems: payload.get('tutorQualificationItems') || '',
       tutorSupportingNotes: payload.get('tutorSupportingNotes') || '',
+      verificationFileDescriptions: payload.get('verificationFileDescriptions') || '',
       verificationFiles: payload.getAll('verificationFiles') || [],
     };
   }
 
   return {
+    shortBio: payload?.shortBio || '',
     tutorEducationSummary: payload?.tutorEducationSummary || '',
+    tutorEducationItems: payload?.tutorEducationItems || '',
     tutorExperienceYears: payload?.tutorExperienceYears || '',
+    tutorWorkExperience: payload?.tutorWorkExperience || '',
+    tutorQualificationItems: payload?.tutorQualificationItems || '',
     tutorSupportingNotes: payload?.tutorSupportingNotes || '',
-    verificationFiles: [],
+    verificationFileDescriptions: payload?.verificationFileDescriptions || '',
+    verificationFiles: payload?.verificationFiles || [],
   };
 };
 
@@ -1515,36 +1588,69 @@ export const tutorApi = {
     }
 
     const parsed = parseApplicationPayload(payload);
-    if (!String(parsed.tutorEducationSummary || '').trim()) {
-      return fail('Education summary is required');
-    }
+    const shortBio = String(parsed.shortBio || '').trim();
+    const educationItems = parseTextList(
+      parsed.tutorEducationItems || parsed.tutorEducationSummary
+    );
+    const workExperienceItems = buildTypedTextItems(parsed.tutorWorkExperience, 'experience');
+    const qualificationItems = buildTypedTextItems(
+      parsed.tutorQualificationItems,
+      'qualification'
+    );
+    const noteItems = String(parsed.tutorSupportingNotes || '').trim()
+      ? [{ kind: 'note', text: String(parsed.tutorSupportingNotes || '').trim() }]
+      : [];
+    const currentFiles = normalizeVerificationFiles(profile.certifications || []);
+    const uploadedFiles = buildVerificationFilesWithDescriptions(
+      parsed.verificationFiles || [],
+      parsed.verificationFileDescriptions || ''
+    );
+    const mergedFiles = [...currentFiles];
+    const fileKeys = new Set(
+      mergedFiles.map((item) =>
+        normalize(String(item.url || item.originalName || item.fileName || item.name || ''))
+      )
+    );
 
-    const files = parsed.verificationFiles || [];
-    const notes = String(parsed.tutorSupportingNotes || '').trim();
-
-    profiles[index].education = parsed.tutorEducationSummary
-      .split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    profiles[index].yearsExperience = Number(parsed.tutorExperienceYears || 0);
-
-    const certifications = [];
-    if (notes) certifications.push({ text: notes });
-    files.forEach((file, idx) => {
-      certifications.push({
-        name: file?.name || `verification-${idx + 1}.pdf`,
-        url: `https://mock.local/files/${Date.now()}_${idx + 1}`,
-      });
+    uploadedFiles.forEach((file) => {
+      const key = normalize(
+        String(file.url || file.originalName || file.fileName || file.name || '')
+      );
+      if (!key || fileKeys.has(key)) return;
+      fileKeys.add(key);
+      mergedFiles.push(file);
     });
 
-    if (certifications.length > 0) {
-      profiles[index].certifications = certifications;
+    if (!shortBio) {
+      return fail('Short bio is required');
     }
+
+    if (educationItems.length === 0) {
+      return fail('Education is required');
+    }
+
+    if (mergedFiles.length === 0) {
+      return fail('Please upload at least one verification file');
+    }
+
+    if (uploadedFiles.some((item) => !String(item.description || '').trim())) {
+      return fail('Each uploaded file needs a short description');
+    }
+    profiles[index].bio = shortBio;
+    profiles[index].education = educationItems;
+    profiles[index].yearsExperience = Number(parsed.tutorExperienceYears || 0);
+    profiles[index].applicationSubmitted = true;
+    profiles[index].certifications = [
+      ...mergedFiles,
+      ...workExperienceItems,
+      ...qualificationItems,
+      ...noteItems,
+    ];
 
     profiles[index].status = 'PENDING';
     profiles[index].latestReviewAction = {
-      action: 'RESUBMITTED',
-      feedback: 'Application resubmitted and pending review.',
+      action: profile.applicationSubmitted ? 'RESUBMITTED' : 'SUBMITTED',
+      description: 'Application submitted and pending admin review.',
       createdAt: new Date().toISOString(),
     };
     profiles[index].updatedAt = new Date().toISOString();
@@ -1552,8 +1658,13 @@ export const tutorApi = {
     writeTutorProfiles(profiles);
 
     const nextUser = updateUserRecord(sessionUser.id, {
+      bio: shortBio,
       tutorProfileId: profiles[index].id,
-      tutorProfile: { id: profiles[index].id, status: profiles[index].status },
+      tutorProfile: {
+        id: profiles[index].id,
+        status: profiles[index].status,
+        applicationSubmitted: true,
+      },
     });
     updateStoredCurrentUser(nextUser || sessionUser);
 

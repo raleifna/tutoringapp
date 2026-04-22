@@ -258,12 +258,6 @@ function RegisterContent() {
             </>
           )}
 
-          {selectedRole === 'TUTOR' && (
-            <div className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
-              Tutor verification happens after your first login. You will upload your documents then.
-            </div>
-          )}
-
           <label className="flex items-start gap-2 text-sm text-gray-600">
             <input type="checkbox" {...register('agreeToTerms')} className="mt-1 rounded border-gray-300" onClick={(e) => {
                   if (!watch('agreeToTerms')) {
