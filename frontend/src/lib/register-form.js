@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const MAX_VERIFICATION_FILES = 5;
+export const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
+export const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
+
 const baseRegisterSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
@@ -28,6 +32,31 @@ function validateLearnerFields(data, ctx) {
       path: ['parentName'],
     });
   }
+}
+
+export function validateVerificationFiles(files = []) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return '';
+  }
+
+  if (files.length > MAX_VERIFICATION_FILES) {
+    return `Upload up to ${MAX_VERIFICATION_FILES} verification files`;
+  }
+
+  if (files.some((file) => Number(file?.size || 0) > MAX_VERIFICATION_FILE_SIZE)) {
+    return `Each file must be smaller than ${Math.floor(
+      MAX_VERIFICATION_FILE_SIZE / (1024 * 1024)
+    )}MB`;
+  }
+
+  const totalSize = files.reduce((sum, file) => sum + Number(file?.size || 0), 0);
+  if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
+    return `Combined file size must stay under ${Math.floor(
+      MAX_VERIFICATION_TOTAL_SIZE / (1024 * 1024)
+    )}MB`;
+  }
+
+  return '';
 }
 
 export const registerSchema = baseRegisterSchema

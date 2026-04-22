@@ -25,8 +25,6 @@ describe('registerSchema', () => {
   test('rejects the main conditional validation failures', () => {
     const cases = [
       { ...valid, confirmPassword: 'Different1!' },
-      { ...valid, role: 'TUTOR', tutorEducationSummary: '' },
-      { ...valid, role: 'TUTOR', tutorEducationSummary: '   ' },
       { ...valid, isMinor: true, parentName: '' },
       { ...valid, isMinor: true, parentName: '   ' },
       { ...valid, agreeToTerms: false },
@@ -35,6 +33,15 @@ describe('registerSchema', () => {
     cases.forEach((payload) => {
       expect(registerSchema.safeParse(payload).success).toBe(false);
     });
+  });
+
+  test('accepts tutor registration without verification materials', () => {
+    const tutorPayload = {
+      ...valid,
+      role: 'TUTOR',
+    };
+
+    expect(registerSchema.safeParse(tutorPayload).success).toBe(true);
   });
 });
 
