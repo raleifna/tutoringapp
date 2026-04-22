@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { AcademicCapIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '../../../lib/api-entry';
 import { useAuthStore } from '../../../lib/store';
+import { getTutorRedirectPath } from '../../../lib/tutor-access';
 import toast from 'react-hot-toast';
 
 const loginSchema = z.object({
@@ -46,7 +47,7 @@ export default function LoginPage() {
 
             const userRole = data?.user?.role;
             if (userRole === 'TUTOR') {
-                router.push('/tutor/dashboard');
+                router.push(getTutorRedirectPath(data.user));
             } else if (userRole === 'ADMIN' || userRole === 'SYSTEM_ADMIN') {
                 router.push('/admin/dashboard');
             } else {

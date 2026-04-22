@@ -23,7 +23,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter tutorconnect-frontend...
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
         run: pnpm --filter tutorconnect-frontend test

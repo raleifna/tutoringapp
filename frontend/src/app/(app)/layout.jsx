@@ -19,6 +19,12 @@ import {
 } from '@heroicons/react/24/solid';
 import { messageApi } from '../../lib/api-entry';
 import { useAuthStore, useMessageStore } from '../../lib/store';
+import {
+  getTutorAccessState,
+  getTutorRedirectPath,
+  TUTOR_REVIEW_PATH,
+  TUTOR_VERIFICATION_PATH,
+} from '../../lib/tutor-access';
 import NotificationBox from '@/components/notificationBox';
 
 const isGuestBrowsePath = (pathname = '') =>
@@ -63,6 +69,8 @@ const pageTitles = {
   '/tutor/dashboard': 'Dashboard',
   '/tutor/requests': 'Requests',
   '/tutor/profile': 'Tutor Profile',
+  '/tutor/verification': 'Tutor Verification',
+  '/tutor/review': 'Review Status',
 };
 
 export default function AppLayout({ children }) {
@@ -76,6 +84,11 @@ export default function AppLayout({ children }) {
   const setUnreadCount = useMessageStore((state) => state.setUnreadCount);
   const [mounted, setMounted] = useState(false);
   const currentUserId = user?.id || '';
+  const tutorAccessState = getTutorAccessState(user);
+  const tutorRedirectPath = getTutorRedirectPath(user);
+  const isTutorRestricted = user?.role === 'TUTOR' && tutorAccessState !== 'ACTIVE';
+  const isTutorVerificationPath = pathname === TUTOR_VERIFICATION_PATH;
+  const isTutorReviewPath = pathname === TUTOR_REVIEW_PATH;
 
   useEffect(() => {
     setMounted(true);
@@ -96,6 +109,32 @@ export default function AppLayout({ children }) {
     initializeAuth().catch(() => {});
   }, [mounted, accessToken, user, isGuestPath, initializeAuth]);
 
+  useEffect(() => {
+    if (!mounted || !accessToken || !user || isGuestPath) return;
+    if (user.role !== 'TUTOR') return;
+
+    if (tutorAccessState === 'ACTIVE') {
+      if (isTutorVerificationPath || isTutorReviewPath) {
+        router.replace('/tutor/dashboard');
+      }
+      return;
+    }
+
+    if (pathname !== tutorRedirectPath) {
+      router.replace(tutorRedirectPath);
+    }
+  }, [
+    mounted,
+    accessToken,
+    user,
+    isGuestPath,
+    tutorAccessState,
+    tutorRedirectPath,
+    isTutorVerificationPath,
+    isTutorReviewPath,
+    pathname,
+    router,
+  ]);
 
   useEffect(() => {
     if (!accessToken || !user || user.role === 'ADMIN') return;
@@ -144,7 +183,9 @@ export default function AppLayout({ children }) {
 
   const navItems =
     user?.role === 'TUTOR'
-      ? getTutorNav()
+      ? isTutorRestricted
+        ? []
+        : getTutorNav()
       : user?.role === 'LEARNER'
         ? getLearnerNav()
         : [];

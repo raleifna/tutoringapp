@@ -13,7 +13,6 @@ import {
   getRegisterDefaultValues,
   getRegisterErrorMessage,
   registerSchema,
-  validateVerificationFiles,
 } from '../../../lib/register-form';
 
 function RegisterContent() {
@@ -26,8 +25,6 @@ function RegisterContent() {
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [registeredRole, setRegisteredRole] = useState('LEARNER');
   const [verificationUrl, setVerificationUrl] = useState('');
-  const [verificationFiles, setVerificationFiles] = useState([]);
-  const [verificationFileError, setVerificationFileError] = useState('');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   const {
@@ -46,32 +43,10 @@ function RegisterContent() {
 
   const handleRoleChange = (role) => {
     setValue('role', role, { shouldValidate: true });
-    if (role !== 'TUTOR') {
-      setVerificationFiles([]);
-      setVerificationFileError('');
-    }
-  };
-
-  const handleVerificationFilesChange = (event) => {
-    const files = Array.from(event.target.files || []);
-    const errorMessage = validateVerificationFiles(files);
-    if (errorMessage) {
-      setVerificationFiles([]);
-      setVerificationFileError(errorMessage);
-      return;
-    }
-
-    setVerificationFiles(files);
-    setVerificationFileError('');
   };
 
   const onSubmit = async (values) => {
-    const { payload, rawData } = buildRegisterPayload(values, verificationFiles);
-
-    if (rawData.role === 'TUTOR' && verificationFiles.length === 0) {
-      setVerificationFileError('Please upload at least one verification file');
-      return;
-    }
+    const { payload, rawData } = buildRegisterPayload(values);
 
     setIsLoading(true);
     try {
@@ -96,7 +71,8 @@ function RegisterContent() {
           <p className="font-semibold text-gray-900 mb-4">{registeredEmail}</p>
           {registeredRole === 'TUTOR' ? (
             <p className="text-sm text-gray-500 mb-6">
-              Your account was created. Tutor verification files were submitted for admin review.
+              Your account was created. Verify your email first, then upload your tutor verification
+              materials after your first login.
             </p>
           ) : (
             <p className="text-sm text-gray-500 mb-6">Please verify your email before logging in.</p>
@@ -279,58 +255,6 @@ function RegisterContent() {
                   </div>
                 </>
               )}
-            </>
-          )}
-
-          {selectedRole === 'TUTOR' && (
-            <>
-              <div>
-                <label className="label">Education summary</label>
-                <textarea
-                  {...register('tutorEducationSummary')}
-                  rows={3}
-                  className="input resize-y"
-                  placeholder="Tell us about your education background"
-                />
-                {errors.tutorEducationSummary && (
-                  <p className="error-text">{errors.tutorEducationSummary.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="label">Years of teaching experience (optional)</label>
-                <input
-                  {...register('tutorExperienceYears')}
-                  type="text"
-                  className="input"
-                  placeholder="e.g. 2"
-                />
-              </div>
-
-              <div>
-                <label className="label">Supporting notes (optional)</label>
-                <textarea
-                  {...register('tutorSupportingNotes')}
-                  rows={3}
-                  className="input resize-y"
-                  placeholder="Anything else you want reviewers to know"
-                />
-              </div>
-
-              <div>
-                <label className="label">Verification files</label>
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleVerificationFilesChange}
-                  className="block w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-sm"
-                />
-                <p className="mt-1 text-xs text-gray-500">Up to 5 files, 5MB each, 25MB total</p>
-                {verificationFiles.length > 0 && (
-                  <p className="mt-1 text-xs text-gray-600">{verificationFiles.length} file(s) selected</p>
-                )}
-                {verificationFileError && <p className="error-text">{verificationFileError}</p>}
-              </div>
             </>
           )}
 

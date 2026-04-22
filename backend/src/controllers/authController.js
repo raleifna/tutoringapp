@@ -14,26 +14,6 @@ const toBoolean = (value) => {
     return false;
 };
 
-const toReviewItems = (value) =>
-    typeof value === 'string'
-        ? value
-              .split('\n')
-              .map((item) => item.trim())
-              .filter(Boolean)
-              .map((item) => ({ text: item }))
-        : [];
-
-const toUploadedFileItems = (files = []) =>
-    files.map((file) => ({
-        kind: 'file',
-        originalName: file.originalname,
-        fileName: file.filename,
-        url: `/uploads/documents/${file.filename}`,
-        mimeType: file.mimetype,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-    }));
-
 const normalizeIpAddress = (value) => {
     const rawValue = Array.isArray(value) ? value[0] : value;
     const candidate = String(rawValue || '')
@@ -77,6 +57,7 @@ const authUserSelect = {
         select: {
             id: true,
             status: true,
+            applicationSubmitted: true,
             isVerified: true,
         },
     },
@@ -108,6 +89,7 @@ const serializeAuthUser = (user, ipAddress = null) => ({
         ? {
               id: user.tutorProfile.id,
               status: user.tutorProfile.status,
+              applicationSubmitted: Boolean(user.tutorProfile.applicationSubmitted),
               isVerified: Boolean(user.tutorProfile.isVerified),
           }
         : null,
@@ -144,16 +126,12 @@ async function register(req, res) {
         parentName,
         parentEmail,
         parentPhone,
-        tutorEducationSummary,
-        tutorExperienceYears,
-        tutorSupportingNotes,
     } = req.body;
 
     const normalizedEmail = normalizeEmail(email);
     const normalizedFirstName = String(firstName || '').trim();
     const normalizedLastName = String(lastName || '').trim();
     const normalizedRole = String(role || 'LEARNER').trim().toUpperCase();
-    const uploadedVerificationFiles = Array.isArray(req.files) ? req.files : [];
     const emailVerificationToken = createEmailVerificationToken();
     const emailVerificationExpiry = createEmailVerificationExpiry();
     const hashedPassword = hashPassword(password);
@@ -176,20 +154,6 @@ async function register(req, res) {
         return res.status(400).json({
             success: false,
             message: 'Parent/guardian name is required for minors.',
-        });
-    }
-
-    if (normalizedRole === 'TUTOR' && !String(tutorEducationSummary || '').trim()) {
-        return res.status(400).json({
-            success: false,
-            message: 'Education summary is required for tutors.',
-        });
-    }
-
-    if (normalizedRole === 'TUTOR' && uploadedVerificationFiles.length === 0) {
-        return res.status(400).json({
-            success: false,
-            message: 'Please upload at least one verification file.',
         });
     }
 
@@ -229,16 +193,11 @@ async function register(req, res) {
                 : {
                       tutorProfile: {
                           create: {
-                              status: 'PENDING',
-                              yearsExperience: parseInt(tutorExperienceYears, 10) || 0,
-                              education: toReviewItems(tutorEducationSummary),
-                              certifications: [
-                                  ...toUploadedFileItems(uploadedVerificationFiles),
-                                  ...toReviewItems(tutorSupportingNotes).map((item) => ({
-                                      ...item,
-                                      kind: 'note',
-                                  })),
-                              ],
+                              applicationSubmitted: false,
+                              status: 'SUSPENDED',
+                              yearsExperience: 0,
+                              education: [],
+                              certifications: [],
                               isVerified: false,
                               verifiedAt: null,
                           },
@@ -256,7 +215,10 @@ async function register(req, res) {
 
     return res.status(201).json({
         success: true,
-        message: 'Registration successful. Please check your email to verify your account.',
+        message:
+            normalizedRole === 'TUTOR'
+                ? 'Registration successful. Please verify your email, then complete tutor verification after your first login.'
+                : 'Registration successful. Please check your email to verify your account.',
         user: serializeAuthUser(user),
         verificationDelivery: emailResult.deliveryMethod,
         ...(emailResult.verificationUrl ? { verificationUrl: emailResult.verificationUrl } : {}),

@@ -21,9 +21,6 @@ const baseRegisterSchema = z.object({
   parentName: z.string().optional(),
   parentEmail: z.union([z.literal(''), z.string().email('Invalid parent email')]).optional(),
   parentPhone: z.string().optional(),
-  tutorEducationSummary: z.string().optional(),
-  tutorExperienceYears: z.string().optional(),
-  tutorSupportingNotes: z.string().optional(),
   agreeToTerms: z.boolean().refine((value) => value === true, 'You must agree to the terms'),
 });
 
@@ -37,14 +34,29 @@ function validateLearnerFields(data, ctx) {
   }
 }
 
-function validateTutorFields(data, ctx) {
-  if (data.role === 'TUTOR' && !data.tutorEducationSummary?.trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Education summary is required for tutors',
-      path: ['tutorEducationSummary'],
-    });
+export function validateVerificationFiles(files = []) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return '';
   }
+
+  if (files.length > MAX_VERIFICATION_FILES) {
+    return `Upload up to ${MAX_VERIFICATION_FILES} verification files`;
+  }
+
+  if (files.some((file) => Number(file?.size || 0) > MAX_VERIFICATION_FILE_SIZE)) {
+    return `Each file must be smaller than ${Math.floor(
+      MAX_VERIFICATION_FILE_SIZE / (1024 * 1024)
+    )}MB`;
+  }
+
+  const totalSize = files.reduce((sum, file) => sum + Number(file?.size || 0), 0);
+  if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
+    return `Combined file size must stay under ${Math.floor(
+      MAX_VERIFICATION_TOTAL_SIZE / (1024 * 1024)
+    )}MB`;
+  }
+
+  return '';
 }
 
 export const registerSchema = baseRegisterSchema
@@ -54,7 +66,6 @@ export const registerSchema = baseRegisterSchema
   })
   .superRefine((data, ctx) => {
     validateLearnerFields(data, ctx);
-    validateTutorFields(data, ctx);
   });
 
 export function getRegisterDefaultValues(roleParam) {
@@ -65,46 +76,8 @@ export function getRegisterDefaultValues(roleParam) {
   };
 }
 
-export function validateVerificationFiles(files) {
-  if (files.length > MAX_VERIFICATION_FILES) {
-    return `Upload up to ${MAX_VERIFICATION_FILES} files`;
-  }
-
-  if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-    return 'Each file must be 5MB or smaller';
-  }
-
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-  if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-    return 'Total file size must stay within 25MB';
-  }
-
-  return '';
-}
-
-export function buildRegisterPayload(values, verificationFiles) {
+export function buildRegisterPayload(values) {
   const { confirmPassword, agreeToTerms, ...rawData } = values;
-
-  if (rawData.role === 'TUTOR') {
-    const formData = new FormData();
-    [
-      ['firstName', rawData.firstName],
-      ['lastName', rawData.lastName],
-      ['email', rawData.email],
-      ['password', rawData.password],
-      ['role', rawData.role],
-      ['tutorEducationSummary', rawData.tutorEducationSummary],
-      ['tutorExperienceYears', rawData.tutorExperienceYears],
-      ['tutorSupportingNotes', rawData.tutorSupportingNotes],
-    ].forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        formData.append(key, value);
-      }
-    });
-
-    verificationFiles.forEach((file) => formData.append('verificationFiles', file));
-    return { payload: formData, rawData };
-  }
 
   return {
     payload: {

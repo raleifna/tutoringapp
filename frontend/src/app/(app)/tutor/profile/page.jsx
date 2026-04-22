@@ -9,12 +9,13 @@ import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
+import {
+  getTutorAccessStateFromProfile,
+  TUTOR_REVIEW_PATH,
+  TUTOR_VERIFICATION_PATH,
+} from '../../../../lib/tutor-access';
 import { TUTOR_SESSION_TYPES } from '../../../../lib/tutor-options';
 import { cn } from '../../../../lib/utils';
-
-const MAX_VERIFICATION_FILES = 5;
-const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
 
 const DAY_OPTIONS = [
   { value: '1', label: 'Monday' },
@@ -34,33 +35,6 @@ const LEVELS = [
 ];
 
 const CURRENCIES = ['AUD', 'USD', 'GBP', 'EUR'];
-
-const formatEducationItem = (item) => {
-  if (!item) return '';
-  if (typeof item === 'string') return item;
-  return [item.degree, item.field, item.institution, item.year, item.text]
-    .filter(Boolean)
-    .join(', ');
-};
-
-const formatCertificationItem = (item) => {
-  if (!item) return '';
-  if (typeof item === 'string') return item;
-  return [item.name, item.issuer, item.year, item.url, item.text].filter(Boolean).join(' | ');
-};
-
-const getApplicationFiles = (items) => {
-  return Array.isArray(items) ? items.filter((item) => item && typeof item === 'object' && item.url) : [];
-};
-
-const getApplicationNotes = (items) => {
-  return Array.isArray(items)
-    ? items
-        .filter((item) => item && typeof item === 'object' && item.text && !item.url)
-        .map((item) => item.text)
-        .join('\n')
-    : '';
-};
 
 export default function TutorProfilePage() {
   const queryClient = useQueryClient();
@@ -83,11 +57,6 @@ export default function TutorProfilePage() {
   const [mySubjects, setMySubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
-  const [applicationSummary, setApplicationSummary] = useState('');
-  const [applicationNotes, setApplicationNotes] = useState('');
-  const [applicationExperienceYears, setApplicationExperienceYears] = useState('0');
-  const [applicationFiles, setApplicationFiles] = useState([]);
-  const [applicationFileError, setApplicationFileError] = useState('');
 
   const {
     data: profileData,
@@ -113,8 +82,11 @@ export default function TutorProfilePage() {
   const allSubjects = subjectsData?.data?.data?.subjects || [];
   const isApproved = profile?.status === 'ACTIVE';
   const latestReviewAction = profile?.latestReviewAction;
-  const existingApplicationFiles = getApplicationFiles(profile?.certifications);
-  const existingApplicationNotes = getApplicationNotes(profile?.certifications);
+  const tutorAccessState = getTutorAccessStateFromProfile(profile);
+  const pendingActionHref =
+    tutorAccessState === 'PENDING_REVIEW' ? TUTOR_REVIEW_PATH : TUTOR_VERIFICATION_PATH;
+  const pendingActionLabel =
+    tutorAccessState === 'PENDING_REVIEW' ? 'Open Review Status' : 'Complete Verification';
 
   useEffect(() => {
     if (!profile) return;
@@ -141,15 +113,6 @@ export default function TutorProfilePage() {
     setShowCurrentWeekEditor(Boolean(profile.hasCurrentWeekAvailabilityOverride));
 
     setMySubjects(profile.subjects || []);
-    setApplicationSummary(
-      Array.isArray(profile.education)
-        ? profile.education.map(formatEducationItem).filter(Boolean).join('\n')
-        : profile.education || ''
-    );
-    setApplicationNotes(getApplicationNotes(profile.certifications));
-    setApplicationExperienceYears(String(profile.yearsExperience || 0));
-    setApplicationFiles([]);
-    setApplicationFileError('');
   }, [profile]);
 
   const updateProfileMutation = useMutation({
@@ -220,19 +183,6 @@ export default function TutorProfilePage() {
     },
     onError: () => {
       toast.error('Failed to remove subject');
-    },
-  });
-
-  const applicationMutation = useMutation({
-    mutationFn: (formData) => tutorApi.updateApplication(formData),
-    onSuccess: () => {
-      toast.success('Verification materials resubmitted');
-      queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
-      setApplicationFiles([]);
-      setApplicationFileError('');
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Failed to resubmit verification materials');
     },
   });
 
@@ -342,61 +292,6 @@ export default function TutorProfilePage() {
     removeSubjectMutation.mutate(subjectId);
   };
 
-  const handleApplicationFilesChange = (event) => {
-    const files = Array.from(event.target.files || []);
-
-    if (files.length > MAX_VERIFICATION_FILES) {
-      setApplicationFiles([]);
-      setApplicationFileError(`Upload up to ${MAX_VERIFICATION_FILES} verification files`);
-      return;
-    }
-
-    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-      setApplicationFiles([]);
-      setApplicationFileError('Each verification file must be 5MB or smaller');
-      return;
-    }
-
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-      setApplicationFiles([]);
-      setApplicationFileError('Total upload size must stay within 25MB');
-      return;
-    }
-
-    setApplicationFiles(files);
-    setApplicationFileError('');
-  };
-
-  const handleApplicationResubmit = () => {
-    const fallbackSummary = Array.isArray(profile?.education)
-      ? profile.education.map(formatEducationItem).filter(Boolean).join('\n')
-      : profile?.education || '';
-    const summaryForSubmit = applicationSummary.trim() || String(fallbackSummary || '').trim();
-
-    if (!summaryForSubmit) {
-      toast.error('Education summary is required');
-      return;
-    }
-
-    if (applicationFiles.length === 0 && existingApplicationFiles.length === 0) {
-      setApplicationFileError('Upload at least one verification file');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('tutorEducationSummary', summaryForSubmit);
-    formData.append(
-      'tutorExperienceYears',
-      String(applicationExperienceYears || profile?.yearsExperience || '0')
-    );
-    if (applicationNotes.trim()) {
-      formData.append('tutorSupportingNotes', applicationNotes);
-    }
-    applicationFiles.forEach((file) => formData.append('verificationFiles', file));
-    applicationMutation.mutate(formData);
-  };
-
   if (profileLoading || subjectsLoading) {
     return (
       <div className="w-full space-y-4 animate-pulse">
@@ -443,131 +338,20 @@ export default function TutorProfilePage() {
       </div>
 
       <div className="space-y-4">
-        {(existingApplicationFiles.length > 0 || existingApplicationNotes) && (
-          <div className="card p-5 space-y-5">
-            <div>
-              <h3 className="font-semibold text-gray-900">Submitted verification files</h3>
-              {existingApplicationFiles.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {existingApplicationFiles.map((item, index) => {
-                    const text =
-                      item.originalName || item.fileName || formatCertificationItem(item);
-                    return text ? (
-                      <a
-                        key={`${text}-${index}`}
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-sm text-primary-700 rounded-xl border border-blue-100 bg-white px-3 py-2 hover:bg-blue-50"
-                      >
-                        {text}
-                      </a>
-                    ) : null;
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 mt-2">No verification files submitted.</p>
-              )}
-            </div>
-
-            {existingApplicationNotes && (
-              <div>
-                <h3 className="font-semibold text-gray-900">Supporting notes</h3>
-                <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">
-                  {existingApplicationNotes}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         {!isApproved && (
           <>
-          <div className="card p-5 space-y-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">Update verification materials</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                You can update only your verification submission here while approval is pending.
-              </p>
-            </div>
-
-            <div>
-              <label className="label">Education / Qualifications Summary</label>
-              <textarea
-                value={applicationSummary}
-                onChange={(event) => setApplicationSummary(event.target.value)}
-                rows={3}
-                className="input resize-none"
-                placeholder="Summarise your qualifications and teaching background"
-              />
-            </div>
-
-            <div>
-              <label className="label">Years of Experience</label>
-              <input
-                type="number"
-                min="0"
-                max="50"
-                value={applicationExperienceYears}
-                onChange={(event) => setApplicationExperienceYears(event.target.value)}
-                className="input"
-              />
-            </div>
-
-            <div>
-              <label className="label">Additional Notes</label>
-              <textarea
-                value={applicationNotes}
-                onChange={(event) => setApplicationNotes(event.target.value)}
-                rows={3}
-                className="input resize-none"
-                placeholder="Optional notes for the reviewer"
-              />
-            </div>
-
-            <div>
-              <label className="label">Upload New Verification Files</label>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.txt,image/*"
-                className="input py-3"
-                onChange={handleApplicationFilesChange}
-              />
-              {applicationFileError && <p className="error-text">{applicationFileError}</p>}
-              {applicationFiles.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {applicationFiles.map((file) => (
-                    <span
-                      key={`${file.name}-${file.size}`}
-                      className="badge bg-blue-50 text-blue-700 text-xs"
-                    >
-                      {file.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleApplicationResubmit}
-              disabled={applicationMutation.isPending}
-              className="btn-primary"
-            >
-              {applicationMutation.isPending ? 'Submitting...' : 'Resubmit Verification Materials'}
-            </button>
-          </div>
-
           <div className="card p-5 border-yellow-200 bg-yellow-50/70">
             <div className="flex items-start gap-3">
               <LockClosedIcon className="w-5 h-5 text-yellow-700 mt-0.5" />
               <div>
                 <h2 className="font-semibold text-gray-900">Tutor profile locked until approval</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Your verification submission is still being reviewed. Public tutor profile fields
-                  stay locked until approval.
+                  Finish your verification submission or wait for admin approval before editing your
+                  public tutor profile.
                 </p>
+                <Link href={pendingActionHref} className="btn-primary mt-4 inline-flex">
+                  {pendingActionLabel}
+                </Link>
               </div>
             </div>
           </div>

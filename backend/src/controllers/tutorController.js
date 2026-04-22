@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { notifyAdmin } = require('../services/notificationService');
 
 const weekdayMap = {
   SUNDAY: 0,
@@ -174,6 +175,7 @@ const tutorProfileSelect = {
   id: true,
   userId: true,
   status: true,
+  applicationSubmitted: true,
   headline: true,
   hourlyRate: true,
   currency: true,
@@ -226,8 +228,39 @@ const toReviewItems = (value) =>
         .map((item) => ({ text: item }))
     : [];
 
-const toUploadedFileItems = (files = []) =>
-  files.map((file) => ({
+const parseTextList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  if (typeof value !== 'string') return [];
+
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  } catch {
+    // Fall back to newline parsing.
+  }
+
+  return trimmed
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const buildTypedTextItems = (items, kind) =>
+  items.map((text) => ({
+    kind,
+    text,
+  }));
+
+const toUploadedFileItems = (files = [], descriptions = []) =>
+  files.map((file, index) => ({
     kind: 'file',
     originalName: file.originalname,
     fileName: file.filename,
@@ -235,6 +268,7 @@ const toUploadedFileItems = (files = []) =>
     mimeType: file.mimetype,
     size: file.size,
     uploadedAt: new Date().toISOString(),
+    description: String(descriptions[index] || '').trim() || null,
   }));
 
 const getApplicationFileItems = (items) =>
@@ -401,13 +435,32 @@ exports.updateApplication = async (req, res) => {
     );
   }
 
-  const { tutorEducationSummary, tutorExperienceYears, tutorSupportingNotes } = req.body;
+  const {
+    shortBio,
+    tutorWorkExperience,
+    tutorEducationItems,
+    tutorEducationSummary,
+    tutorQualificationItems,
+    tutorSupportingNotes,
+    tutorExperienceYears,
+    verificationFileDescriptions,
+  } = req.body;
 
-  if (!tutorEducationSummary || !tutorEducationSummary.trim()) {
-    throw new AppError('Education summary is required', 400);
+  const educationItems = parseTextList(tutorEducationItems || tutorEducationSummary);
+  const qualificationItems = parseTextList(tutorQualificationItems);
+  const reviewerNotes = parseTextList(tutorSupportingNotes);
+  const workExperienceItems = parseTextList(tutorWorkExperience);
+  const fileDescriptions = parseTextList(verificationFileDescriptions);
+
+  if (!String(shortBio || '').trim()) {
+    throw new AppError('Short bio is required', 400);
   }
 
-  const uploadedFiles = toUploadedFileItems(req.files || []);
+  if (educationItems.length === 0) {
+    throw new AppError('Add at least one education item', 400);
+  }
+
+  const uploadedFiles = toUploadedFileItems(req.files || [], fileDescriptions);
   const nextFileItems =
     uploadedFiles.length > 0 ? uploadedFiles : getApplicationFileItems(profile.certifications);
 
@@ -415,17 +468,34 @@ exports.updateApplication = async (req, res) => {
     throw new AppError('Upload at least one verification file before resubmitting', 400);
   }
 
+  if (uploadedFiles.some((item) => !item.description)) {
+    throw new AppError('Add a short description for each uploaded verification file', 400);
+  }
+
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: {
+      bio:
+        shortBio === undefined
+          ? profile.user?.bio || null
+          : String(shortBio || '').trim() || null,
+    },
+  });
+
   const updated = await prisma.tutorProfile.update({
     where: { userId: req.user.id },
     data: {
+      applicationSubmitted: true,
       yearsExperience:
         tutorExperienceYears === undefined || tutorExperienceYears === ''
           ? profile.yearsExperience
           : parseInt(tutorExperienceYears, 10) || 0,
-      education: toReviewItems(tutorEducationSummary),
+      education: buildTypedTextItems(educationItems, 'education'),
       certifications: [
         ...nextFileItems,
-        ...toReviewItems(tutorSupportingNotes).map((item) => ({ ...item, kind: 'note' })),
+        ...buildTypedTextItems(workExperienceItems, 'experience'),
+        ...buildTypedTextItems(qualificationItems, 'qualification'),
+        ...buildTypedTextItems(reviewerNotes, 'note'),
       ],
       status: 'PENDING',
       isVerified: false,
