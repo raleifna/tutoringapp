@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import { DAY_ORDER, DAY_LABELS, getWeekStart } from '../lib/availability-calendar';
+import { formatBookingStatus } from '../lib/booking-status';
 
 const DISPLAY_HOURS = Array.from({ length: 15 }, (_, i) => i + 7);
 
@@ -35,6 +36,7 @@ function CalendarRow({ hour, weekDates, bookingsBySlot, isTutor, returnTo, today
               const otherPerson = isTutor
                 ? `${booking.learner?.firstName || ''} ${booking.learner?.lastName || ''}`.trim()
                 : `${booking.tutorProfile?.user?.firstName || ''} ${booking.tutorProfile?.user?.lastName || ''}`.trim();
+              const statusLabel = formatBookingStatus(booking.status);
 
               return (
                 <Link
@@ -44,6 +46,9 @@ function CalendarRow({ hour, weekDates, bookingsBySlot, isTutor, returnTo, today
                 >
                   <div className="truncate text-[11px] font-semibold leading-tight">
                     {booking.subject || 'Session'}
+                  </div>
+                  <div className="truncate text-[10px] font-medium leading-tight opacity-80">
+                    Status: {statusLabel}
                   </div>
                   {otherPerson && (
                     <div className="truncate text-[10px] opacity-70">with {otherPerson}</div>
