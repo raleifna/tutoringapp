@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-FORCE_SEED=false
 SKIP_SEED=false
 RUN_SMOKE_TEST=false
 PROJECT_NAME="tutorconnect"
@@ -11,7 +10,7 @@ ENV_FILE=".env"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --force-seed)
-      FORCE_SEED=true
+      echo "--force-seed is now the default; seeding runs unless --skip-seed is provided."
       shift
       ;;
     --skip-seed)
@@ -132,15 +131,6 @@ wait_for_url() {
   exit 1
 }
 
-get_user_count() {
-  local script
-  script='const { PrismaClient } = require("@prisma/client"); const prisma = new PrismaClient(); prisma.user.count().then((count) => { console.log(count); }).catch((error) => { console.error(error); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });'
-
-  local output
-  output="$(docker compose --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T backend node -e "$script")"
-  printf '%s\n' "$output" | tail -n 1 | tr -d '[:space:]'
-}
-
 sync_database_schema() {
   write_step "Synchronizing Prisma schema with the database"
   invoke_backend_command pnpm exec prisma db push --accept-data-loss
@@ -162,24 +152,11 @@ wait_for_url "http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
 sync_database_schema
 
 if [[ "$SKIP_SEED" != "true" ]]; then
-  SHOULD_SEED="$FORCE_SEED"
-
-  if [[ "$SHOULD_SEED" != "true" ]]; then
-    USER_COUNT="$(get_user_count)"
-    if [[ "$USER_COUNT" == "0" ]]; then
-      SHOULD_SEED=true
-    else
-      echo "Seed skipped: detected ${USER_COUNT} existing users."
-    fi
-  fi
-
-  if [[ "$SHOULD_SEED" == "true" ]]; then
-    if backend_has_script "db:seed"; then
-      write_step "Seeding demo accounts and subjects"
-      invoke_backend_command pnpm run db:seed
-    else
-      echo "Seed skipped: backend/package.json does not define db:seed."
-    fi
+  if backend_has_script "db:seed"; then
+    write_step "Seeding demo accounts and subjects"
+    invoke_backend_command pnpm run db:seed
+  else
+    echo "Seed skipped: backend/package.json does not define db:seed."
   fi
 fi
 
