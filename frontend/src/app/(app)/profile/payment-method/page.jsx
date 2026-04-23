@@ -26,6 +26,9 @@ const paymentElementOptions = {
   business: {
     name: 'TutorConnect',
   },
+  wallets: {
+    link: 'never',
+  },
   fields: {
     billingDetails: {
       address: 'never',
