@@ -3,6 +3,11 @@ export const isRecurringBooking = (booking) =>
 
 export const getRecurringSeries = (booking) => booking?.recurringSeries || null;
 
+export const getLatestRescheduleEntry = (booking) =>
+  booking?.statusHistory?.find((entry) => entry.status === 'RESCHEDULED') || null;
+
+export const getLatestRescheduleReason = (booking) => getLatestRescheduleEntry(booking)?.reason || '';
+
 export const getRecurringSeriesBookings = (booking) =>
   [...(getRecurringSeries(booking)?.bookings || [])].sort(
     (left, right) => new Date(left.scheduledAt) - new Date(right.scheduledAt)
@@ -38,6 +43,7 @@ export const getRecurringStatusSummary = (booking) => {
   const acceptedCount = (counts.ACCEPTED || 0) + (counts.COMPLETED || 0);
   const declinedCount = counts.DECLINED || 0;
   const cancelledCount = counts.CANCELLED || 0;
+  const rescheduledCount = counts.RESCHEDULED || 0;
   const pendingCount = bookings.filter((entry) => {
     const status = normalizeStatus(entry?.status);
     return status === 'PENDING' && !isAwaitingPayment(entry);
@@ -69,6 +75,7 @@ export const getRecurringStatusSummary = (booking) => {
     acceptedCount,
     declinedCount,
     cancelledCount,
+    rescheduledCount,
     unpaidCount,
     pendingCount,
     isPartiallyAccepted: status === 'ACCEPTED' && acceptedCount > 0 && acceptedCount < totalSessions,
