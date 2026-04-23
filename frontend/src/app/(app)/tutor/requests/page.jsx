@@ -15,7 +15,7 @@ import {
 import { bookingApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { getBookingStatusClass } from '../../../../lib/booking-status';
-import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, getUserTimezone } from '../../../../lib/formatters';
 import {
   getDisplayStatusLabel,
   getRecurringDisplayBookings,
@@ -26,6 +26,7 @@ import {
   matchesBookingDisplayStatus,
 } from '../../../../lib/recurring-bookings';
 import { cn, getPositivePageNumber } from '../../../../lib/utils';
+import { useAuthStore } from '../../../../lib/store';
 
 const STATUS_TABS = [
   { value: 'PENDING', label: 'Pending' },
@@ -60,6 +61,8 @@ function TutorRequestsContent() {
   );
   const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const timeZone = getUserTimezone(user);
   const currentRequestsHref = (() => {
     const params = new URLSearchParams();
     if (activeStatus) params.set('status', activeStatus);
@@ -229,7 +232,7 @@ function TutorRequestsContent() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
                       <div className="flex items-center gap-1">
                         <CalendarDaysIcon className="w-3.5 h-3.5" />
-                        {formatDate(booking.scheduledAt)}
+                        {formatDate(booking.scheduledAt, timeZone)}
                       </div>
                       <div className="flex items-center gap-1">
                         <ClockIcon className="w-3.5 h-3.5" />

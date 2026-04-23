@@ -9,6 +9,7 @@ import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline
 import { tutorApi, subjectApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
+import { getUserTimezone } from '../../../../lib/formatters';
 import {
   getTutorAccessStateFromProfile,
   TUTOR_REVIEW_PATH,
@@ -79,6 +80,7 @@ export default function TutorProfilePage() {
   });
 
   const profile = profileData?.data?.data;
+  const timeZone = getUserTimezone(profile?.user);
   const allSubjects = subjectsData?.data?.data?.subjects || [];
   const isApproved = profile?.status === 'ACTIVE';
   const latestReviewAction = profile?.latestReviewAction;
@@ -598,7 +600,12 @@ export default function TutorProfilePage() {
             <p className="mt-1 text-sm text-gray-500">Click cells to toggle 1-hour blocks across the full 24-hour day.</p>
           </div>
 
-          <AvailabilityCalendar slots={availability} mode="edit" onChange={setAvailability} />
+          <AvailabilityCalendar
+            slots={availability}
+            mode="edit"
+            timezone={timeZone}
+            onChange={setAvailability}
+          />
 
           <div className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-500">
             {availability.length === 0
@@ -652,6 +659,7 @@ export default function TutorProfilePage() {
                   fixedWeekOffset={0}
                   hideWeekNavigation
                   title="This Week Only"
+                  timezone={timeZone}
                 />
 
                 <div className="rounded-xl bg-white/80 px-3 py-2 text-sm text-gray-600">

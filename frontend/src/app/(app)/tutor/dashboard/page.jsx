@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
-import { formatCurrency, formatDuration, formatShortDateTime as formatDate } from '../../../../lib/formatters';
+import { formatCurrency, formatDuration, formatShortDateTime as formatDate, getUserTimezone } from '../../../../lib/formatters';
 import {
   getRecurringDisplayBookings,
   getRecurringLabel,
@@ -42,10 +42,10 @@ export default function TutorDashboardPage() {
     return () => clearInterval(timerId);
   }, []);
 
-  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+  const timeZone = getUserTimezone(user);
 
-  const formattedTime = time.toLocaleTimeString({
-    timeZone: timeZone,
+  const formattedTime = time.toLocaleTimeString('en-AU', {
+    timeZone,
   });
 
   useEffect(() => {
@@ -250,7 +250,7 @@ export default function TutorDashboardPage() {
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
                       <p className="text-xs text-gray-500">
-                        {booking.subject} · {formatDate(booking.scheduledAt)}
+                        {booking.subject} · {formatDate(booking.scheduledAt, timeZone)}
                       </p>
                       {recurring && (
                         <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
@@ -310,7 +310,7 @@ export default function TutorDashboardPage() {
                       {learner?.firstName} {learner?.lastName}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {booking.subject} · {formatDate(booking.scheduledAt)} ·{' '}
+                      {booking.subject} · {formatDate(booking.scheduledAt, timeZone)} ·{' '}
                       {formatDuration(booking.duration)}
                     </p>
                   </div>
@@ -329,6 +329,7 @@ export default function TutorDashboardPage() {
           bookings={allBookings}
           isTutor={true}
           returnTo="/tutor/dashboard"
+          timezone={timeZone}
         />
       </div>
 

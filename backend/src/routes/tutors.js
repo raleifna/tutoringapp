@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get('/', optionalAuth, tutorController.searchTutors);
 router.get('/:id', optionalAuth, tutorController.getTutorProfile);
-router.get('/:id/availability', tutorController.getTutorAvailability);
+router.get('/:id/availability', optionalAuth, tutorController.getTutorAvailability);
 
 router.use(authenticate);
 

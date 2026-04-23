@@ -188,7 +188,7 @@ const validateTutorAvailabilityWithTimezone = async (
   }
 
   // Validate booking time against tutor's availability
-  const validation = validateBookingTime(new Date(scheduledAt), tutorTimezone, slots);
+  const validation = validateBookingTime(new Date(scheduledAt), tutorTimezone, slots, duration);
 
   if (!validation.isValid) {
     throw new AppError(validation.message, 400);
@@ -512,8 +512,6 @@ exports.createBooking = async (req, res) => {
     data: booking,
   });
 };
-};
-
 exports.getMyBookings = async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
   const parsedPage = parseInt(page, 10) || 1;

@@ -23,6 +23,7 @@ import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { BOOKING_DURATIONS } from '../../../../lib/tutor-options';
 import { useAuthStore } from '../../../../lib/store';
+import { getUserTimezone } from '../../../../lib/formatters';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import BackButton from '../../../../components/BackButton';
 
@@ -149,6 +150,7 @@ export default function TutorDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const timeZone = getUserTimezone(user);
   const [activeTab, setActiveTab] = useState('about');
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState([]);
@@ -741,6 +743,7 @@ export default function TutorDetailPage() {
                   bookedSlots={bookedSlots}
                   mode="select"
                   selectedKeys={selectedSlots.map((slot) => slot.key)}
+                  timezone={timeZone}
                   onSelect={handleSlotSelect}
                 />
                 {selectedSlots.length > 0 && (
@@ -754,7 +757,7 @@ export default function TutorDetailPage() {
                           key={slot.key}
                           className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-700"
                         >
-                          {slot.date.toLocaleString('en-AU')}
+                          {slot.date.toLocaleString('en-AU', { timeZone })}
                         </span>
                       ))}
                     </div>

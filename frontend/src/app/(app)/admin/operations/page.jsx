@@ -308,7 +308,7 @@ function AdminOperationsContent() {
                             )}
                           </div>
                           <p className="text-sm text-gray-500 mt-1">
-                            {formatDate(booking.scheduledAt)} · {formatDuration(booking.duration)} ·{' '}
+                            {formatDate(booking.scheduledAt, booking.learnerTimezone || booking.tutorTimezone)} · {formatDuration(booking.duration)} ·{' '}
                             {booking.sessionType?.replace('_', ' ')}
                           </p>
                         </div>

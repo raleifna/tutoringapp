@@ -377,7 +377,7 @@ function AdminUsersContent() {
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
                             With {booking.tutorProfile?.user?.firstName} {booking.tutorProfile?.user?.lastName} ·{' '}
-                            {formatDate(booking.scheduledAt)}
+                            {formatDate(booking.scheduledAt, booking.learnerTimezone || booking.tutorTimezone)}
                           </p>
                         </div>
                       ))}
@@ -396,7 +396,7 @@ function AdminUsersContent() {
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
                             Learner {booking.learner?.firstName} {booking.learner?.lastName} ·{' '}
-                            {formatDate(booking.scheduledAt)}
+                            {formatDate(booking.scheduledAt, booking.learnerTimezone || booking.tutorTimezone)}
                           </p>
                         </div>
                       ))}

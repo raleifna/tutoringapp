@@ -169,7 +169,9 @@ export default function AdminDashboardPage() {
                             </div>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 text-gray-500">{formatDate(booking.scheduledAt)}</td>
+                        <td className="py-2.5 px-4 text-gray-500">
+                          {formatDate(booking.scheduledAt, booking.learnerTimezone || booking.tutorTimezone)}
+                        </td>
                         <td className="py-2.5 px-4 font-medium text-gray-800">
                           {formatCurrency(booking.totalAmount || 0)}
                         </td>

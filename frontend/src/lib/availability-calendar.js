@@ -1,3 +1,5 @@
+import { getDatePartsInTimezone, zonedTimeToUtc } from './formatters';
+
 export const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export const DAY_LABELS = {
@@ -71,7 +73,23 @@ export const cellsToSlots = (cells) => {
   });
 };
 
-export const getWeekStart = (date = new Date(), weekOffset = 0) => {
+const addDaysToLocalDate = ({ year, month, day }, days) => {
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  };
+};
+
+export const getWeekStart = (date = new Date(), weekOffset = 0, timezone = null) => {
+  if (timezone) {
+    const parts = getDatePartsInTimezone(date, timezone);
+    const diff = (parts.dayOfWeek + 6) % 7;
+    const weekStart = addDaysToLocalDate(parts, -diff + weekOffset * 7);
+    return zonedTimeToUtc({ ...weekStart, hour: 0 }, timezone);
+  }
+
   const base = new Date(date);
   const diff = (base.getDay() + 6) % 7;
   base.setHours(0, 0, 0, 0);
@@ -79,10 +97,17 @@ export const getWeekStart = (date = new Date(), weekOffset = 0) => {
   return base;
 };
 
-export const getSlotDate = (dayOfWeek, hour, weekOffset = 0) => {
-  const start = getWeekStart(new Date(), weekOffset);
+export const getSlotDate = (dayOfWeek, hour, weekOffset = 0, timezone = null) => {
+  const start = getWeekStart(new Date(), weekOffset, timezone);
   const date = new Date(start);
   const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  if (timezone) {
+    const startParts = getDatePartsInTimezone(start, timezone);
+    const slotDate = addDaysToLocalDate(startParts, offset);
+    return zonedTimeToUtc({ ...slotDate, hour }, timezone);
+  }
+
   date.setDate(start.getDate() + offset);
   date.setHours(hour, 0, 0, 0);
   return date;
