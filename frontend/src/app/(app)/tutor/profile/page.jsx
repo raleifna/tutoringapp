@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { LockClosedIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { tutorApi, subjectApi } from '../../../../lib/api-entry';
+import { tutorApi, subjectApi, userApi } from '../../../../lib/api-entry';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import { cloneSlots } from '../../../../lib/availability-calendar';
 import { getUserTimezone } from '../../../../lib/formatters';
+import { useAuthStore } from '../../../../lib/store';
 import {
   getTutorAccessStateFromProfile,
   TUTOR_REVIEW_PATH,
@@ -37,8 +38,25 @@ const LEVELS = [
 
 const CURRENCIES = ['AUD', 'USD', 'GBP', 'EUR'];
 
+const TIMEZONE_OPTIONS = [
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Australia/Brisbane',
+  'Australia/Perth',
+  'Australia/Adelaide',
+  'Asia/Shanghai',
+  'Asia/Hong_Kong',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Europe/London',
+  'America/Los_Angeles',
+  'America/New_York',
+  'UTC',
+];
+
 export default function TutorProfilePage() {
   const queryClient = useQueryClient();
+  const fetchMe = useAuthStore((state) => state.fetchMe);
   const [activeTab, setActiveTab] = useState('profile');
   const [profileForm, setProfileForm] = useState({
     headline: '',
@@ -52,6 +70,7 @@ export default function TutorProfilePage() {
     workExperience: '',
     certificationItems: '',
     languages: '',
+    timezone: 'Australia/Sydney',
   });
   const [availability, setAvailability] = useState([]);
   const [currentWeekAvailability, setCurrentWeekAvailability] = useState([]);
@@ -116,6 +135,7 @@ export default function TutorProfilePage() {
         .map((item) => item.text)
         .join('\n'),
       languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : '',
+      timezone: profile.user?.timezone || 'Australia/Sydney',
     });
 
     setAvailability(cloneSlots(profile.availability || []));
@@ -129,9 +149,13 @@ export default function TutorProfilePage() {
   }, [profile]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: (payload) => tutorApi.updateProfile(payload),
-    onSuccess: () => {
+    mutationFn: async ({ timezone, tutorProfile }) => {
+      await userApi.updateProfile({ bio: tutorProfile.bio, timezone });
+      return tutorApi.updateProfile(tutorProfile);
+    },
+    onSuccess: async () => {
       toast.success('Profile updated');
+      await fetchMe();
       queryClient.invalidateQueries({ queryKey: ['my-tutor-profile'] });
     },
     onError: (err) => {
@@ -252,7 +276,10 @@ export default function TutorProfilePage() {
       certifications: [...existingFileCerts, ...experienceItems, ...qualificationItems],
     };
 
-    updateProfileMutation.mutate(payload);
+    updateProfileMutation.mutate({
+      timezone: profileForm.timezone,
+      tutorProfile: payload,
+    });
   };
 
   const addAvailabilitySlot = () => {
@@ -469,6 +496,21 @@ export default function TutorProfilePage() {
               className="input"
               placeholder="e.g. Sydney, NSW"
             />
+          </div>
+
+          <div>
+            <label className="label">Timezone</label>
+            <select
+              value={profileForm.timezone}
+              onChange={(e) => handleProfileChange('timezone', e.target.value)}
+              className="input"
+            >
+              {TIMEZONE_OPTIONS.map((timezone) => (
+                <option key={timezone} value={timezone}>
+                  {timezone}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

@@ -1,7 +1,7 @@
 // src/app/(app)/profile/page.jsx - User Profile Edit Page
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,7 +26,24 @@ const profileSchema = z.object({
   lastName: z.string().min(2, 'At least 2 characters'),
   phone: z.string().optional(),
   bio: z.string().max(500).optional(),
+  timezone: z.string().min(1, 'Timezone is required'),
 });
+
+const TIMEZONE_OPTIONS = [
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Australia/Brisbane',
+  'Australia/Perth',
+  'Australia/Adelaide',
+  'Asia/Shanghai',
+  'Asia/Hong_Kong',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Europe/London',
+  'America/Los_Angeles',
+  'America/New_York',
+  'UTC',
+];
 
 const passwordSchema = z
   .object({
@@ -69,6 +86,7 @@ export default function ProfilePage() {
     register,
     handleSubmit,
     formState: { errors, isDirty },
+    reset,
   } = useForm({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -76,8 +94,20 @@ export default function ProfilePage() {
       lastName: user?.lastName || '',
       phone: user?.phone || '',
       bio: user?.bio || '',
+      timezone: user?.timezone || 'Australia/Sydney',
     },
   });
+
+  useEffect(() => {
+    if (!user) return;
+    reset({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      phone: user.phone || '',
+      bio: user.bio || '',
+      timezone: user.timezone || 'Australia/Sydney',
+    });
+  }, [reset, user]);
 
   const {
     register: registerPwd,
@@ -243,6 +273,18 @@ export default function ProfilePage() {
                 className="input"
                 placeholder="+61 400 000 000"
               />
+            </div>
+
+            <div>
+              <label className="label">Timezone</label>
+              <select {...register('timezone')} className="input">
+                {TIMEZONE_OPTIONS.map((timezone) => (
+                  <option key={timezone} value={timezone}>
+                    {timezone}
+                  </option>
+                ))}
+              </select>
+              {errors.timezone && <p className="error-text">{errors.timezone.message}</p>}
             </div>
 
             <div>
