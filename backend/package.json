@@ -9,7 +9,9 @@
     "db:seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
     "start": "pnpm run db:push && node server.js",
-    "dev": "pnpm run db:push && node --watch server.js"
+    "dev": "pnpm run db:push && node --watch server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -28,6 +30,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "prisma": "^6.6.0"
+    "prisma": "^6.6.0",
+    "supertest": "^7.1.4",
+    "vitest": "^3.2.4"
   }
 }

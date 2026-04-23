@@ -21,6 +21,22 @@ const getVerificationUrl = (token) =>
 
 const getMailFrom = () => process.env.EMAIL_FROM || 'TutorConnect <no-reply@tutorconnect.local>';
 
+const getVerificationMailboxUrl = () => {
+    const mailboxUrl = normalizeUrl(process.env.DEV_MAILBOX_URL || '');
+    const smtpHost = String(process.env.SMTP_HOST || '').trim().toLowerCase();
+    const smtpUrl = String(process.env.SMTP_URL || '').trim().toLowerCase();
+
+    if (!mailboxUrl) {
+        return '';
+    }
+
+    if (smtpHost === 'mailpit' || smtpUrl.includes('mailpit')) {
+        return mailboxUrl;
+    }
+
+    return '';
+};
+
 const hasSmtpConfig = () =>
     Boolean(process.env.SMTP_URL || (process.env.SMTP_HOST && process.env.SMTP_PORT));
 
@@ -57,6 +73,7 @@ const getTransporter = () => {
 async function sendVerificationEmail({ email, firstName, token }) {
     const verificationUrl = getVerificationUrl(token);
     const transporter = getTransporter();
+    const mailboxUrl = getVerificationMailboxUrl();
 
     if (!transporter) {
         logger.info(`Email verification link for ${email}: ${verificationUrl}`);
@@ -94,6 +111,7 @@ async function sendVerificationEmail({ email, firstName, token }) {
     return {
         delivered: true,
         deliveryMethod: 'smtp',
+        ...(mailboxUrl ? { mailboxUrl } : {}),
     };
 }
 
