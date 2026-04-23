@@ -30,7 +30,6 @@ import BackButton from '../../../components/BackButton';
 
 const STATUS_TABS = [
   { value: '', label: 'All' },
-  { value: 'UNPAID', label: 'Unpaid' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'ACCEPTED', label: 'Upcoming' },
   { value: 'COMPLETED', label: 'Completed' },
@@ -87,13 +86,6 @@ function BookingsPageContent() {
 
   const bookings = data?.data?.data?.bookings || [];
   const sortedBookings = [...bookings].sort((a, b) => {
-    const statusPriority = (booking) => {
-      const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : getBookingDisplayStatus(booking);
-      return displayStatus === 'UNPAID' ? 0 : 1;
-    };
-    const priorityDiff = statusPriority(a) - statusPriority(b);
-    if (priorityDiff !== 0) return priorityDiff;
-
     const createdAtA = new Date(a?.createdAt || 0).getTime();
     const createdAtB = new Date(b?.createdAt || 0).getTime();
     if (createdAtA !== createdAtB) return createdAtB - createdAtA;

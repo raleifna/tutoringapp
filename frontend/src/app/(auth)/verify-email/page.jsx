@@ -19,6 +19,7 @@ function VerifyEmailContent() {
   const [message, setMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
   const [verificationUrl, setVerificationUrl] = useState('');
+  const [verificationMailboxUrl, setVerificationMailboxUrl] = useState('');
   const hasRequestedRef = useRef(false);
 
   useEffect(() => {
@@ -124,6 +125,7 @@ function VerifyEmailContent() {
                   try {
                     const response = await authApi.resendVerification({ email });
                     setVerificationUrl(response?.data?.verificationUrl || '');
+                    setVerificationMailboxUrl(response?.data?.verificationMailboxUrl || '');
                     toast.success('Verification email resent');
                   } catch (error) {
                     toast.error(error?.response?.data?.message || 'Resend failed');
@@ -140,6 +142,16 @@ function VerifyEmailContent() {
                   className="inline-flex w-full items-center justify-center rounded-xl border border-primary-200 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-50"
                 >
                   Open Verification Link
+                </a>
+              ) : null}
+              {verificationMailboxUrl ? (
+                <a
+                  href={verificationMailboxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-primary-200 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-50"
+                >
+                  Open Local Mailbox
                 </a>
               ) : null}
             </div>

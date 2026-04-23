@@ -94,27 +94,27 @@ If you need a fresh test run, remove mock keys in browser console:
 
 ---
 
-# Mock 使用说明（中文）
+# Mock Usage Guide
 
-这个目录用于存放前端本地开发用的 mock API。
-注意：Next.js 本地环境变量读取的是 `.env.local`。
+This directory contains mock APIs for local frontend development.
+Note: Next.js reads local frontend environment variables from `.env.local`.
 
-## 如何切换 后端 / Mock
+## Switching Between Backend And Mock APIs
 
-项目目前使用五个 stage 开关：
+The project currently uses five stage switches:
 
 - `NEXT_PUBLIC_STAGE1_API_MODE`（auth）
 - `NEXT_PUBLIC_STAGE2_API_MODE`（subject + tutor）
 - `NEXT_PUBLIC_STAGE3_API_MODE`（booking）
-- `NEXT_PUBLIC_STAGE4_API_MODE`（tutor 私有能力 + user profile）
+- `NEXT_PUBLIC_STAGE4_API_MODE`（private tutor features + user profile）
 - `NEXT_PUBLIC_STAGE5_API_MODE`（admin）
 
-每个开关支持：
+Each switch supports:
 
-- `backend`：使用真实后端接口（`src/lib/api.js`）
-- `mock`：使用 mock 接口（`src/mocks/stage1.mock.js`、`src/mocks/stage2.mock.js`、`src/mocks/stage3.mock.js`、`src/mocks/stage4.mock.js`、`src/mocks/stage5.mock.js`）
+- `backend`: use the real backend API (`src/lib/api.js`)
+- `mock`: use the mock API (`src/mocks/stage1.mock.js`, `src/mocks/stage2.mock.js`, `src/mocks/stage3.mock.js`, `src/mocks/stage4.mock.js`, `src/mocks/stage5.mock.js`)
 
-建议在环境变量文件中设置：
+Recommended local environment setup:
 
 ```bash
 # frontend/.env.local
@@ -125,14 +125,14 @@ NEXT_PUBLIC_STAGE4_API_MODE=mock
 NEXT_PUBLIC_STAGE5_API_MODE=mock
 ```
 
-兼容说明：
-- 如果不设置 `STAGE2/3/4/5`，会默认跟随 `STAGE1`。
+Compatibility note:
+- If `STAGE2/3/4/5` are not set, they default to following `STAGE1`.
 
-修改后请重启前端开发服务器。
+Restart the frontend development server after changing these values.
 
-## 当前 mock 覆盖范围
+## Current Mock Coverage
 
-目前已实现：
+Currently implemented:
 
 - `authApi`（register/login/logout/getMe/verifyEmail/resendVerification/changePassword）
 - `subjectApi`（getCategories/getAll）
@@ -144,23 +144,23 @@ NEXT_PUBLIC_STAGE5_API_MODE=mock
 - `messageApi`（getConversations/createConversation/getMessages/sendMessage/markAsRead/getUnreadCount）
 - `adminApi`（getDashboard/getAnalytics/getUsers/getUser/updateUserStatus/getPendingTutors/approveTutor/rejectTutor/returnTutor/getBookings/getActions/createSubject/updateSubject/deleteSubject）
 
-开关逻辑位置：
+Switching logic:
 
 - `src/lib/api-entry.js`
 
-## Mock 测试账号
+## Mock Demo Accounts
 
-所有演示账号统一密码：
+All demo accounts use the same password:
 
 - `Demo1234!`
 
-建议优先使用：
+Recommended accounts:
 
-- Learner：`ava.learner@example.com`
-- Tutor：`emma.tutor@example.com`
-- Admin：`admin@mock.local`
+- Learner: `ava.learner@example.com`
+- Tutor: `emma.tutor@example.com`
+- Admin: `admin@mock.local`
 
-其它已内置账号：
+Other built-in accounts:
 
 - `ethan.learner@example.com`
 - `mia.learner@example.com`
@@ -169,9 +169,9 @@ NEXT_PUBLIC_STAGE5_API_MODE=mock
 - `noah.tutor@example.com`
 - `sysadmin@mock.local`
 
-## 重置 Mock 数据（可选）
+## Reset Mock Data (Optional)
 
-如果你要重新走一轮完整流程，可在浏览器控制台执行：
+To replay a full mock flow from a clean state, run this in the browser console:
 
 ```js
 [

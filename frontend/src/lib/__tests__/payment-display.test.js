@@ -4,7 +4,7 @@ import {
   formatPaymentStatus,
   formatSavedMethod,
   getPaymentStatusClass,
-} from '../src/lib/payment-display.js';
+} from '../payment-display.js';
 
 describe('payment display helpers', () => {
   it('converts payment status values to readable labels', () => {
@@ -22,8 +22,8 @@ describe('payment display helpers', () => {
     expect(getPaymentStatusClass('REFUNDED')).toContain('gray');
   });
 
-  it('test saved card details without exposing full card numbers', () => {
-    expect(formatSavedMethod({ brand: 'visa', last4: '4242' })).toBe('Visa ending in 4242');
+  it('formats saved card details without exposing full card numbers', () => {
+    expect(formatSavedMethod({ brand: 'visa', last4: '1111' })).toBe('Visa ending in 1111');
     expect(formatSavedMethod({ brand: 'mastercard', last4: '4444' })).toBe('Mastercard ending in 4444');
   });
 

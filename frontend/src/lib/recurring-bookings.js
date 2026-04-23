@@ -14,17 +14,10 @@ export const getRecurringSeriesBookings = (booking) =>
   );
 
 const normalizeStatus = (status) => String(status || 'PENDING').toUpperCase();
-const normalizePaymentStatus = (status) => String(status || 'PENDING').toUpperCase();
 
 export const isAwaitingPayment = (booking) => {
   const bookingStatus = normalizeStatus(booking?.status);
-  const paymentStatus = normalizePaymentStatus(booking?.payment?.status);
-
-  if (['CANCELLED', 'DECLINED', 'COMPLETED', 'RESCHEDULED'].includes(bookingStatus)) {
-    return false;
-  }
-
-  return ['PENDING', 'FAILED', 'PROCESSING'].includes(paymentStatus);
+  return bookingStatus === 'UNPAID';
 };
 
 export const getBookingDisplayStatus = (booking) => {

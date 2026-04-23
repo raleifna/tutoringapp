@@ -30,17 +30,15 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   : null;
 const addressElementOptions = {
   mode: 'billing',
-  defaultValues: {
-    address: {
-      country: 'AU',
-    },
-  },
 };
 const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const paymentElementOptions = {
   business: {
     name: 'TutorConnect',
+  },
+  wallets: {
+    link: 'never',
   },
   fields: {
     billingDetails: {
@@ -49,23 +47,30 @@ const paymentElementOptions = {
   },
 };
 
-function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFuture, onSaved }) {
+function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFuture, shouldRetryPayment, onSaved }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitLabel = saveForFuture ? 'Save Card and Pay' : 'Use Card and Pay';
+  const submitLabel = shouldRetryPayment
+    ? 'Save Card and Retry Payment'
+    : saveForFuture
+      ? 'Save Card for This Booking'
+      : 'Use This Card';
 
   const successHref = useMemo(() => {
-    if (!returnTo) return `/bookings/${bookingId}?payment=success`;
+    const successKey = shouldRetryPayment ? 'payment' : 'paymentMethod';
+    const successValue = shouldRetryPayment ? 'success' : 'ready';
+
+    if (!returnTo) return `/bookings/${bookingId}?${successKey}=${successValue}`;
 
     const [pathname, queryString = ''] = returnTo.split('?');
     const params = new URLSearchParams(queryString);
-    params.set('payment', 'success');
+    params.set(successKey, successValue);
     const query = params.toString();
 
     return query ? `${pathname}?${query}` : pathname;
-  }, [bookingId, returnTo]);
+  }, [bookingId, returnTo, shouldRetryPayment]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -107,14 +112,16 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
         bookingId,
         saveAsDefault: saveForFuture,
       });
-      await bookingApi.pay(bookingId);
+      if (shouldRetryPayment) {
+        await bookingApi.pay(bookingId);
+      }
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Payment could not be completed');
+      toast.error(error?.response?.data?.message || 'Payment method could not be saved');
       setIsSubmitting(false);
       return;
     }
 
-    toast.success('Payment successful');
+    toast.success(shouldRetryPayment ? 'Payment retried successfully' : 'Payment method saved');
     onSaved?.();
     router.push(successHref);
   };
@@ -137,7 +144,7 @@ function SetupPaymentMethodForm({ bookingId, clientSecret, returnTo, saveForFutu
           className="btn-primary gap-2"
         >
           <CheckCircleIcon className="w-4 h-4" />
-          {isSubmitting ? 'Confirming...' : submitLabel}
+          {isSubmitting ? 'Saving...' : submitLabel}
         </button>
       </div>
     </form>
@@ -181,6 +188,8 @@ export default function BookingPaymentPage() {
     enabled: !!currentUserId && user?.role === 'LEARNER',
   });
   const savedMethod = savedMethodQuery.data?.data?.data?.paymentMethod || null;
+  const shouldRetryPayment =
+    booking?.status === 'ACCEPTED' && ['PENDING', 'FAILED'].includes(paymentStatus);
   const canUpdatePaymentMethod =
     user?.role === 'LEARNER' &&
     (
@@ -192,39 +201,20 @@ export default function BookingPaymentPage() {
   const useSavedMethodMutation = useMutation({
     mutationFn: async () => {
       await paymentApi.useSavedMethodForBooking(id);
-      return bookingApi.pay(id);
+      if (shouldRetryPayment) {
+        return bookingApi.pay(id);
+      }
+      return null;
     },
-    onSuccess: async (response) => {
-      toast.success(response?.data?.message || 'Payment successful');
+    onSuccess: async () => {
+      toast.success(shouldRetryPayment ? 'Payment retried successfully' : 'Payment method confirmed');
       await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
       await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
       await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      router.push(returnTo || `/bookings/${id}?payment=success`);
+      router.push(returnTo || `/bookings/${id}?${shouldRetryPayment ? 'payment=success' : 'paymentMethod=ready'}`);
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not complete payment');
-    },
-  });
-
-  const localTestPaymentMutation = useMutation({
-    mutationFn: async () => {
-      await paymentApi.completeSetupIntent({
-        setupIntentId: `local_setup_${currentUserId || id}`,
-        bookingId: id,
-        saveAsDefault: true,
-      });
-      return bookingApi.pay(id);
-    },
-    onSuccess: async (response) => {
-      toast.success(response?.data?.message || 'Payment successful');
-      await queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-      await queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });
-      await queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      await queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] });
-      router.push(returnTo || `/bookings/${id}?payment=success`);
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Could not complete payment');
+      toast.error(err?.response?.data?.message || 'Could not confirm payment method');
     },
   });
 
@@ -309,7 +299,7 @@ export default function BookingPaymentPage() {
     ((Number(booking?.hourlyRate || 0) * Number(booking?.duration || 0)) / 60 || 0);
   const seriesTotalAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
   const fullSeriesAmount = getSeriesTotalAmount(recurringBookings);
-  const amountToPayNow = recurring ? seriesTotalAmount || fullSeriesAmount || totalAmount : totalAmount;
+  const amountToChargeLater = recurring ? seriesTotalAmount || fullSeriesAmount || totalAmount : totalAmount;
 
   const elementsOptions = setupIntentData?.clientSecret
     ? {
@@ -327,7 +317,7 @@ export default function BookingPaymentPage() {
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Payment</p>
           <h1 className="text-2xl font-bold text-gray-900">
-            {recurring ? 'Pay Series' : 'Pay Booking'}
+            {recurring ? 'Set Up Series Payment' : 'Set Up Payment Method'}
           </h1>
         </div>
         {showBackButton && <BackButton href={returnTo} />}
@@ -378,7 +368,7 @@ export default function BookingPaymentPage() {
                   Sessions in this series
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  Paying here charges the whole recurring booking together. Later changes can still be refunded per session.
+                  TutorConnect will charge the included sessions after tutor approval.
                 </p>
               </div>
               <div className="text-right">
@@ -386,7 +376,7 @@ export default function BookingPaymentPage() {
                   {recurringBookings.length} sessions
                 </p>
                 <p className="mt-2 text-lg font-bold text-sky-900">
-                  {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
+                  {formatCurrency(amountToChargeLater, booking.currency || 'AUD')}
                 </p>
               </div>
             </div>
@@ -415,9 +405,9 @@ export default function BookingPaymentPage() {
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Pay Now</p>
+              <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Amount to Charge After Approval</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(amountToPayNow, booking.currency || 'AUD')}
+                {formatCurrency(amountToChargeLater, booking.currency || 'AUD')}
               </p>
               {recurring && (
                 <p className="mt-1 text-sm text-blue-700">
@@ -428,7 +418,7 @@ export default function BookingPaymentPage() {
             <CreditCardIcon className="w-8 h-8 text-blue-500" />
           </div>
           <p className="text-sm text-blue-700 mt-3">
-            Payment will be processed now. If a session is later cancelled, the refund will be applied to that session.
+            No payment is charged on this page. TutorConnect will charge the selected payment method only after the tutor accepts this booking.
           </p>
         </div>
 
@@ -469,8 +459,12 @@ export default function BookingPaymentPage() {
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-sm text-emerald-800 mb-3">
                 {recurring
-                  ? `We will charge your saved ${formatSavedMethod(savedMethod)} for this recurring booking now.`
-                  : `We will charge your saved ${formatSavedMethod(savedMethod)} for this booking now.`}
+                  ? shouldRetryPayment
+                    ? `We will retry payment for this recurring booking with your saved ${formatSavedMethod(savedMethod)}.`
+                    : `We will use your saved ${formatSavedMethod(savedMethod)} when the tutor accepts this recurring booking.`
+                  : shouldRetryPayment
+                    ? `We will retry payment for this booking with your saved ${formatSavedMethod(savedMethod)}.`
+                    : `We will use your saved ${formatSavedMethod(savedMethod)} when the tutor accepts this booking.`}
               </p>
               <div className="flex justify-end">
                 <button
@@ -480,30 +474,17 @@ export default function BookingPaymentPage() {
                   className="btn-primary gap-2"
                 >
                   <CheckCircleIcon className="w-4 h-4" />
-                  {useSavedMethodMutation.isPending ? 'Paying...' : recurring ? 'Pay Series Now' : 'Pay Now'}
+                  {useSavedMethodMutation.isPending
+                    ? 'Confirming...'
+                    : shouldRetryPayment
+                      ? 'Confirm and Retry Payment'
+                      : 'Confirm Payment Method'}
                 </button>
               </div>
             </div>
           ) : !stripeEnabled ? (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm text-blue-800 mb-3">
-                {recurring
-                  ? 'Pay this booking now.'
-                  : 'Pay this booking now.'}
-              </p>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => localTestPaymentMutation.mutate()}
-                  disabled={localTestPaymentMutation.isPending}
-                  className="btn-primary gap-2"
-                >
-                  <CheckCircleIcon className="w-4 h-4" />
-                  {localTestPaymentMutation.isPending
-                    ? 'Paying...'
-                    : 'Pay Now'}
-                </button>
-              </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm">
+              Payment setup is currently unavailable. Please try again later.
             </div>
           ) : setupIntentMutation.isPending && !setupIntentData?.clientSecret ? (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
@@ -533,6 +514,7 @@ export default function BookingPaymentPage() {
                   clientSecret={setupIntentData.clientSecret}
                   returnTo={returnTo}
                   saveForFuture={saveForFuture}
+                  shouldRetryPayment={shouldRetryPayment}
                   onSaved={() => {
                     queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
                     queryClient.invalidateQueries({ queryKey: ['bookings', currentUserId] });

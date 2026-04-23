@@ -25,6 +25,7 @@ function RegisterContent() {
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [registeredRole, setRegisteredRole] = useState('LEARNER');
   const [verificationUrl, setVerificationUrl] = useState('');
+  const [verificationMailboxUrl, setVerificationMailboxUrl] = useState('');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   const {
@@ -54,6 +55,7 @@ function RegisterContent() {
       setRegisteredEmail(rawData.email);
       setRegisteredRole(rawData.role);
       setVerificationUrl(response?.data?.verificationUrl || '');
+      setVerificationMailboxUrl(response?.data?.verificationMailboxUrl || '');
       setRegistered(true);
     } catch (error) {
       toast.error(getRegisterErrorMessage(error));
@@ -91,6 +93,17 @@ function RegisterContent() {
             </a>
           ) : null}
 
+          {verificationMailboxUrl ? (
+            <a
+              href={verificationMailboxUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center justify-center rounded-xl border border-primary-200 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-50"
+            >
+              Open Local Mailbox
+            </a>
+          ) : null}
+
           <p className="text-sm text-gray-500 mt-4">
             Didn't receive it?{' '}
             <button
@@ -102,6 +115,7 @@ function RegisterContent() {
                 try {
                   const response = await authApi.resendVerification({ email: registeredEmail });
                   setVerificationUrl(response?.data?.verificationUrl || '');
+                  setVerificationMailboxUrl(response?.data?.verificationMailboxUrl || '');
                   toast.success('Verification email resent');
                 } catch (error) {
                   toast.error(getRegisterErrorMessage(error));

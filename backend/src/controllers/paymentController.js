@@ -23,19 +23,6 @@ const mapSavedPaymentMethod = (paymentMethod) => {
 };
 
 const pendingPaymentStatuses = ['PENDING', 'FAILED', 'PROCESSING'];
-const LOCAL_PAYMENT_METHOD_ID = 'local_test_card';
-
-const buildLocalPaymentMethod = (paymentMethodId = LOCAL_PAYMENT_METHOD_ID) => ({
-  id: paymentMethodId,
-  type: 'card',
-  brand: 'visa',
-  last4: '4242',
-  expMonth: 12,
-  expYear: 2030,
-  billingName: 'Local Test Card',
-});
-
-const buildLocalCustomerId = (userId) => `local_customer_${userId}`;
 
 const getTargetBookingsForPaymentSetup = async (booking, learnerId) => {
   if (!booking.recurringGroupId) {
@@ -77,6 +64,19 @@ const getStripeCustomerMethods = async (stripe, stripeCustomerId, stripeDefaultP
   });
 };
 
+const bookingPendingUpdate = (booking, reason) =>
+  booking.status === 'UNPAID'
+    ? {
+        status: 'PENDING',
+        statusHistory: {
+          create: {
+            status: 'PENDING',
+            reason,
+          },
+        },
+      }
+    : {};
+
 exports.getSavedPaymentMethod = async (req, res) => {
   if (req.user.role !== 'LEARNER') {
     throw new AppError('Only learners can view payment methods', 403);
@@ -94,6 +94,19 @@ exports.getSavedPaymentMethod = async (req, res) => {
     throw new AppError('User not found', 404);
   }
 
+  if (!isStripeConfigured()) {
+    res.json({
+      success: true,
+      data: {
+        hasPaymentMethod: false,
+        paymentMethod: null,
+        paymentMethods: [],
+        unavailable: true,
+      },
+    });
+    return;
+  }
+
   if (!user.stripeCustomerId || !user.stripeDefaultPaymentMethodId) {
     res.json({
       success: true,
@@ -101,20 +114,6 @@ exports.getSavedPaymentMethod = async (req, res) => {
         hasPaymentMethod: false,
         paymentMethod: null,
         paymentMethods: [],
-      },
-    });
-    return;
-  }
-
-  if (!isStripeConfigured()) {
-    res.json({
-      success: true,
-      data: {
-        hasPaymentMethod: true,
-        paymentMethod: buildLocalPaymentMethod(user.stripeDefaultPaymentMethodId),
-        paymentMethods: [buildLocalPaymentMethod(user.stripeDefaultPaymentMethodId)],
-        defaultPaymentMethodId: user.stripeDefaultPaymentMethodId,
-        localMode: true,
       },
     });
     return;
@@ -170,23 +169,12 @@ exports.setDefaultPaymentMethod = async (req, res) => {
     },
   });
 
-  if (!user?.stripeCustomerId) {
-    throw new AppError('Stripe customer not found', 404);
+  if (!isStripeConfigured()) {
+    throw new AppError('Payment setup is currently unavailable', 503);
   }
 
-  if (!isStripeConfigured()) {
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: {
-        stripeDefaultPaymentMethodId: paymentMethodId,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: 'Default payment method updated',
-    });
-    return;
+  if (!user?.stripeCustomerId) {
+    throw new AppError('Stripe customer not found', 404);
   }
 
   const stripe = getStripe();
@@ -216,16 +204,7 @@ exports.createSetupIntent = async (req, res) => {
   }
 
   if (!isStripeConfigured()) {
-    res.json({
-      success: true,
-      data: {
-        clientSecret: null,
-        customerId: buildLocalCustomerId(req.user.id),
-        setupIntentId: `local_setup_${req.user.id}`,
-        localMode: true,
-      },
-    });
-    return;
+    throw new AppError('Payment setup is currently unavailable', 503);
   }
 
   const stripe = getStripe();
@@ -289,73 +268,7 @@ exports.completeSetupIntent = async (req, res) => {
   }
 
   if (!isStripeConfigured()) {
-    const stripeCustomerId = buildLocalCustomerId(req.user.id);
-    const stripePaymentMethodId = LOCAL_PAYMENT_METHOD_ID;
-
-    let updatedUser = null;
-
-    if (saveAsDefault) {
-      updatedUser = await prisma.user.update({
-        where: { id: req.user.id },
-        data: {
-          stripeCustomerId,
-          stripeDefaultPaymentMethodId: stripePaymentMethodId,
-        },
-        select: {
-          id: true,
-          stripeCustomerId: true,
-          stripeDefaultPaymentMethodId: true,
-        },
-      });
-    }
-
-    if (bookingId) {
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { payment: true },
-      });
-
-      if (!booking || booking.learnerId !== req.user.id) {
-        throw new AppError('Booking not found', 404);
-      }
-
-      if (!booking.payment) {
-        throw new AppError('Payment record not found for this booking', 404);
-      }
-
-      const targetBookings = await getTargetBookingsForPaymentSetup(booking, req.user.id);
-
-      await prisma.$transaction(
-        targetBookings
-          .filter((targetBooking) => targetBooking.payment)
-          .map((targetBooking) =>
-            prisma.payment.update({
-              where: { id: targetBooking.payment.id },
-              data: {
-                stripeCustomerId,
-                stripePaymentMethodId,
-                stripeSetupIntentId: setupIntentId,
-                status: targetBooking.payment.status === 'FAILED' ? 'PENDING' : targetBooking.payment.status,
-                failureReason: null,
-                failedAt: null,
-              },
-            })
-          )
-      );
-    }
-
-    res.json({
-      success: true,
-      message: 'Payment method saved successfully',
-      data: {
-        user: updatedUser,
-        paymentMethod: buildLocalPaymentMethod(stripePaymentMethodId),
-        savedAsDefault: Boolean(saveAsDefault),
-        bookingId: bookingId || null,
-        localMode: true,
-      },
-    });
-    return;
+    throw new AppError('Payment setup is currently unavailable', 503);
   }
 
   const stripe = getStripe();
@@ -408,7 +321,7 @@ exports.completeSetupIntent = async (req, res) => {
     await prisma.$transaction(
       targetBookings
         .filter((targetBooking) => targetBooking.payment)
-        .map((targetBooking) =>
+        .flatMap((targetBooking) => [
           prisma.payment.update({
             where: { id: targetBooking.payment.id },
             data: {
@@ -419,8 +332,16 @@ exports.completeSetupIntent = async (req, res) => {
               failureReason: null,
               failedAt: null,
             },
-          })
-        )
+          }),
+          ...(targetBooking.status === 'UNPAID'
+            ? [
+                prisma.booking.update({
+                  where: { id: targetBooking.id },
+                  data: bookingPendingUpdate(targetBooking, 'Payment method saved'),
+                }),
+              ]
+            : []),
+        ])
     );
   }
 
@@ -441,6 +362,10 @@ exports.completeSetupIntent = async (req, res) => {
 exports.useSavedMethodForBooking = async (req, res) => {
   if (req.user.role !== 'LEARNER') {
     throw new AppError('Only learners can manage booking payment methods', 403);
+  }
+
+  if (!isStripeConfigured()) {
+    throw new AppError('Payment setup is currently unavailable', 503);
   }
 
   const booking = await prisma.booking.findUnique({
@@ -470,10 +395,10 @@ exports.useSavedMethodForBooking = async (req, res) => {
 
   const targetBookings = await getTargetBookingsForPaymentSetup(booking, req.user.id);
 
-  const updatedPayments = await prisma.$transaction(
+  const transactionResult = await prisma.$transaction(
     targetBookings
       .filter((targetBooking) => targetBooking.payment)
-      .map((targetBooking) =>
+      .flatMap((targetBooking) => [
         prisma.payment.update({
           where: { id: targetBooking.payment.id },
           data: {
@@ -483,9 +408,18 @@ exports.useSavedMethodForBooking = async (req, res) => {
             failedAt: null,
             status: targetBooking.payment.status === 'FAILED' ? 'PENDING' : targetBooking.payment.status,
           },
-        })
-      )
+        }),
+        ...(targetBooking.status === 'UNPAID'
+          ? [
+              prisma.booking.update({
+                where: { id: targetBooking.id },
+                data: bookingPendingUpdate(targetBooking, 'Saved payment method selected'),
+              }),
+            ]
+          : []),
+      ])
   );
+  const updatedPayments = transactionResult.filter((item) => item && item.bookingId);
 
   res.json({
     success: true,
@@ -585,8 +519,7 @@ exports.deleteSavedPaymentMethod = async (req, res) => {
 
     try {
       await stripe.paymentMethods.detach(targetPaymentMethodId);
-    } catch (error) {
-      // ignore detach errors so local state can still be cleaned up
+    } catch {
     }
   }
 
