@@ -2,6 +2,7 @@ const { prisma } = require('../config/database');
 const { getStripe, isStripeConfigured } = require('../config/stripe');
 const { AppError } = require('../middleware/errorHandler');
 const { notify, notifyOrRefresh, notifyAdmin } = require('../services/notificationService');
+const { validateBookingTime } = require('../utils/timezone');
 
 const bookingInclude = {
   learner: {
@@ -155,6 +156,49 @@ const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration) => {
   if (hasOverlap) {
     throw new AppError('This time slot has already been booked', 409);
   }
+};
+
+/**
+ * Validate booking time against tutor's timezone-aware availability
+ */
+const validateTutorAvailabilityWithTimezone = async (
+  tutorId,
+  scheduledAt,
+  duration,
+  learnerTimezone
+) => {
+  // Get tutor's availability slots and timezone
+  const tutorProfile = await prisma.tutorProfile.findUnique({
+    where: { id: tutorId },
+    include: {
+      availability: { orderBy: { dayOfWeek: 'asc' } },
+      user: { select: { timezone: true } },
+    },
+  });
+
+  if (!tutorProfile) {
+    throw new AppError('Tutor not found', 404);
+  }
+
+  const tutorTimezone = tutorProfile.user?.timezone || 'UTC';
+  const slots = tutorProfile.availability || [];
+
+  if (!slots.length) {
+    throw new AppError('Tutor has no availability set', 400);
+  }
+
+  // Validate booking time against tutor's availability
+  const validation = validateBookingTime(new Date(scheduledAt), tutorTimezone, slots);
+
+  if (!validation.isValid) {
+    throw new AppError(validation.message, 400);
+  }
+
+  return {
+    isValid: true,
+    tutorTimezone,
+    tutorLocalTime: validation.tutorLocalTime,
+  };
 };
 
 const getPayableSeriesBookingsForLearner = async (booking, learnerId) => {
@@ -399,7 +443,24 @@ exports.createBooking = async (req, res) => {
         },
       })) === 0
     : true;
+
+  // Get learner timezone
+  const learner = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { timezone: true },
+  });
+  const learnerTimezone = learner?.timezone || 'UTC';
+
+  // Check overlapping bookings
   await ensureTutorSlotIsAvailable(tutorProfile.id, scheduledAt, parsedDuration);
+
+  // Validate timezone-aware availability
+  const tzValidation = await validateTutorAvailabilityWithTimezone(
+    tutorProfile.id,
+    scheduledAt,
+    parsedDuration,
+    learnerTimezone
+  );
 
   const booking = await prisma.booking.create({
     data: {
@@ -417,6 +478,8 @@ exports.createBooking = async (req, res) => {
       recurringType: recurringType || 'ONE_OFF',
       recurringGroupId: recurringGroupId || null,
       meetingTool: meetingTool || tutorProfile.preferredMeetingTool || null,
+      learnerTimezone,
+      tutorTimezone: tzValidation.tutorTimezone,
       payment: {
         create: {
           userId: req.user.id,
@@ -448,6 +511,7 @@ exports.createBooking = async (req, res) => {
     message: 'Booking request sent successfully',
     data: booking,
   });
+};
 };
 
 exports.getMyBookings = async (req, res) => {
