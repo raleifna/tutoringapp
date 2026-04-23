@@ -1,5 +1,4 @@
 const request = require('supertest');
-const { beforeEach, describe, expect, test, vi } = require('vitest');
 
 const prisma = {
   user: {
@@ -11,13 +10,27 @@ const prisma = {
 
 const sendVerificationEmail = vi.fn();
 
-vi.mock('../../src/config/database', () => ({
-  prisma,
-}));
+const databaseModulePath = require.resolve('../../src/config/database');
+const emailServiceModulePath = require.resolve('../../src/services/emailService');
+const appModulePath = require.resolve('../../src/app');
 
-vi.mock('../../src/services/emailService', () => ({
-  sendVerificationEmail,
-}));
+delete require.cache[databaseModulePath];
+delete require.cache[emailServiceModulePath];
+delete require.cache[appModulePath];
+
+require.cache[databaseModulePath] = {
+  id: databaseModulePath,
+  filename: databaseModulePath,
+  loaded: true,
+  exports: { prisma },
+};
+
+require.cache[emailServiceModulePath] = {
+  id: emailServiceModulePath,
+  filename: emailServiceModulePath,
+  loaded: true,
+  exports: { sendVerificationEmail },
+};
 
 const app = require('../../src/app');
 const { createAccessToken, createRefreshToken } = require('../../src/utils/tokens');

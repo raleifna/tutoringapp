@@ -1,5 +1,4 @@
 const request = require('supertest');
-const { beforeEach, describe, expect, test, vi } = require('vitest');
 
 const prisma = {
   user: {
@@ -34,13 +33,30 @@ const ioMock = {
   to: vi.fn(() => ({ emit: ioEmit })),
 };
 
-vi.mock('../../src/config/database', () => ({
-  prisma,
-}));
+const databaseModulePath = require.resolve('../../src/config/database');
+const socketServiceModulePath = require.resolve('../../src/services/socketService');
+const appModulePath = require.resolve('../../src/app');
 
-vi.mock('../../src/services/socketService', () => ({
-  getSocketIO: vi.fn(() => ioMock),
-}));
+delete require.cache[databaseModulePath];
+delete require.cache[socketServiceModulePath];
+delete require.cache[appModulePath];
+
+require.cache[databaseModulePath] = {
+  id: databaseModulePath,
+  filename: databaseModulePath,
+  loaded: true,
+  exports: { prisma },
+};
+
+require.cache[socketServiceModulePath] = {
+  id: socketServiceModulePath,
+  filename: socketServiceModulePath,
+  loaded: true,
+  exports: {
+    getSocketIO: () => ioMock,
+    initSocket: vi.fn(),
+  },
+};
 
 const app = require('../../src/app');
 const { createAccessToken } = require('../../src/utils/tokens');

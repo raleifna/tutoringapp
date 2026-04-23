@@ -1,5 +1,4 @@
 const request = require('supertest');
-const { beforeEach, describe, expect, test, vi } = require('vitest');
 
 const prisma = {
   user: {
@@ -20,20 +19,43 @@ const notify = vi.fn();
 const notifyOrRefresh = vi.fn();
 const notifyAdmin = vi.fn();
 
-vi.mock('../../src/config/database', () => ({
-  prisma,
-}));
+const databaseModulePath = require.resolve('../../src/config/database');
+const notificationServiceModulePath = require.resolve('../../src/services/notificationService');
+const stripeModulePath = require.resolve('../../src/config/stripe');
+const appModulePath = require.resolve('../../src/app');
 
-vi.mock('../../src/services/notificationService', () => ({
-  notify,
-  notifyOrRefresh,
-  notifyAdmin,
-}));
+delete require.cache[databaseModulePath];
+delete require.cache[notificationServiceModulePath];
+delete require.cache[stripeModulePath];
+delete require.cache[appModulePath];
 
-vi.mock('../../src/config/stripe', () => ({
-  isStripeConfigured: vi.fn(() => false),
-  getStripe: vi.fn(),
-}));
+require.cache[databaseModulePath] = {
+  id: databaseModulePath,
+  filename: databaseModulePath,
+  loaded: true,
+  exports: { prisma },
+};
+
+require.cache[notificationServiceModulePath] = {
+  id: notificationServiceModulePath,
+  filename: notificationServiceModulePath,
+  loaded: true,
+  exports: {
+    notify,
+    notifyOrRefresh,
+    notifyAdmin,
+  },
+};
+
+require.cache[stripeModulePath] = {
+  id: stripeModulePath,
+  filename: stripeModulePath,
+  loaded: true,
+  exports: {
+    isStripeConfigured: () => false,
+    getStripe: vi.fn(),
+  },
+};
 
 const app = require('../../src/app');
 const { createAccessToken } = require('../../src/utils/tokens');
