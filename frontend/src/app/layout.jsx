@@ -1,4 +1,5 @@
 import Providers from '../components/providers/Provider';
+import LocalhostServiceWorkerReset from '../components/LocalhostServiceWorkerReset';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
@@ -42,6 +43,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen">
         <Providers>
+          <LocalhostServiceWorkerReset />
           {children}
 
           <Toaster

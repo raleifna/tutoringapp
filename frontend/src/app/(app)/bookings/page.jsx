@@ -13,6 +13,8 @@ import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, g
 import {
   getDisplayStatusLabel,
   getBookingDisplayStatus,
+  getLatestRescheduleEntry,
+  getLatestRescheduleReason,
   getRecurringDisplayBookings,
   getRecurringDisplayStatus,
   getRecurringLabel,
@@ -265,6 +267,8 @@ function BookingCard({ booking, isTutor, returnTo, timezone }) {
     if (!returnTo) return `/tutors/${tutorId}`;
     return `/tutors/${tutorId}?returnTo=${encodeURIComponent(returnTo)}`;
   })();
+  const latestRescheduleEntry = getLatestRescheduleEntry(booking);
+  const latestRescheduleReason = getLatestRescheduleReason(booking);
 
   return (
     <div
@@ -337,6 +341,16 @@ function BookingCard({ booking, isTutor, returnTo, timezone }) {
           {sessionType}
         </span>
       </div>
+
+      {latestRescheduleEntry && (
+        <div className="mt-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+          <p className="font-medium">Schedule updated</p>
+          <p className="mt-0.5">
+            This booking was rescheduled to {formatDate(booking?.scheduledAt)}.
+            {latestRescheduleReason ? ` Reason: ${latestRescheduleReason}` : ''}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

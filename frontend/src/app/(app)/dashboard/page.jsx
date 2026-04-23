@@ -22,6 +22,8 @@ import { formatShortDateTime as formatDate, getUserTimezone } from '../../../lib
 import {
   getDisplayStatusLabel,
   getBookingDisplayStatus,
+  getLatestRescheduleEntry,
+  getLatestRescheduleReason,
   getRecurringDisplayBookings,
   getRecurringDisplayStatus,
   getRecurringLabel,
@@ -231,6 +233,8 @@ export default function DashboardPage() {
               const tutorDetailHref = getTutorDetailHref(booking, '/dashboard');
               const displayStatus = getDisplayStatus(booking);
               const recurringStatus = getRecurringStatusSummary(booking);
+              const latestRescheduleEntry = getLatestRescheduleEntry(booking);
+              const latestRescheduleReason = getLatestRescheduleReason(booking);
 
               return (
                 <div
@@ -280,6 +284,12 @@ export default function DashboardPage() {
                       {isRecurringBooking(booking) && (
                         <p className="mt-1 text-[11px] font-medium text-sky-700">
                           {getRecurringLabel(booking)}
+                        </p>
+                      )}
+                      {latestRescheduleEntry && (
+                        <p className="mt-1 text-[11px] text-sky-700">
+                          Updated to {formatDate(booking.scheduledAt)}
+                          {latestRescheduleReason ? ` · ${latestRescheduleReason}` : ''}
                         </p>
                       )}
                     </Link>
