@@ -49,6 +49,8 @@ export default function TutorProfilePage() {
     sessionTypes: ['ONLINE'],
     yearsExperience: 0,
     education: '',
+    workExperience: '',
+    certificationItems: '',
     languages: '',
   });
   const [availability, setAvailability] = useState([]);
@@ -93,17 +95,26 @@ export default function TutorProfilePage() {
   useEffect(() => {
     if (!profile) return;
 
+    const certs = Array.isArray(profile.certifications) ? profile.certifications : [];
     setProfileForm({
       headline: profile.headline || '',
-      bio: profile.bio || '',
+      bio: profile.user?.bio || '',
       hourlyRate: profile.hourlyRate || 50,
       currency: profile.currency || 'AUD',
       location: profile.location || '',
       sessionTypes: profile.sessionTypes || ['ONLINE'],
       yearsExperience: profile.yearsExperience || 0,
       education: Array.isArray(profile.education)
-        ? profile.education.join('\n')
+        ? profile.education.map((item) => (typeof item === 'string' ? item : item?.text || '')).filter(Boolean).join('\n')
         : profile.education || '',
+      workExperience: certs
+        .filter((item) => item?.kind === 'experience' && item?.text)
+        .map((item) => item.text)
+        .join('\n'),
+      certificationItems: certs
+        .filter((item) => item?.kind === 'qualification' && item?.text)
+        .map((item) => item.text)
+        .join('\n'),
       languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : '',
     });
 
@@ -213,22 +224,32 @@ export default function TutorProfilePage() {
       return;
     }
 
+    const experienceItems = profileForm.workExperience
+      ? profileForm.workExperience.split('\n').map((s) => s.trim()).filter(Boolean).map((text) => ({ kind: 'experience', text }))
+      : [];
+    const qualificationItems = profileForm.certificationItems
+      ? profileForm.certificationItems.split('\n').map((s) => s.trim()).filter(Boolean).map((text) => ({ kind: 'qualification', text }))
+      : [];
+
+    const existingFileCerts = Array.isArray(profile?.certifications)
+      ? profile.certifications.filter((item) => item?.kind === 'file')
+      : [];
+
     const payload = {
-      ...profileForm,
+      headline: profileForm.headline,
+      bio: profileForm.bio,
       hourlyRate: Number(profileForm.hourlyRate),
+      currency: profileForm.currency,
+      location: profileForm.location,
+      sessionTypes: profileForm.sessionTypes,
       yearsExperience: Number(profileForm.yearsExperience || 0),
       languages: profileForm.languages
-        ? profileForm.languages
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean)
+        ? profileForm.languages.split(',').map((item) => item.trim()).filter(Boolean)
         : [],
       education: profileForm.education
-        ? profileForm.education
-            .split('\n')
-            .map((item) => item.trim())
-            .filter(Boolean)
+        ? profileForm.education.split('\n').map((item) => item.trim()).filter(Boolean)
         : [],
+      certifications: [...existingFileCerts, ...experienceItems, ...qualificationItems],
     };
 
     updateProfileMutation.mutate(payload);
@@ -501,7 +522,29 @@ export default function TutorProfilePage() {
               onChange={(e) => handleProfileChange('education', e.target.value)}
               rows={2}
               className="input resize-none"
-              placeholder="e.g. BSc Mathematics, UNSW, 2023"
+              placeholder="One item per line, e.g. BSc Mathematics, UNSW, 2023"
+            />
+          </div>
+
+          <div>
+            <label className="label">Teaching / Work Experience</label>
+            <textarea
+              value={profileForm.workExperience}
+              onChange={(e) => handleProfileChange('workExperience', e.target.value)}
+              rows={3}
+              className="input resize-none"
+              placeholder="One item per line, e.g. 3 years teaching high school Mathematics"
+            />
+          </div>
+
+          <div>
+            <label className="label">Certifications / Training</label>
+            <textarea
+              value={profileForm.certificationItems}
+              onChange={(e) => handleProfileChange('certificationItems', e.target.value)}
+              rows={3}
+              className="input resize-none"
+              placeholder="One item per line, e.g. Certificate IV in Training and Assessment"
             />
           </div>
 

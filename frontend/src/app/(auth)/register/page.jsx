@@ -72,10 +72,10 @@ function RegisterContent() {
           <p className="text-gray-600 text-sm mb-1">We sent a verification link to</p>
           <p className="font-semibold text-gray-900 mb-4">{registeredEmail}</p>
           {registeredRole === 'TUTOR' ? (
-            <p className="text-sm text-gray-500 mb-6">
-              Your account was created. Verify your email first, then upload your tutor verification
-              materials after your first login.
-            </p>
+            <div className="text-sm text-gray-500 mb-6 space-y-2">
+              <p>Your account was created. Please verify your email to continue.</p>
+              <p className="text-xs text-gray-400">After verifying, you will be guided to complete your tutor profile — including your bio, teaching experience, education, and certifications.</p>
+            </div>
           ) : (
             <p className="text-sm text-gray-500 mb-6">Please verify your email before logging in.</p>
           )}
