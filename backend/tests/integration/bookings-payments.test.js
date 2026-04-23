@@ -156,6 +156,55 @@ describe('booking and payment API integration tests', () => {
     );
   });
 
+  test('rejects booking creation when the tutor time slot is already taken', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
+    prisma.tutorProfile.findFirst.mockResolvedValueOnce({
+      id: 'tutor-profile-1',
+      userId: 'tutor-user-1',
+      status: 'ACTIVE',
+      hourlyRate: '80.00',
+      currency: 'AUD',
+      preferredMeetingTool: 'ZOOM',
+      user: {
+        id: 'tutor-user-1',
+        firstName: 'Tutor',
+        lastName: 'Example',
+        avatar: null,
+        email: 'tutor@example.com',
+      },
+      subjects: [
+        {
+          subjectId: 'subject-1',
+          subject: { name: 'Mathematics' },
+        },
+      ],
+    });
+    prisma.booking.count.mockResolvedValueOnce(0);
+    prisma.booking.findMany.mockResolvedValueOnce([
+      {
+        id: 'existing-booking',
+        scheduledAt: '2026-05-01T10:00:00.000Z',
+        duration: 60,
+      },
+    ]);
+
+    const response = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
+      .send({
+        tutorId: 'tutor-profile-1',
+        subjectId: 'subject-1',
+        scheduledAt: '2026-05-01T10:30:00.000Z',
+        duration: 60,
+        sessionType: 'ONLINE',
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe('This time slot has already been booked');
+    expect(prisma.booking.create).not.toHaveBeenCalled();
+  });
+
   test('returns empty payment method data when the learner has no saved card', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(learnerUser)
@@ -217,5 +266,23 @@ describe('booking and payment API integration tests', () => {
         stripeDefaultPaymentMethodId: 'pm_local_1',
       },
     });
+  });
+
+  test('rejects updating the default payment method when the learner has no customer record', async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(learnerUser)
+      .mockResolvedValueOnce({
+        stripeCustomerId: null,
+      });
+
+    const response = await request(app)
+      .patch('/api/v1/payments/method/default')
+      .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
+      .send({ paymentMethodId: 'pm_local_1' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe('Stripe customer not found');
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });
