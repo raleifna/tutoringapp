@@ -246,46 +246,46 @@ export default function TutorVerificationPage() {
 
       <div className="card space-y-4 p-6">
         <div>
-          <label className="label">Short Bio</label>
+          <label className="label">Short Bio <span className="text-xs font-normal text-primary-600 ml-1">· shown to students</span></label>
           <textarea
             value={shortBio}
             onChange={(event) => setShortBio(event.target.value)}
             rows={3}
             className="input resize-none"
-            placeholder="Write a short public bio for students"
+            placeholder="Write a short public bio that students will see on your profile"
           />
         </div>
 
         <div>
-          <label className="label">Teaching / Work Experience</label>
+          <label className="label">Teaching / Work Experience <span className="text-xs font-normal text-primary-600 ml-1">· shown to students</span></label>
           <textarea
             value={workExperience}
             onChange={(event) => setWorkExperience(event.target.value)}
             rows={4}
             className="input resize-none"
-            placeholder="One experience item per line"
+            placeholder="One experience item per line, e.g. 3 years teaching high school Mathematics"
           />
         </div>
 
         <div>
-          <label className="label">Education</label>
+          <label className="label">Education <span className="text-xs font-normal text-primary-600 ml-1">· shown to students</span></label>
           <textarea
             value={applicationSummary}
             onChange={(event) => setApplicationSummary(event.target.value)}
             rows={4}
             className="input resize-none"
-            placeholder="One education item per line"
+            placeholder="One education item per line, e.g. Bachelor of Science, University of Sydney, 2019"
           />
         </div>
 
         <div>
-          <label className="label">Certifications / Training</label>
+          <label className="label">Certifications / Training <span className="text-xs font-normal text-primary-600 ml-1">· shown to students</span></label>
           <textarea
             value={qualificationItems}
             onChange={(event) => setQualificationItems(event.target.value)}
             rows={4}
             className="input resize-none"
-            placeholder="One certification or training item per line"
+            placeholder="One item per line, e.g. Certificate IV in Training and Assessment"
           />
         </div>
 
@@ -302,18 +302,18 @@ export default function TutorVerificationPage() {
         </div>
 
         <div>
-          <label className="label">Additional Notes</label>
+          <label className="label">Additional Notes <span className="text-xs font-normal text-gray-400 ml-1">· for admin reviewer only</span></label>
           <textarea
             value={applicationNotes}
             onChange={(event) => setApplicationNotes(event.target.value)}
             rows={3}
             className="input resize-none"
-            placeholder="Optional notes for the reviewer"
+            placeholder="Optional notes for the reviewer, e.g. context about your qualifications"
           />
         </div>
 
         <div>
-          <label className="label">Verification Files</label>
+          <label className="label">Verification Files <span className="text-xs font-normal text-gray-400 ml-1">· for admin review only, not shown to students</span></label>
           <input
             type="file"
             multiple
@@ -321,7 +321,7 @@ export default function TutorVerificationPage() {
             className="input py-3"
             onChange={handleApplicationFilesChange}
           />
-          <p className="mt-1 text-xs text-gray-500">Up to 5 files, 5MB each, 25MB total</p>
+          <p className="mt-1 text-xs text-gray-500">Up to 5 files, 5MB each, 25MB total. Add a description for each file explaining what it verifies.</p>
           {applicationFileError && <p className="error-text">{applicationFileError}</p>}
           {applicationFiles.length > 0 && (
             <div className="mt-3 space-y-3">

@@ -15,6 +15,7 @@ import {
   CheckBadgeIcon,
   AcademicCapIcon,
   BriefcaseIcon,
+  ClipboardDocumentListIcon,
   GlobeAltIcon,
   MapPinIcon,
   StarIcon,
@@ -71,15 +72,27 @@ const formatRate = (amount, currency = 'AUD') => {
   return `$${value} ${currency}`;
 };
 
+const getExperienceItems = (tutor) => {
+  if (!Array.isArray(tutor?.certifications)) return [];
+  return tutor.certifications
+    .filter((item) => item?.kind === 'experience' && item?.text)
+    .map((item) => String(item.text).trim())
+    .filter(Boolean);
+};
+
+const getCertificationItems = (tutor) => {
+  if (!Array.isArray(tutor?.certifications)) return [];
+  return tutor.certifications
+    .filter((item) => item?.kind === 'qualification' && item?.text)
+    .map((item) => String(item.text).trim())
+    .filter(Boolean);
+};
+
 const getVerifiedQualificationItems = (tutor) => {
   if (!Array.isArray(tutor?.certifications)) return [];
-
   return tutor.certifications
-    .map((item) => {
-      if (!item || typeof item !== 'object') return '';
-      if (item.kind === 'file') return String(item.description || '').trim();
-      return String(item.text || item.name || '').trim();
-    })
+    .filter((item) => item?.kind === 'file' && item?.description)
+    .map((item) => String(item.description).trim())
     .filter(Boolean);
 };
 
@@ -193,6 +206,8 @@ export default function TutorDetailPage() {
   });
 
   const tutor = tutorData?.data?.data;
+  const experienceItems = getExperienceItems(tutor);
+  const certificationItems = getCertificationItems(tutor);
   const verifiedQualificationItems = getVerifiedQualificationItems(tutor);
   const availabilityState = availabilityData?.data?.data || {};
   const availability = availabilityState?.availability || [];
@@ -598,18 +613,46 @@ export default function TutorDetailPage() {
                     <AcademicCapIcon className="w-4 h-4 text-gray-400 mt-0.5" />
                     <div>
                       <p className="text-xs text-gray-400">Education</p>
-                      <p className="font-medium text-gray-700 text-xs leading-relaxed">
-                        {Array.isArray(tutor.education)
-                          ? tutor.education
-                              .map((item) =>
-                                [item?.degree, item?.field, item?.institution, item?.text]
-                                  .filter(Boolean)
-                                  .join(', ')
-                              )
-                              .filter(Boolean)
-                              .join(' | ')
-                          : String(tutor.education)}
-                      </p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {(Array.isArray(tutor.education)
+                          ? tutor.education.map((item) =>
+                              [item?.degree, item?.field, item?.institution, item?.text]
+                                .filter(Boolean)
+                                .join(', ')
+                            ).filter(Boolean)
+                          : [String(tutor.education)]
+                        ).map((line, i) => (
+                          <p key={i} className="font-medium text-gray-700 text-xs leading-relaxed">{line}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {experienceItems.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <BriefcaseIcon className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Teaching / Work Experience</p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {experienceItems.map((item, i) => (
+                          <p key={i} className="font-medium text-gray-700 text-xs leading-relaxed">{item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {certificationItems.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <ClipboardDocumentListIcon className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">Certifications & Training</p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {certificationItems.map((item, i) => (
+                          <p key={i} className="font-medium text-gray-700 text-xs leading-relaxed">{item}</p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -619,11 +662,9 @@ export default function TutorDetailPage() {
                     <CheckBadgeIcon className="w-4 h-4 text-primary-600 mt-0.5" />
                     <div>
                       <p className="text-xs text-gray-400">Verified Qualifications</p>
-                      <div className="mt-1 space-y-1">
-                        {verifiedQualificationItems.map((item, index) => (
-                          <p key={`${item}-${index}`} className="font-medium text-gray-700 text-xs leading-relaxed">
-                            {item}
-                          </p>
+                      <div className="mt-0.5 space-y-0.5">
+                        {verifiedQualificationItems.map((item, i) => (
+                          <p key={i} className="font-medium text-gray-700 text-xs leading-relaxed">{item}</p>
                         ))}
                       </div>
                     </div>
