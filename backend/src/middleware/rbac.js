@@ -49,9 +49,8 @@ const authorizeActiveTutor = (req, res, next) => {
 
   const tutorProfile = req.user.tutorProfile;
   const tutorStatus = String(tutorProfile?.status || '').toUpperCase();
-  const applicationSubmitted = Boolean(tutorProfile?.applicationSubmitted);
 
-  if (!applicationSubmitted || tutorStatus !== 'ACTIVE') {
+  if (tutorStatus !== 'ACTIVE') {
     throw new AppError('Your tutor account must be approved before using this feature.', 403);
   }
 

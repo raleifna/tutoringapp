@@ -54,6 +54,14 @@ router.patch('/:id/payment/pay', authorize('LEARNER'), bookingController.payForB
 router.post('/:id/cancel', bookingController.cancelBooking);
 router.patch('/:id/accept', authorize('TUTOR'), authorizeActiveTutor, bookingController.acceptBooking);
 router.patch('/:id/decline', authorize('TUTOR'), authorizeActiveTutor, bookingController.declineBooking);
+router.patch(
+  '/:id/reschedule',
+  authorize('TUTOR'),
+  authorizeActiveTutor,
+  body('scheduledAt').isISO8601().withMessage('Valid date-time required'),
+  validate,
+  bookingController.rescheduleBooking
+);
 router.patch('/:id/complete', authorize('TUTOR'), authorizeActiveTutor, bookingController.completeBooking);
 
 module.exports = router;

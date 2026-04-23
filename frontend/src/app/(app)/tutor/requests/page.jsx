@@ -18,6 +18,8 @@ import { getBookingStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
 import {
   getDisplayStatusLabel,
+  getLatestRescheduleEntry,
+  getLatestRescheduleReason,
   getRecurringDisplayBookings,
   getRecurringDisplayStatus,
   getRecurringLabel,
@@ -100,7 +102,7 @@ function TutorRequestsContent() {
   });
 
   const declineMutation = useMutation({
-    mutationFn: (id) => bookingApi.decline(id),
+    mutationFn: ({ id, reason }) => bookingApi.decline(id, reason),
     onSuccess: (response) => {
       toast.success(response?.data?.message || 'Booking declined');
       queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
@@ -121,6 +123,30 @@ function TutorRequestsContent() {
       toast.error(err?.response?.data?.message || 'Failed');
     },
   });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }) => bookingApi.cancel(id, reason),
+    onSuccess: (response) => {
+      toast.success(response?.data?.message || 'Booking cancelled');
+      queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-availability'] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to cancel');
+    },
+  });
+
+  const promptForReason = ({ title, required = false }) => {
+    const value = window.prompt(title, '');
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (required && !trimmed) {
+      toast.error('Please provide a short reason.');
+      return null;
+    }
+    return trimmed;
+  };
 
   return (
     <div className="relative space-y-5">
@@ -182,6 +208,8 @@ function TutorRequestsContent() {
             const recurring = isRecurringBooking(booking);
             const displayStatus = recurring ? getRecurringDisplayStatus(booking) : booking.status;
             const recurringStatus = getRecurringStatusSummary(booking);
+            const latestRescheduleEntry = getLatestRescheduleEntry(booking);
+            const latestRescheduleReason = getLatestRescheduleReason(booking);
             return (
               <div
                 key={booking.id}
@@ -246,6 +274,12 @@ function TutorRequestsContent() {
                         {recurringStatus.acceptedCount} accepted · {recurringStatus.pendingCount} pending · {recurringStatus.declinedCount} declined · {recurringStatus.cancelledCount} cancelled
                       </p>
                     )}
+                    {latestRescheduleEntry && (
+                      <p className="mt-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-xs text-sky-700">
+                        Rescheduled to {formatDate(booking.scheduledAt)}
+                        {latestRescheduleReason ? ` · ${latestRescheduleReason}` : ''}
+                      </p>
+                    )}
                     {booking.notes && (
                       <p className="text-xs text-gray-600 mt-2 bg-gray-50 rounded px-2 py-1.5 italic">
                         &quot;{booking.notes}&quot;
@@ -273,7 +307,12 @@ function TutorRequestsContent() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          declineMutation.mutate(booking.id);
+                          const reason = promptForReason({
+                            title: 'Please enter a short decline reason:',
+                            required: true,
+                          });
+                          if (reason === null) return;
+                          declineMutation.mutate({ id: booking.id, reason });
                         }}
                         disabled={declineMutation.isPending}
                         className="btn-danger btn-sm gap-1.5 flex-1"
@@ -284,17 +323,35 @@ function TutorRequestsContent() {
                     </>
                   )}
                   {!recurring && booking.status === 'ACCEPTED' && (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        completeMutation.mutate(booking.id);
-                      }}
-                      disabled={completeMutation.isPending}
-                      className="btn-primary btn-sm gap-1.5"
-                    >
-                      <CheckCircleIcon className="w-4 h-4" /> Mark Complete
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          completeMutation.mutate(booking.id);
+                        }}
+                        disabled={completeMutation.isPending}
+                        className="btn-primary btn-sm gap-1.5"
+                      >
+                        <CheckCircleIcon className="w-4 h-4" /> Mark Complete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          const reason = promptForReason({
+                            title: 'Reason for cancelling this booking (optional):',
+                          });
+                          if (reason === null) return;
+                          if (!window.confirm('Cancel this booking?')) return;
+                          cancelMutation.mutate({ id: booking.id, reason });
+                        }}
+                        disabled={cancelMutation.isPending}
+                        className="btn-secondary btn-sm gap-1.5"
+                      >
+                        <XCircleIcon className="w-4 h-4" /> Cancel
+                      </button>
+                    </>
                   )}
                   <Link
                     href={detailHref}

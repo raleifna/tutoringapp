@@ -16,6 +16,8 @@ const bookingInclude = {
   statusHistory: { orderBy: { createdAt: 'desc' } },
 };
 
+const CANCELLABLE_STATUSES = ['UNPAID', 'PENDING', 'ACCEPTED'];
+
 const isPaidPaymentStatus = (status) => ['PAID', 'COMPLETED'].includes(String(status || '').toUpperCase());
 
 const tutorVisibleBookingWhere = {
@@ -73,6 +75,10 @@ const buildRecurringSeries = (bookings) => {
       duration: booking.duration,
       totalAmount: booking.totalAmount,
       currency: booking.currency,
+      cancellationReason: booking.cancellationReason || null,
+      declineReason: booking.declineReason || null,
+      latestRescheduleReason:
+        booking.statusHistory?.find((entry) => entry.status === 'RESCHEDULED')?.reason || null,
       payment: booking.payment
         ? {
             id: booking.payment.id,
@@ -102,7 +108,10 @@ const attachRecurringSeries = async (bookings, baseWhere = {}) => {
       ...baseWhere,
       recurringGroupId: { in: recurringGroupIds },
     },
-    include: { payment: true },
+    include: {
+      payment: true,
+      statusHistory: { orderBy: { createdAt: 'desc' } },
+    },
     orderBy: { scheduledAt: 'asc' },
   });
 
@@ -122,7 +131,16 @@ const attachRecurringSeries = async (bookings, baseWhere = {}) => {
   });
 };
 
-const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration) => {
+const formatNotificationDateTime = (value) =>
+  new Date(value).toLocaleString('en-AU', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration, options = {}) => {
   const requestedStart = new Date(scheduledAt);
   if (Number.isNaN(requestedStart.getTime())) {
     throw new AppError('Valid date-time required', 400);
@@ -130,10 +148,12 @@ const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration) => {
 
   const requestedEnd = new Date(requestedStart.getTime() + duration * 60 * 1000);
   const lookupStart = new Date(requestedStart.getTime() - 8 * 60 * 60 * 1000);
+  const ignoreBookingId = options.ignoreBookingId || null;
   const existingBookings = await prisma.booking.findMany({
     where: {
       tutorId,
       status: { notIn: ['CANCELLED', 'DECLINED'] },
+      ...(ignoreBookingId ? { id: { not: ignoreBookingId } } : {}),
       scheduledAt: {
         gte: lookupStart,
         lt: requestedEnd,
@@ -155,6 +175,43 @@ const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration) => {
   if (hasOverlap) {
     throw new AppError('This time slot has already been booked', 409);
   }
+};
+
+const findOverlappingTutorBookings = async ({
+  tutorId,
+  scheduledAt,
+  duration,
+  excludeBookingId = null,
+  statuses = [],
+}) => {
+  const requestedStart = new Date(scheduledAt);
+  if (Number.isNaN(requestedStart.getTime())) {
+    throw new AppError('Valid date-time required', 400);
+  }
+
+  const requestedEnd = new Date(requestedStart.getTime() + duration * 60 * 1000);
+  const lookupStart = new Date(requestedStart.getTime() - 8 * 60 * 60 * 1000);
+  const candidates = await prisma.booking.findMany({
+    where: {
+      tutorId,
+      ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+      ...(statuses.length ? { status: { in: statuses } } : {}),
+      scheduledAt: {
+        gte: lookupStart,
+        lt: requestedEnd,
+      },
+    },
+    include: {
+      payment: true,
+      learner: true,
+    },
+  });
+
+  return candidates.filter((booking) => {
+    const existingStart = new Date(booking.scheduledAt);
+    const existingEnd = new Date(existingStart.getTime() + Number(booking.duration || 0) * 60 * 1000);
+    return existingStart < requestedEnd && existingEnd > requestedStart;
+  });
 };
 
 const getPayableSeriesBookingsForLearner = async (booking, learnerId) => {
@@ -458,7 +515,7 @@ exports.getBooking = async (req, res) => {
 };
 
 exports.cancelBooking = async (req, res) => {
-  const stripe = getStripe();
+  const stripe = isStripeConfigured() ? getStripe() : null;
   const { reason } = req.body;
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
@@ -481,8 +538,7 @@ exports.cancelBooking = async (req, res) => {
 
   if (!isLearner && !isTutor) throw new AppError('Access denied', 403);
 
-  const cancellableStatuses = ['UNPAID', 'PENDING', 'ACCEPTED'];
-  if (!cancellableStatuses.includes(booking.status)) {
+  if (!CANCELLABLE_STATUSES.includes(booking.status)) {
     throw new AppError(`Cannot cancel a ${booking.status.toLowerCase()} booking`, 400);
   }
 
@@ -510,12 +566,11 @@ exports.cancelBooking = async (req, res) => {
 
     try {
   
-      const refund = await stripe.refunds.create({
-        payment_intent: booking.payment.stripePaymentIntentId,
-      });
-
-      console.log("refund:" + refund);
-      console.log("payment intent id:" + booking.payment.stripePaymentIntentId);
+      if (stripe) {
+        await stripe.refunds.create({
+          payment_intent: booking.payment.stripePaymentIntentId,
+        });
+      }
       
     } catch (err) {
       // If have refound, just set ok
@@ -558,7 +613,27 @@ exports.cancelBooking = async (req, res) => {
     include: bookingInclude,
   });
 
-  await notify(booking.tutorProfile.userId, 'booking', 'Booking Cancelled', `A booking has been cancelled.`, `/bookings/${updated.id}`);
+  if (isTutor) {
+    await notify(
+      booking.learnerId,
+      'booking',
+      'Booking Cancelled',
+      reason
+        ? `Your tutor cancelled this booking: ${reason}`
+        : 'Your tutor cancelled this booking.',
+      `/bookings/${updated.id}`
+    );
+  } else {
+    await notify(
+      booking.tutorProfile.userId,
+      'booking',
+      'Booking Cancelled',
+      reason
+        ? `A learner cancelled this booking: ${reason}`
+        : 'A learner cancelled this booking.',
+      `/bookings/${updated.id}`
+    );
+  }
 
   res.json({
     success: true,
@@ -590,6 +665,20 @@ exports.acceptBooking = async (req, res) => {
     throw new AppError('This session must be paid before it can be accepted', 400);
   }
 
+  const blockingAcceptedBookings = await findOverlappingTutorBookings({
+    tutorId: tutorProfile.id,
+    scheduledAt: booking.scheduledAt,
+    duration: booking.duration,
+    excludeBookingId: booking.id,
+    statuses: ['ACCEPTED', 'COMPLETED'],
+  });
+  if (blockingAcceptedBookings.length > 0) {
+    throw new AppError(
+      'Another session has already been accepted for this time slot. Please decline or reschedule this request.',
+      409
+    );
+  }
+
   const updated = await prisma.booking.update({
     where: { id: booking.id },
     data: {
@@ -599,6 +688,54 @@ exports.acceptBooking = async (req, res) => {
     },
     include: bookingInclude,
   });
+
+  const overlappingPendingBookings = await findOverlappingTutorBookings({
+    tutorId: tutorProfile.id,
+    scheduledAt: booking.scheduledAt,
+    duration: booking.duration,
+    excludeBookingId: booking.id,
+    statuses: ['PENDING', 'UNPAID'],
+  });
+
+  const autoDeclinedBookings = [];
+  for (const conflictingBooking of overlappingPendingBookings) {
+    const declinedBooking = await prisma.booking.update({
+      where: { id: conflictingBooking.id },
+      data: {
+        status: 'DECLINED',
+        declineReason:
+          'This time slot is no longer available because another learner confirmed it first.',
+        ...(isPaidPaymentStatus(conflictingBooking?.payment?.status)
+          ? {
+              payment: {
+                update: {
+                  status: 'REFUNDED',
+                  refundAmount: conflictingBooking.payment.amount,
+                  refundedAt: new Date(),
+                },
+              },
+            }
+          : conflictingBooking?.payment
+            ? {
+                payment: {
+                  update: {
+                    status: 'CANCELLED',
+                  },
+                },
+              }
+            : {}),
+        statusHistory: {
+          create: {
+            status: 'DECLINED',
+            reason:
+              'This time slot is no longer available because another learner confirmed it first.',
+          },
+        },
+      },
+      include: bookingInclude,
+    });
+    autoDeclinedBookings.push(declinedBooking);
+  }
 
   if (booking.recurringGroupId) {
     await syncRecurringLearnerNotification(booking);
@@ -611,6 +748,20 @@ exports.acceptBooking = async (req, res) => {
       `/bookings/${updated.id}`
     );
   }
+
+  await Promise.all(
+    autoDeclinedBookings.map((conflictingBooking) =>
+      notify(
+        conflictingBooking.learnerId,
+        'booking',
+        'Booking Declined',
+        isPaidPaymentStatus(conflictingBooking?.payment?.status)
+          ? 'This request was declined because another learner confirmed the same time slot first. Your payment will be refunded.'
+          : 'This request was declined because another learner confirmed the same time slot first.',
+        `/bookings/${conflictingBooking.id}`
+      )
+    )
+  );
 
   res.json({
     success: true,
@@ -671,10 +822,132 @@ exports.declineBooking = async (req, res) => {
       booking.learnerId,
       'booking',
       'Booking Declined',
-      'One session has been declined.',
+      reason ? `One session has been declined: ${reason}` : 'One session has been declined.',
       `/bookings/${updated.id}`
     );
   }
+};
+
+exports.rescheduleBooking = async (req, res) => {
+  const { scheduledAt, reason } = req.body;
+  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { userId: req.user.id } });
+  if (!tutorProfile) throw new AppError('Tutor profile not found', 404);
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: req.params.id },
+    include: {
+      learner: true,
+      payment: true,
+    },
+  });
+  if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
+  if (booking.status !== 'ACCEPTED') {
+    throw new AppError('Only accepted bookings can be rescheduled', 400);
+  }
+
+  const previousScheduledAt = booking.scheduledAt;
+  await ensureTutorSlotIsAvailable(tutorProfile.id, scheduledAt, booking.duration, {
+    ignoreBookingId: booking.id,
+  });
+
+  const updated = await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      scheduledAt: new Date(scheduledAt),
+      statusHistory: {
+        create: {
+          status: 'RESCHEDULED',
+          reason: reason || null,
+        },
+      },
+    },
+    include: bookingInclude,
+  });
+
+  const overlappingPendingBookings = await findOverlappingTutorBookings({
+    tutorId: tutorProfile.id,
+    scheduledAt,
+    duration: booking.duration,
+    excludeBookingId: booking.id,
+    statuses: ['PENDING', 'UNPAID'],
+  });
+
+  const autoDeclinedBookings = [];
+  for (const conflictingBooking of overlappingPendingBookings) {
+    const declinedBooking = await prisma.booking.update({
+      where: { id: conflictingBooking.id },
+      data: {
+        status: 'DECLINED',
+        declineReason:
+          'This time slot is no longer available because the tutor rescheduled another confirmed session into it.',
+        ...(isPaidPaymentStatus(conflictingBooking?.payment?.status)
+          ? {
+              payment: {
+                update: {
+                  status: 'REFUNDED',
+                  refundAmount: conflictingBooking.payment.amount,
+                  refundedAt: new Date(),
+                },
+              },
+            }
+          : conflictingBooking?.payment
+            ? {
+                payment: {
+                  update: {
+                    status: 'CANCELLED',
+                  },
+                },
+              }
+            : {}),
+        statusHistory: {
+          create: {
+            status: 'DECLINED',
+            reason:
+              'This time slot is no longer available because the tutor rescheduled another confirmed session into it.',
+          },
+        },
+      },
+      include: bookingInclude,
+    });
+    autoDeclinedBookings.push(declinedBooking);
+  }
+
+  const previousTimeLabel = formatNotificationDateTime(previousScheduledAt);
+  const updatedTimeLabel = formatNotificationDateTime(updated.scheduledAt);
+  const rescheduleMessage = reason
+    ? `Your tutor moved this session from ${previousTimeLabel} to ${updatedTimeLabel}. Reason: ${reason}`
+    : `Your tutor moved this session from ${previousTimeLabel} to ${updatedTimeLabel}.`;
+
+  await notifyOrRefresh(
+    booking.learnerId,
+    'booking',
+    'Booking Rescheduled',
+    rescheduleMessage,
+    `/bookings/${updated.id}`
+  );
+
+  await Promise.all(
+    autoDeclinedBookings.map((conflictingBooking) =>
+      notify(
+        conflictingBooking.learnerId,
+        'booking',
+        'Booking Declined',
+        isPaidPaymentStatus(conflictingBooking?.payment?.status)
+          ? 'This request was declined because the tutor rescheduled another confirmed session into the same time slot. Your payment will be refunded.'
+          : 'This request was declined because the tutor rescheduled another confirmed session into the same time slot.',
+        `/bookings/${conflictingBooking.id}`
+      )
+    )
+  );
+
+  res.json({
+    success: true,
+    message:
+      autoDeclinedBookings.length > 0
+        ? `Booking rescheduled. ${autoDeclinedBookings.length} conflicting request(s) were automatically declined.`
+        : 'Booking rescheduled',
+    data: updated,
+  });
 };
 
 exports.completeBooking = async (req, res) => {
@@ -848,5 +1121,3 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
-
-

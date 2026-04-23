@@ -17,7 +17,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi, paymentApi } from '../../../../lib/api-entry';
+import { bookingApi, paymentApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
@@ -34,22 +34,43 @@ import {
 } from '../../../../lib/recurring-bookings';
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
+import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 
 const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
   reason: z.string().optional(),
 });
 
-const isCancellableBooking = (booking, isLearner) => {
-  if (!isLearner || !booking) return false;
-  if (!['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status)) return false;
+const getLatestStatusReason = (booking, status) =>
+  booking?.statusHistory?.find((entry) => entry.status === status)?.reason || '';
+
+const getCancellationState = (booking, { isLearner = false, isTutor = false } = {}) => {
+  if (!booking) return { canCancel: false, blockedReason: '' };
+  if (!['UNPAID', 'PENDING', 'ACCEPTED'].includes(booking?.status)) {
+    return { canCancel: false, blockedReason: '' };
+  }
+
+  if (isTutor) {
+    return { canCancel: true, blockedReason: '' };
+  }
+
+  if (!isLearner) {
+    return { canCancel: false, blockedReason: '' };
+  }
 
   const paymentStatus = booking?.payment?.status || 'PENDING';
   const isPaidBooking = ['PAID', 'COMPLETED'].includes(paymentStatus);
   const isAcceptedBooking = booking?.status === 'ACCEPTED';
   const timeDelta = new Date(booking?.scheduledAt) - new Date();
 
-  return !isAcceptedBooking || !isPaidBooking || timeDelta > 1000 * 60 * 60 * 24;
+  if (isAcceptedBooking && isPaidBooking && timeDelta <= 1000 * 60 * 60 * 24) {
+    return {
+      canCancel: false,
+      blockedReason: 'Accepted bookings cannot be cancelled within 24 hours of the session. Please contact the tutor for special arrangements.',
+    };
+  }
+
+  return { canCancel: true, blockedReason: '' };
 };
 
 const invalidateBookingViews = async ({ queryClient, currentUserId, id, bookingTutorId }) => {
@@ -62,6 +83,7 @@ const invalidateBookingViews = async ({ queryClient, currentUserId, id, bookingT
     queryClient.invalidateQueries({ queryKey: ['tutor-requests'] }),
     queryClient.invalidateQueries({ queryKey: ['tutor-bookings'] }),
     queryClient.invalidateQueries({ queryKey: ['tutor-bookings-all'] }),
+    queryClient.invalidateQueries({ queryKey: ['notifications', currentUserId] }),
     queryClient.invalidateQueries({ queryKey: ['savedPaymentMethod', currentUserId] }),
     bookingTutorId
       ? queryClient.invalidateQueries({ queryKey: ['tutor-availability', bookingTutorId] })
@@ -76,6 +98,7 @@ export default function BookingDetailPage() {
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
+  const [selectedRescheduleSlot, setSelectedRescheduleSlot] = useState(null);
 
   const from = (searchParams.get('from') || '').toLowerCase();
   const returnTo = searchParams.get('returnTo') || '';
@@ -117,6 +140,11 @@ export default function BookingDetailPage() {
   });
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor;
   const bookingTutorId = booking?.tutorProfile?.id || booking?.tutor?.id || booking?.tutorId;
+  const rescheduleAvailabilityQuery = useQuery({
+    queryKey: ['tutor-availability', bookingTutorId, 'reschedule'],
+    queryFn: () => tutorApi.getAvailability(bookingTutorId),
+    enabled: !!bookingTutorId && showRescheduleModal,
+  });
   const bookingDetailHref = (() => {
     const params = new URLSearchParams();
     if (returnTo) params.set('returnTo', returnTo);
@@ -143,10 +171,41 @@ export default function BookingDetailPage() {
   const isFailedPayment = paymentStatus === 'FAILED';
   const isAcceptedBooking = booking?.status === 'ACCEPTED';
   const recurring = isRecurringBooking(booking);
-  const canCancel = !recurring && isCancellableBooking(booking, isLearner);
+  const cancellationState = getCancellationState(booking, { isLearner, isTutor });
+  const canCancel =
+    !recurring &&
+    (
+      isLearner
+        ? cancellationState.canCancel
+        : isTutor
+          ? booking?.status === 'ACCEPTED'
+          : false
+    );
+  const latestRescheduleReason = getLatestStatusReason(booking, 'RESCHEDULED');
+  const rescheduleAvailabilityState = rescheduleAvailabilityQuery.data?.data?.data || {};
+  const rescheduleAvailability = rescheduleAvailabilityState?.availability || [];
+  const rescheduleCurrentWeekAvailability =
+    rescheduleAvailabilityState?.currentWeekEffectiveAvailability || rescheduleAvailability;
+  const rescheduleHasCurrentWeekAvailabilityOverride = Boolean(
+    rescheduleAvailabilityState?.hasCurrentWeekAvailabilityOverride
+  );
+  const rescheduleBookedSlots = (rescheduleAvailabilityState?.bookedSlots || []).filter(
+    (slot) => slot?.id !== booking?.id
+  );
+
+  const promptForReason = ({ title, required = false, defaultValue = '' }) => {
+    const value = window.prompt(title, defaultValue);
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (required && !trimmed) {
+      toast.error('Please provide a short reason.');
+      return null;
+    }
+    return trimmed;
+  };
 
   const cancelMutation = useMutation({
-    mutationFn: (targetId) => bookingApi.cancel(targetId),
+    mutationFn: ({ targetId, reason }) => bookingApi.cancel(targetId, reason),
     onSuccess: async (response) => {
       const refunded = response?.data?.data?.payment?.status === 'REFUNDED';
       toast.success(refunded ? 'Booking cancelled and payment refunded' : 'Booking cancelled');
@@ -159,10 +218,10 @@ export default function BookingDetailPage() {
   });
 
   const cancelSeriesMutation = useMutation({
-    mutationFn: async (targetIds) => {
-      console.log("cancel orders: ", targetIds);
-
-      const results = await Promise.allSettled(targetIds.map((targetId) => bookingApi.cancel(targetId)));
+    mutationFn: async ({ targetIds, reason }) => {
+      const results = await Promise.allSettled(
+        targetIds.map((targetId) => bookingApi.cancel(targetId, reason))
+      );
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
       const failedCount = results.length - successCount;
       return { successCount, failedCount };
@@ -195,7 +254,7 @@ export default function BookingDetailPage() {
   });
 
   const declineMutation = useMutation({
-    mutationFn: (targetId) => bookingApi.decline(targetId),
+    mutationFn: ({ targetId, reason }) => bookingApi.decline(targetId, reason),
     onSuccess: async (response) => {
       toast.success(response?.data?.message || 'Session declined');
       await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
@@ -206,12 +265,12 @@ export default function BookingDetailPage() {
   });
 
   const bulkSeriesDecisionMutation = useMutation({
-    mutationFn: async ({ acceptedIds, declinedIds }) => {
+    mutationFn: async ({ acceptedIds, declinedIds, declineReason }) => {
       const acceptedResults = await Promise.allSettled(
         acceptedIds.map((targetId) => bookingApi.accept(targetId))
       );
       const declinedResults = await Promise.allSettled(
-        declinedIds.map((targetId) => bookingApi.decline(targetId))
+        declinedIds.map((targetId) => bookingApi.decline(targetId, declineReason))
       );
 
       return {
@@ -257,6 +316,8 @@ export default function BookingDetailPage() {
   const {
     register: registerReschedule,
     handleSubmit: handleRescheduleSubmit,
+    setValue: setRescheduleValue,
+    reset: resetRescheduleForm,
     formState: { errors: rescheduleErrors },
   } = useForm({
     resolver: zodResolver(rescheduleSchema),
@@ -275,8 +336,9 @@ export default function BookingDetailPage() {
   const allPendingRecurringSelected =
     pendingRecurringBookingIds.length > 0 &&
     pendingRecurringBookingIds.every((seriesBookingId) => selectedSeriesBookingIds.includes(seriesBookingId));
-  const cancellableRecurringBookings = recurringBookings.filter((seriesBooking) =>
-    isCancellableBooking(seriesBooking, isLearner)
+  const cancellableRecurringBookings = recurringBookings.filter(
+    (seriesBooking) =>
+      getCancellationState(seriesBooking, { isLearner, isTutor }).canCancel
   );
   const paymentSetupSeriesBookings = getPayableSeriesBookings(booking);
   const paymentSetupSeriesAmount = getSeriesTotalAmount(paymentSetupSeriesBookings);
@@ -299,6 +361,13 @@ export default function BookingDetailPage() {
         : nextSelection;
     });
   }, [booking?.id, pendingRecurringBookingIdsKey]);
+
+  useEffect(() => {
+    if (!showRescheduleModal) {
+      setSelectedRescheduleSlot(null);
+      resetRescheduleForm({ newDate: '', reason: '' });
+    }
+  }, [showRescheduleModal, resetRescheduleForm]);
 
   if (!currentUserId) {
     return (
@@ -510,6 +579,17 @@ export default function BookingDetailPage() {
                           const declinedIds = pendingRecurringBookingIds.filter(
                             (seriesBookingId) => !selectedSeriesBookingIds.includes(seriesBookingId)
                           );
+                          const declineReason =
+                            declinedIds.length > 0
+                              ? promptForReason({
+                                  title:
+                                    'Reason for the sessions you are declining:',
+                                  required: true,
+                                })
+                              : '';
+                          if (declinedIds.length > 0 && declineReason === null) {
+                            return;
+                          }
                           if (
                             !window.confirm(
                               `Accept ${selectedSeriesBookingIds.length} selected session(s) and decline ${declinedIds.length} unselected session(s)?`
@@ -521,6 +601,7 @@ export default function BookingDetailPage() {
                           bulkSeriesDecisionMutation.mutate({
                             acceptedIds: selectedSeriesBookingIds,
                             declinedIds,
+                            declineReason,
                           });
                         }}
                         disabled={bulkSeriesDecisionMutation.isPending}
@@ -541,8 +622,14 @@ export default function BookingDetailPage() {
                   {recurringBookings.map((seriesBooking) => {
                     const isCurrent = seriesBooking.id === booking.id;
                     const isPendingSeriesBooking = seriesBooking.status === 'PENDING';
-                    const canCancelSeriesBooking = isCancellableBooking(seriesBooking, isLearner);
-                    const isCancellingThis = cancelMutation.isPending && cancelMutation.variables === seriesBooking.id;
+                    const canCancelSeriesBooking = isLearner
+                      ? getCancellationState(seriesBooking, { isLearner, isTutor }).canCancel
+                      : isTutor
+                        ? seriesBooking.status === 'ACCEPTED'
+                        : false;
+                    const isCancellingThis =
+                      cancelMutation.isPending &&
+                      cancelMutation.variables?.targetId === seriesBooking.id;
                     return (
                       <div
                         key={seriesBooking.id}
@@ -593,16 +680,37 @@ export default function BookingDetailPage() {
                                 Payment: {seriesBooking.payment?.status || 'PENDING'}
                               </span>
                             </div>
+                            {seriesBooking.declineReason && (
+                              <p className="mt-2 text-xs text-red-600">
+                                Decline reason: {seriesBooking.declineReason}
+                              </p>
+                            )}
+                            {seriesBooking.cancellationReason && (
+                              <p className="mt-2 text-xs text-gray-600">
+                                Cancellation reason: {seriesBooking.cancellationReason}
+                              </p>
+                            )}
+                            {seriesBooking.latestRescheduleReason && (
+                              <p className="mt-2 text-xs text-purple-700">
+                                Reschedule note: {seriesBooking.latestRescheduleReason}
+                              </p>
+                            )}
                             </div>
                           </div>
 
                           <div className="flex shrink-0 flex-wrap gap-2">
-                            {isLearner && canCancelSeriesBooking && (
+                            {(isLearner || isTutor) && canCancelSeriesBooking && (
                               <button
                                 type="button"
                                 onClick={() => {
+                                  const reason = promptForReason({
+                                    title: isTutor
+                                      ? 'Reason for cancelling this session (optional):'
+                                      : 'Reason for cancelling this session (optional):',
+                                  });
+                                  if (reason === null) return;
                                   if (window.confirm('Cancel this session?')) {
-                                    cancelMutation.mutate(seriesBooking.id);
+                                    cancelMutation.mutate({ targetId: seriesBooking.id, reason });
                                   }
                                 }}
                                 disabled={isCancellingThis || cancelSeriesMutation.isPending || bulkSeriesDecisionMutation.isPending}
@@ -706,22 +814,38 @@ export default function BookingDetailPage() {
         </div>
       )}
 
+      {isLearner && !canCancel && cancellationState.blockedReason && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {cancellationState.blockedReason}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <div className='text-gray-700 text-sm mb-2 mt-2'>
           {recurring
             ? 'Recurring bookings stay grouped as one order. Tutors and learners can handle each session directly in the list below.'
-            : isAcceptedBooking && isPaidBooking
-              ? 'Accepted bookings must be cancelled at least 48 hours in advance.'
-              : 'You can cancel this booking before the tutor confirms it.'}
+            : cancellationState.blockedReason
+              ? cancellationState.blockedReason
+              : isAcceptedBooking && isPaidBooking
+                ? 'Accepted bookings must be cancelled at least 24 hours in advance.'
+                : isTutor
+                  ? booking.status === 'PENDING'
+                    ? 'Tutors can accept or decline pending requests here.'
+                    : 'Accepted bookings can be rescheduled or cancelled by the tutor when needed.'
+                  : 'You can cancel this booking before the tutor confirms it.'}
         </div>
-        {canCancel && (
+        {isLearner && canCancel && (
           <>
           
             <button
               type="button"
               onClick={() => {
+                const reason = promptForReason({
+                  title: 'Reason for cancelling this booking (optional):',
+                });
+                if (reason === null) return;
                 if (window.confirm('Cancel this booking?')) {
-                  cancelMutation.mutate(id);
+                  cancelMutation.mutate({ targetId: id, reason });
                 }
               }}
               disabled={cancelMutation.isPending}
@@ -737,8 +861,15 @@ export default function BookingDetailPage() {
           <button
             type="button"
             onClick={() => {
+              const reason = promptForReason({
+                title: 'Reason for cancelling these sessions (optional):',
+              });
+              if (reason === null) return;
               if (window.confirm(`Cancel ${cancellableRecurringBookings.length} session(s) in this recurring booking?`)) {
-                cancelSeriesMutation.mutate(cancellableRecurringBookings.map((seriesBooking) => seriesBooking.id));
+                cancelSeriesMutation.mutate({
+                  targetIds: cancellableRecurringBookings.map((seriesBooking) => seriesBooking.id),
+                  reason,
+                });
               }
             }}
             disabled={cancelSeriesMutation.isPending}
@@ -762,13 +893,25 @@ export default function BookingDetailPage() {
             </button>
             <button
               type="button"
-              onClick={() => declineMutation.mutate(id)}
+              onClick={() => {
+                const reason = promptForReason({
+                  title: 'Please enter a short decline reason:',
+                  required: true,
+                });
+                if (reason === null) return;
+                declineMutation.mutate({ targetId: id, reason });
+              }}
               disabled={declineMutation.isPending}
               className="btn-danger gap-2"
             >
               <XCircleIcon className="w-4 h-4" />
               {declineMutation.isPending ? 'Declining...' : 'Decline'}
             </button>
+          </>
+        )}
+
+        {isTutor && booking.status === 'ACCEPTED' && (
+          <>
             <button
               type="button"
               onClick={() => setShowRescheduleModal(true)}
@@ -777,79 +920,148 @@ export default function BookingDetailPage() {
               <CalendarDaysIcon className="w-4 h-4" />
               Reschedule
             </button>
+            <button
+              type="button"
+              onClick={() => completeMutation.mutate()}
+              disabled={completeMutation.isPending}
+              className="btn-primary gap-2"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              {completeMutation.isPending ? 'Saving...' : 'Mark Complete'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const reason = promptForReason({
+                  title: 'Reason for cancelling this booking (optional):',
+                });
+                if (reason === null) return;
+                if (window.confirm('Cancel this booking?')) {
+                  cancelMutation.mutate({ targetId: id, reason });
+                }
+              }}
+              disabled={cancelMutation.isPending}
+              className="btn-danger gap-2"
+            >
+              <XCircleIcon className="w-4 h-4" />
+              {cancelMutation.isPending ? 'Cancelling...' : 'Cancel'}
+            </button>
           </>
-        )}
-
-        {isTutor && booking.status === 'ACCEPTED' && (
-          <button
-            type="button"
-            onClick={() => completeMutation.mutate()}
-            disabled={completeMutation.isPending}
-            className="btn-primary gap-2"
-          >
-            <CheckCircleIcon className="w-4 h-4" />
-            {completeMutation.isPending ? 'Saving...' : 'Mark Complete'}
-          </button>
         )}
       </div>
 
+      {(booking.declineReason || booking.cancellationReason || latestRescheduleReason) && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-3">
+          {booking.declineReason && (
+            <div>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Decline Reason</p>
+              <p className="text-sm text-gray-700">{booking.declineReason}</p>
+            </div>
+          )}
+          {booking.cancellationReason && (
+            <div>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Cancellation Reason</p>
+              <p className="text-sm text-gray-700">{booking.cancellationReason}</p>
+            </div>
+          )}
+          {latestRescheduleReason && (
+            <div>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Reschedule Note</p>
+              <p className="text-sm text-gray-700">{latestRescheduleReason}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {showRescheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="mb-5 text-lg font-bold text-gray-900">Propose Reschedule</h2>
-            <form
-              onSubmit={handleRescheduleSubmit((formData) => {
-                bookingApi
-                  .reschedule(id, {
-                    scheduledAt: new Date(formData.newDate).toISOString(),
-                    reason: formData.reason,
-                  })
-                  .then(() => {
-                    toast.success('Reschedule proposed');
-                    setShowRescheduleModal(false);
-                    queryClient.invalidateQueries({ queryKey: ['booking', currentUserId, id] });
-                    queryClient.invalidateQueries({ queryKey: ['tutor-requests'] });
-                  })
-                  .catch((err) => {
-                    toast.error(err?.response?.data?.message || 'Failed');
-                  });
-              })}
-              className="space-y-4"
-            >
-              <div>
-                <label className="label">New Date & Time</label>
-                <input
-                  type="datetime-local"
-                  {...registerReschedule('newDate')}
-                  className="input"
-                  min={new Date().toISOString().slice(0, 16)}
-                />
-                {rescheduleErrors.newDate && (
-                  <p className="error-text">{rescheduleErrors.newDate.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="label">Reason (optional)</label>
-                <textarea
-                  {...registerReschedule('reason')}
-                  rows={2}
-                  className="input resize-none"
-                  placeholder="Reason for rescheduling..."
-                />
-              </div>
-              <div className="flex gap-3">
-                <button type="submit" className="btn-primary flex-1">
-                  Propose
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRescheduleModal(false)}
-                  className="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+          <div className="mx-auto flex min-h-full w-full max-w-4xl items-start justify-center py-6">
+            <div className="w-full max-h-[90vh] overflow-hidden rounded-xl bg-white shadow-xl">
+              <form
+                onSubmit={handleRescheduleSubmit((formData) => {
+                  bookingApi
+                    .reschedule(id, {
+                      scheduledAt: new Date(formData.newDate).toISOString(),
+                      reason: formData.reason,
+                    })
+                    .then(async () => {
+                      toast.success('Reschedule proposed');
+                      setShowRescheduleModal(false);
+                      await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
+                    })
+                    .catch((err) => {
+                      toast.error(err?.response?.data?.message || 'Failed');
+                    });
+                })}
+                className="flex max-h-[90vh] flex-col"
+              >
+                <div className="overflow-y-auto p-6">
+                  <h2 className="mb-5 text-lg font-bold text-gray-900">Propose Reschedule</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="label">New Date & Time</label>
+                      <p className="mb-2 text-sm text-gray-500">
+                        Select a new time slot from the tutor&apos;s availability.
+                      </p>
+                      <input type="hidden" {...registerReschedule('newDate')} />
+                      {rescheduleAvailabilityQuery.isLoading ? (
+                        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+                          Loading availability...
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-gray-100 p-1">
+                          <AvailabilityCalendar
+                            slots={rescheduleAvailability}
+                            currentWeekSlots={rescheduleCurrentWeekAvailability}
+                            hasCurrentWeekOverride={rescheduleHasCurrentWeekAvailabilityOverride}
+                            bookedSlots={rescheduleBookedSlots}
+                            mode="select"
+                            selectedKey={selectedRescheduleSlot?.key || ''}
+                            onSelect={(slot) => {
+                              setSelectedRescheduleSlot(slot);
+                              setRescheduleValue('newDate', slot.date.toISOString(), { shouldValidate: true });
+                            }}
+                          />
+                        </div>
+                      )}
+                      {selectedRescheduleSlot && (
+                        <div className="mt-3">
+                          <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs text-primary-700">
+                            {selectedRescheduleSlot.date.toLocaleString('en-AU')}
+                          </span>
+                        </div>
+                      )}
+                      {rescheduleErrors.newDate && (
+                        <p className="error-text">{rescheduleErrors.newDate.message}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="label">Reason (optional)</label>
+                      <textarea
+                        {...registerReschedule('reason')}
+                        rows={2}
+                        className="input resize-none"
+                        placeholder="Reason for rescheduling..."
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-gray-100 bg-white p-6 pt-4">
+                  <div className="flex gap-3">
+                    <button type="submit" className="btn-primary flex-1">
+                      Propose
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRescheduleModal(false)}
+                      className="btn-secondary flex-1"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
