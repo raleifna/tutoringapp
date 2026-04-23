@@ -1,6 +1,11 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { notifyAdmin } = require('../services/notificationService');
+const {
+  convertAvailabilityForStudent,
+  validateBookingTime,
+  formatBookingInTimezone,
+} = require('../utils/timezone');
 
 const weekdayMap = {
   SUNDAY: 0,
@@ -682,6 +687,7 @@ exports.getTutorAvailability = async (req, res) => {
     where: { OR: [{ id: req.params.id }, { userId: req.params.id }] },
     select: {
       id: true,
+      userId: true,
       availability: {
         orderBy: availabilityOrderBy,
       },
@@ -689,15 +695,45 @@ exports.getTutorAvailability = async (req, res) => {
   });
   if (!profile) throw new AppError('Tutor not found', 404);
 
+  // Get tutor's timezone
+  const tutor = await prisma.user.findUnique({
+    where: { id: profile.userId },
+    select: { timezone: true },
+  });
+  const tutorTimezone = tutor?.timezone || 'UTC';
+
+  // Get requesting user's timezone (if student is logged in)
+  const requesterTimezone = req.user?.timezone || 'UTC';
+
   const [currentWeekOverride, bookedSlots] = await Promise.all([
     getCurrentWeekAvailabilityOverride(profile.id),
     getBookedSlots(profile.id),
   ]);
 
+  // Build availability state
+  let availabilityState = buildAvailabilityState(profile.availability, currentWeekOverride);
+
+  // If requester is a different timezone, convert availability to their timezone
+  if (requesterTimezone && requesterTimezone !== tutorTimezone) {
+    availabilityState = {
+      ...availabilityState,
+      availability: convertAvailabilityForStudent(
+        availabilityState.availability,
+        tutorTimezone
+      ),
+      currentWeekEffectiveAvailability: convertAvailabilityForStudent(
+        availabilityState.currentWeekEffectiveAvailability,
+        tutorTimezone
+      ),
+    };
+  }
+
   res.json({
     success: true,
     data: {
-      ...buildAvailabilityState(profile.availability, currentWeekOverride),
+      ...availabilityState,
+      tutorTimezone,
+      requesterTimezone,
       bookedSlots,
     },
   });
