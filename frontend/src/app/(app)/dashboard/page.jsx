@@ -18,7 +18,7 @@ import { bookingApi } from '../../../lib/api-entry';
 import BookingCalendar from '../../../components/BookingCalendar';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
-import { formatShortDateTime as formatDate, getUserTimezone } from '../../../lib/formatters';
+import { appendTimezoneName, formatShortDateTime as formatDate, getUserTimezone } from '../../../lib/formatters';
 import {
   getDisplayStatusLabel,
   getBookingDisplayStatus,
@@ -104,9 +104,9 @@ export default function DashboardPage() {
 
   const timeZone = getUserTimezone(user);
 
-  const formattedTime = time.toLocaleTimeString('en-AU', {
+  const formattedTime = appendTimezoneName(time.toLocaleTimeString('en-AU', {
     timeZone,
-  });
+  }), time, timeZone);
 
   useEffect(() => {
     setMounted(true);

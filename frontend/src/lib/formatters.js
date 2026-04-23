@@ -39,6 +39,28 @@ function formatDateValue(value, options, timezone = null) {
   }
 }
 
+export function getTimezoneName(value = new Date(), timezone = null, style = 'short') {
+  if (!timezone) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-AU', {
+      timeZone: timezone,
+      timeZoneName: style,
+    }).formatToParts(date);
+    return parts.find((part) => part.type === 'timeZoneName')?.value || '';
+  } catch {
+    return '';
+  }
+}
+
+export function appendTimezoneName(label, value, timezone = null) {
+  const timezoneName = getTimezoneName(value, timezone);
+  return timezoneName ? `${label} ${timezoneName}` : label;
+}
+
 export function getUserTimezone(user, fallback = 'Australia/Sydney') {
   return user?.timezone?.trim() || user?.timeZone?.trim() || fallback;
 }
@@ -94,11 +116,11 @@ export function zonedTimeToUtc({ year, month, day, hour = 0, minute = 0, second 
 }
 
 export function formatShortDateTime(value, timezone = null) {
-  return formatDateValue(value, SHORT_DATE_TIME_FORMAT, timezone);
+  return appendTimezoneName(formatDateValue(value, SHORT_DATE_TIME_FORMAT, timezone), value, timezone);
 }
 
 export function formatDateTimeWithYear(value, timezone = null) {
-  return formatDateValue(value, DATE_TIME_WITH_YEAR_FORMAT, timezone);
+  return appendTimezoneName(formatDateValue(value, DATE_TIME_WITH_YEAR_FORMAT, timezone), value, timezone);
 }
 
 export function formatMonthDay(value, timezone = null) {
@@ -126,7 +148,7 @@ export function formatDateInTimezone(value, timezone) {
     timeZone: timezone,
   };
 
-  return new Intl.DateTimeFormat(LOCALE, options).format(date);
+  return appendTimezoneName(new Intl.DateTimeFormat(LOCALE, options).format(date), date, timezone);
 }
 
 /**

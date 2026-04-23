@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
-import { formatCurrency, formatDuration, formatShortDateTime as formatDate, getUserTimezone } from '../../../../lib/formatters';
+import { appendTimezoneName, formatCurrency, formatDuration, formatShortDateTime as formatDate, getUserTimezone } from '../../../../lib/formatters';
 import {
   getRecurringDisplayBookings,
   getRecurringLabel,
@@ -44,9 +44,9 @@ export default function TutorDashboardPage() {
 
   const timeZone = getUserTimezone(user);
 
-  const formattedTime = time.toLocaleTimeString('en-AU', {
+  const formattedTime = appendTimezoneName(time.toLocaleTimeString('en-AU', {
     timeZone,
-  });
+  }), time, timeZone);
 
   useEffect(() => {
     setMounted(true);
