@@ -150,6 +150,7 @@ ensure_command docker "Install Docker Desktop and make sure the daemon is runnin
 ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
 BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
 GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8080")"
+MAILBOX_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "MAILPIT_UI_HOST_PORT" "8025")"
 
 write_step "Building and starting the local full-stack Docker environment"
 invoke_compose up --build -d
@@ -195,3 +196,4 @@ echo
 echo "Local environment is ready."
 echo "Frontend: http://localhost:${GATEWAY_HOST_PORT}"
 echo "Backend:  http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
+echo "Mailbox:  http://localhost:${MAILBOX_HOST_PORT}"

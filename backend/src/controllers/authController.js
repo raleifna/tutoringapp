@@ -221,6 +221,7 @@ async function register(req, res) {
                 : 'Registration successful. Please check your email to verify your account.',
         user: serializeAuthUser(user),
         verificationDelivery: emailResult.deliveryMethod,
+        ...(emailResult.mailboxUrl ? { verificationMailboxUrl: emailResult.mailboxUrl } : {}),
         ...(emailResult.verificationUrl ? { verificationUrl: emailResult.verificationUrl } : {}),
     });
 }
@@ -386,6 +387,7 @@ async function resendVerification(req, res) {
         success: true,
         message: 'Verification email resent.',
         verificationDelivery: emailResult.deliveryMethod,
+        ...(emailResult.mailboxUrl ? { verificationMailboxUrl: emailResult.mailboxUrl } : {}),
         ...(emailResult.verificationUrl ? { verificationUrl: emailResult.verificationUrl } : {}),
     });
 }
