@@ -282,7 +282,7 @@ model Booking {
   subject            String
   status             BookingStatus @default(PENDING)
   sessionType        SessionType   @default(ONLINE)
-  scheduledAt        DateTime
+  scheduledAt        DateTime      // Stored in UTC
   duration           Int
   hourlyRate         Decimal       @db.Decimal(10, 2)
   totalAmount        Decimal       @db.Decimal(10, 2)
@@ -295,6 +295,8 @@ model Booking {
   declineReason      String?
   recurringType      RecurringType @default(ONE_OFF)
   recurringGroupId   String?
+  learnerTimezone    String?       // Backup: learner's timezone when booking was created
+  tutorTimezone      String?       // Backup: tutor's timezone when booking was created
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   completedAt        DateTime?
