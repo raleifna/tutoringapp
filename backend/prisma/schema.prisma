@@ -295,6 +295,8 @@ model Booking {
   declineReason      String?
   recurringType      RecurringType @default(ONE_OFF)
   recurringGroupId   String?
+  learnerTimezone    String?
+  tutorTimezone      String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   completedAt        DateTime?

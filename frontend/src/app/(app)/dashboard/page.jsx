@@ -18,7 +18,7 @@ import { bookingApi } from '../../../lib/api-entry';
 import BookingCalendar from '../../../components/BookingCalendar';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { getBookingStatusClass as getStatusClass } from '../../../lib/booking-status';
-import { formatShortDateTime as formatDate } from '../../../lib/formatters';
+import { formatShortDateTime as formatDate, getUserTimezone } from '../../../lib/formatters';
 import {
   getDisplayStatusLabel,
   getBookingDisplayStatus,
@@ -102,10 +102,10 @@ export default function DashboardPage() {
     return () => clearInterval(timerId);
   }, []);
 
-  const timeZone = user?.timeZone?.trim() || 'Australia/Sydney';
+  const timeZone = getUserTimezone(user);
 
-  const formattedTime = time.toLocaleTimeString({
-    timeZone: timeZone,
+  const formattedTime = time.toLocaleTimeString('en-AU', {
+    timeZone,
   });
 
   useEffect(() => {
@@ -279,7 +279,7 @@ export default function DashboardPage() {
                       </p>
                       <p className="text-xs text-gray-500 truncate">
                         with {booking.tutorProfile?.user?.firstName || 'Tutor'} ·{' '}
-                        {formatDate(booking.scheduledAt)}
+                        {formatDate(booking.scheduledAt, timeZone)}
                       </p>
                       {isRecurringBooking(booking) && (
                         <p className="mt-1 text-[11px] font-medium text-sky-700">
@@ -315,6 +315,7 @@ export default function DashboardPage() {
           bookings={calendarBookings}
           isTutor={false}
           returnTo="/dashboard"
+          timezone={timeZone}
         />
       </div>
 

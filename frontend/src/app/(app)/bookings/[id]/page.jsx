@@ -20,7 +20,7 @@ import {
 import { bookingApi, paymentApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
-import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../lib/formatters';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, getUserTimezone } from '../../../../lib/formatters';
 import { formatSavedMethod } from '../../../../lib/payment-display';
 import {
   getDisplayStatusLabel,
@@ -95,6 +95,7 @@ export default function BookingDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user, fetchMe } = useAuthStore();
+  const timeZone = getUserTimezone(user);
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
@@ -519,7 +520,7 @@ export default function BookingDetailPage() {
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Date & Time</p>
             <p className="font-medium text-gray-900 inline-flex items-center gap-1">
               <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
-              {formatDate(booking.scheduledAt)}
+              {formatDate(booking.scheduledAt, timeZone)}
             </p>
           </div>
           <div>
@@ -662,7 +663,7 @@ export default function BookingDetailPage() {
                             <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="font-medium text-gray-900">
-                                {formatDate(seriesBooking.scheduledAt)}
+                                {formatDate(seriesBooking.scheduledAt, timeZone)}
                                 {isCurrent ? ' · current' : ''}
                               </span>
                               <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusClass(seriesBooking.status)}`}>

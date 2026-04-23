@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { bookingApi, paymentApi } from '../../../../../lib/api-entry';
-import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../../../lib/formatters';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, getUserTimezone } from '../../../../../lib/formatters';
 import { formatPaymentStatus, formatSavedMethod, getPaymentStatusClass } from '../../../../../lib/payment-display';
 import {
   getPayableSeriesBookings,
@@ -157,6 +157,7 @@ export default function BookingPaymentPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const timeZone = getUserTimezone(user);
   const currentUserId = user?.id || '';
   const returnTo = searchParams.get('returnTo') || '';
   const showBackButton = Boolean(returnTo);
@@ -352,7 +353,7 @@ export default function BookingPaymentPage() {
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Session Time</p>
-            <p className="font-medium text-gray-900">{formatDate(booking.scheduledAt)}</p>
+            <p className="font-medium text-gray-900">{formatDate(booking.scheduledAt, timeZone)}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Duration</p>
@@ -389,7 +390,7 @@ export default function BookingPaymentPage() {
                     className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">{formatDate(seriesBooking.scheduledAt)}</p>
+                      <p className="font-medium text-gray-900">{formatDate(seriesBooking.scheduledAt, timeZone)}</p>
                       <p className="text-xs text-gray-500">{formatDuration(seriesBooking.duration)}</p>
                     </div>
                     <p className={`text-xs font-medium ${needsSetup ? 'text-sky-700' : 'text-emerald-700'}`}>

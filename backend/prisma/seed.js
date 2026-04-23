@@ -18,7 +18,7 @@ const SUBJECTS = [
   { name: 'Japanese', category: 'Languages', description: 'Japanese language' },
 ];
 
-async function upsertUser({ email, password, firstName, lastName, role, status, bio }) {
+async function upsertUser({ email, password, firstName, lastName, role, status, bio, timezone = 'Australia/Sydney' }) {
   const storedPassword = hashPassword(password);
 
   return prisma.user.upsert({
@@ -30,6 +30,7 @@ async function upsertUser({ email, password, firstName, lastName, role, status, 
       role,
       status,
       bio: bio || null,
+      timezone,
       isEmailVerified: true,
     },
     create: {
@@ -40,6 +41,7 @@ async function upsertUser({ email, password, firstName, lastName, role, status, 
       role,
       status,
       bio: bio || null,
+      timezone,
       isEmailVerified: true,
     },
   });
@@ -208,6 +210,88 @@ async function main() {
     },
   });
 
+  const timezoneLearner = await upsertUser({
+    email: 'tz.learner.la@demo.com',
+    password: 'Demo@123456',
+    firstName: 'Timezone',
+    lastName: 'Learner LA',
+    role: 'LEARNER',
+    status: 'ACTIVE',
+    timezone: 'America/Los_Angeles',
+    bio: 'Timezone validation learner account.',
+  });
+
+  await prisma.learnerProfile.upsert({
+    where: { userId: timezoneLearner.id },
+    update: {
+      gradeLevel: 'Demo',
+      learningGoals: 'Validate timezone display',
+      subjects: ['Mathematics', 'Programming'],
+      preferredStyle: 'visual',
+    },
+    create: {
+      userId: timezoneLearner.id,
+      gradeLevel: 'Demo',
+      learningGoals: 'Validate timezone display',
+      subjects: ['Mathematics', 'Programming'],
+      preferredStyle: 'visual',
+    },
+  });
+
+  const timezoneTutor = await upsertUser({
+    email: 'tz.tutor.sydney@demo.com',
+    password: 'Demo@123456',
+    firstName: 'Timezone',
+    lastName: 'Tutor Sydney',
+    role: 'TUTOR',
+    status: 'ACTIVE',
+    timezone: 'Australia/Sydney',
+    bio: 'Sydney tutor account for timezone validation.',
+  });
+
+  const timezoneTutorProfile = await prisma.tutorProfile.upsert({
+    where: { userId: timezoneTutor.id },
+    update: {
+      status: 'ACTIVE',
+      applicationSubmitted: true,
+      headline: 'Sydney Timezone Demo Tutor',
+      hourlyRate: 70,
+      currency: 'AUD',
+      yearsExperience: 6,
+      education: [{ institution: 'UNSW Sydney', degree: 'MSc', field: 'Mathematics', year: '2022' }],
+      certifications: [{ text: 'Timezone demo verified tutor' }],
+      languages: ['English'],
+      sessionTypes: ['ONLINE'],
+      location: 'Sydney, NSW, Australia',
+      rating: 4.8,
+      totalReviews: 12,
+      totalSessions: 20,
+      isVerified: true,
+      verifiedAt: new Date(),
+      responseTime: 20,
+    },
+    create: {
+      userId: timezoneTutor.id,
+      status: 'ACTIVE',
+      applicationSubmitted: true,
+      headline: 'Sydney Timezone Demo Tutor',
+      hourlyRate: 70,
+      currency: 'AUD',
+      yearsExperience: 6,
+      education: [{ institution: 'UNSW Sydney', degree: 'MSc', field: 'Mathematics', year: '2022' }],
+      certifications: [{ text: 'Timezone demo verified tutor' }],
+      languages: ['English'],
+      sessionTypes: ['ONLINE'],
+      location: 'Sydney, NSW, Australia',
+      rating: 4.8,
+      totalReviews: 12,
+      totalSessions: 20,
+      isVerified: true,
+      verifiedAt: new Date(),
+      responseTime: 20,
+    },
+  });
+
   const byName = Object.fromEntries(subjects.map((subject) => [subject.name, subject]));
 
   for (const subjectName of ['Mathematics', 'Python', 'Calculus']) {
@@ -251,9 +335,31 @@ async function main() {
     });
   }
 
+  const timezoneSubject = byName.Mathematics;
+  if (timezoneSubject) {
+    await prisma.tutorSubject.upsert({
+      where: {
+        tutorId_subjectId: {
+          tutorId: timezoneTutorProfile.id,
+          subjectId: timezoneSubject.id,
+        },
+      },
+      update: {
+        level: 'all',
+        description: 'Timezone demo mathematics sessions',
+      },
+      create: {
+        tutorId: timezoneTutorProfile.id,
+        subjectId: timezoneSubject.id,
+        level: 'all',
+        description: 'Timezone demo mathematics sessions',
+      },
+    });
+  }
+
   await prisma.tutorAvailability.deleteMany({
     where: {
-      tutorId: { in: [tutorProfile.id, pendingTutorProfile.id] },
+      tutorId: { in: [tutorProfile.id, pendingTutorProfile.id, timezoneTutorProfile.id] },
     },
   });
 
@@ -263,6 +369,9 @@ async function main() {
       { tutorId: tutorProfile.id, dayOfWeek: 3, startTime: '10:00', endTime: '16:00', timezone: 'Australia/Sydney' },
       { tutorId: tutorProfile.id, dayOfWeek: 6, startTime: '10:00', endTime: '14:00', timezone: 'Australia/Sydney' },
       { tutorId: pendingTutorProfile.id, dayOfWeek: 2, startTime: '17:00', endTime: '20:00', timezone: 'Australia/Sydney' },
+      { tutorId: timezoneTutorProfile.id, dayOfWeek: 1, startTime: '09:00', endTime: '11:00', timezone: 'Australia/Sydney' },
+      { tutorId: timezoneTutorProfile.id, dayOfWeek: 3, startTime: '18:00', endTime: '20:00', timezone: 'Australia/Sydney' },
+      { tutorId: timezoneTutorProfile.id, dayOfWeek: 6, startTime: '10:00', endTime: '12:00', timezone: 'Australia/Sydney' },
     ],
   });
 
@@ -313,6 +422,8 @@ async function main() {
   console.log('  Learner: learner@demo.com / Learner@123');
   console.log('  Tutor:   tutor@demo.com / Tutor@123');
   console.log('  Pending tutor: pending.tutor@demo.com / Tutor@123');
+  console.log('  TZ learner: tz.learner.la@demo.com / Demo@123456');
+  console.log('  TZ tutor:   tz.tutor.sydney@demo.com / Demo@123456');
 }
 
 main()

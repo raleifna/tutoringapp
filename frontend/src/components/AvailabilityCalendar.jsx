@@ -1,14 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { formatMonthDay as formatDate } from '../lib/formatters';
+import { formatMonthDay as formatDate, getDayOfWeekInTimezone, getHourInTimezone } from '../lib/formatters';
 import { DAY_ORDER, DAY_LABELS, HOURS, buildCellKey, cellsToSlots, getSlotDate, getWeekStart, slotsToCells } from '../lib/availability-calendar';
 
-const formatWeekRange = (weekOffset) => {
-  const start = getWeekStart(new Date(), weekOffset);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  const format = new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' });
+const formatWeekRange = (weekOffset, timezone) => {
+  const start = getWeekStart(new Date(), weekOffset, timezone);
+  const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+  const format = new Intl.DateTimeFormat('en-AU', {
+    month: 'short',
+    day: 'numeric',
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
   return `${format.format(start)} - ${format.format(end)}`;
 };
 
@@ -25,6 +28,7 @@ export default function AvailabilityCalendar({
   fixedWeekOffset,
   hideWeekNavigation = false,
   title,
+  timezone = null,
 }) {
   const [internalWeekOffset, setInternalWeekOffset] = useState(0);
   const weekOffset = typeof fixedWeekOffset === 'number' ? fixedWeekOffset : internalWeekOffset;
@@ -32,9 +36,8 @@ export default function AvailabilityCalendar({
   const overrideCells = useMemo(() => slotsToCells(currentWeekSlots), [currentWeekSlots]);
   const cells = hasCurrentWeekOverride && weekOffset === 0 ? overrideCells : baseCells;
   const bookedCells = useMemo(() => {
-    const weekStart = getWeekStart(new Date(), weekOffset);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 7);
+    const weekStart = getWeekStart(new Date(), weekOffset, timezone);
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
     const nextCells = new Set();
 
     bookedSlots.forEach((slot) => {
@@ -48,14 +51,16 @@ export default function AvailabilityCalendar({
 
       while (cursor < end) {
         if (cursor >= weekStart && cursor < weekEnd) {
-          nextCells.add(buildCellKey(cursor.getDay(), cursor.getHours()));
+          const dayOfWeek = timezone ? getDayOfWeekInTimezone(cursor, timezone) : cursor.getDay();
+          const hour = timezone ? getHourInTimezone(cursor, timezone) : cursor.getHours();
+          nextCells.add(buildCellKey(dayOfWeek, hour));
         }
-        cursor.setHours(cursor.getHours() + 1);
+        cursor.setTime(cursor.getTime() + 60 * 60 * 1000);
       }
     });
 
     return nextCells;
-  }, [bookedSlots, weekOffset]);
+  }, [bookedSlots, timezone, weekOffset]);
   const activeSelections = selectedKeys.length ? selectedKeys : selectedKey ? [selectedKey] : [];
   const heading =
     title || (mode === 'edit' ? 'Weekly availability preview' : 'Pick a slot');
@@ -74,7 +79,7 @@ export default function AvailabilityCalendar({
         key: `${weekOffset}:${key}`,
         dayOfWeek,
         hour,
-        date: getSlotDate(dayOfWeek, hour, weekOffset),
+        date: getSlotDate(dayOfWeek, hour, weekOffset, timezone),
       });
     }
   };
@@ -84,7 +89,7 @@ export default function AvailabilityCalendar({
       <div className="flex items-center justify-between gap-3 text-sm">
         <div>
           <div className="font-medium text-gray-700">{heading}</div>
-          <div className="text-xs text-gray-400">{formatWeekRange(weekOffset)}</div>
+          <div className="text-xs text-gray-400">{formatWeekRange(weekOffset, timezone)}</div>
         </div>
         {!hideWeekNavigation && typeof fixedWeekOffset !== 'number' && (
           <div className="flex items-center gap-2">
@@ -102,7 +107,7 @@ export default function AvailabilityCalendar({
           {DAY_ORDER.map((dayOfWeek) => (
             <div key={dayOfWeek} className="rounded-lg bg-gray-50 p-2 text-center font-medium text-gray-600">
               <div>{DAY_LABELS[dayOfWeek]}</div>
-              <div className="text-[11px] text-gray-400">{formatDate(getSlotDate(dayOfWeek, 0, weekOffset))}</div>
+              <div className="text-[11px] text-gray-400">{formatDate(getSlotDate(dayOfWeek, 0, weekOffset, timezone), timezone)}</div>
             </div>
           ))}
           {HOURS.map((hour) => (
@@ -114,6 +119,7 @@ export default function AvailabilityCalendar({
               bookedCells={bookedCells}
               selectedKeys={activeSelections}
               weekOffset={weekOffset}
+              timezone={timezone}
               onClick={handleClick}
             />
           ))}
@@ -123,7 +129,7 @@ export default function AvailabilityCalendar({
   );
 }
 
-function FragmentRow({ hour, mode, cells, bookedCells, selectedKeys, weekOffset, onClick }) {
+function FragmentRow({ hour, mode, cells, bookedCells, selectedKeys, weekOffset, timezone, onClick }) {
   return (
     <>
           <div className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-400">
@@ -133,7 +139,7 @@ function FragmentRow({ hour, mode, cells, bookedCells, selectedKeys, weekOffset,
         const key = buildCellKey(dayOfWeek, hour);
         const active = cells.has(key);
         const booked = mode === 'select' && bookedCells.has(key);
-        const disabled = mode === 'select' && (!active || booked || getSlotDate(dayOfWeek, hour, weekOffset) < new Date());
+        const disabled = mode === 'select' && (!active || booked || getSlotDate(dayOfWeek, hour, weekOffset, timezone) < new Date());
         const selected = selectedKeys.includes(`${weekOffset}:${key}`);
         const label = selected ? 'Selected' : booked ? 'Booked' : active ? 'Available' : '';
         return (

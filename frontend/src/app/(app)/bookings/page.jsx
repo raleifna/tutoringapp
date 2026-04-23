@@ -9,7 +9,7 @@ import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { bookingApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
 import { getBookingStatusClass } from '../../../lib/booking-status';
-import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration } from '../../../lib/formatters';
+import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, getUserTimezone } from '../../../lib/formatters';
 import {
   getDisplayStatusLabel,
   getBookingDisplayStatus,
@@ -50,6 +50,7 @@ function BookingsPageContent() {
   const pageParam = searchParams.get('page');
   const fromParam = (searchParams.get('from') || '').toLowerCase();
   const { user } = useAuthStore();
+  const timeZone = getUserTimezone(user);
   const currentUserId = user?.id || '';
   const [activeStatus, setActiveStatus] = useState(() => getInitialStatus(statusParam));
   const [page, setPage] = useState(() => getPositivePageNumber(pageParam));
@@ -190,6 +191,7 @@ function BookingsPageContent() {
               booking={booking}
               isTutor={isTutor}
               returnTo={currentBookingsHref}
+              timezone={timeZone}
             />
           ))}
         </div>
@@ -240,7 +242,7 @@ function BookingsPageFallback() {
   );
 }
 
-function BookingCard({ booking, isTutor, returnTo }) {
+function BookingCard({ booking, isTutor, returnTo, timezone }) {
   const router = useRouter();
   const other = isTutor ? booking?.learner : booking?.tutorProfile?.user || booking?.tutor || {};
   const otherFirstName = other?.firstName || (isTutor ? 'Learner' : 'Tutor');
@@ -326,7 +328,7 @@ function BookingCard({ booking, isTutor, returnTo }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-50">
         <div className="flex items-center gap-1">
           <CalendarDaysIcon className="w-3.5 h-3.5" />
-          {formatDate(booking?.scheduledAt)}
+          {formatDate(booking?.scheduledAt, timezone)}
         </div>
         <div className="flex items-center gap-1">
           <ClockIcon className="w-3.5 h-3.5" />

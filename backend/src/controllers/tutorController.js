@@ -1,6 +1,12 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
 const { notifyAdmin } = require('../services/notificationService');
+const {
+  convertAvailabilityForStudent,
+  validateBookingTime,
+  formatBookingInTimezone,
+  normalizeTimezone,
+} = require('../utils/timezone');
 
 const weekdayMap = {
   SUNDAY: 0,
@@ -39,7 +45,7 @@ const readHour = (value, allowUpTo24 = false) => {
   return hour;
 };
 
-const normalizeAvailabilitySlots = (availability) => {
+const normalizeAvailabilitySlots = (availability, defaultTimezone = 'UTC') => {
   if (availability == null) return [];
   if (!Array.isArray(availability)) throw new AppError('Availability must be an array', 400);
 
@@ -57,7 +63,7 @@ const normalizeAvailabilitySlots = (availability) => {
         dayOfWeek,
         startTime: formatHour(startHour),
         endTime: formatHour(endHour),
-        timezone: slot?.timezone || 'UTC',
+        timezone: normalizeTimezone(slot?.timezone || defaultTimezone),
       };
     })
     .sort((a, b) => {
@@ -196,6 +202,7 @@ const tutorProfileSelect = {
       lastName: true,
       avatar: true,
       bio: true,
+      timezone: true,
       createdAt: true,
     },
   },
@@ -563,12 +570,14 @@ exports.updateProfile = async (req, res) => {
 
 exports.updateAvailability = async (req, res) => {
   const availability = Array.isArray(req.body) ? req.body : req.body.availability;
-  const normalizedAvailability = normalizeAvailabilitySlots(availability);
 
   const profile = await prisma.tutorProfile.findUnique({
     where: { userId: req.user.id },
+    include: { user: { select: { timezone: true } } },
   });
   ensureTutorProfileEditable(profile);
+  const tutorTimezone = normalizeTimezone(profile.user?.timezone || req.user?.timezone || 'UTC');
+  const normalizedAvailability = normalizeAvailabilitySlots(availability, tutorTimezone);
 
   await prisma.$transaction(async (tx) => {
     await tx.tutorAvailability.deleteMany({ where: { tutorId: profile.id } });
@@ -595,12 +604,14 @@ exports.updateAvailability = async (req, res) => {
 
 exports.updateCurrentWeekAvailability = async (req, res) => {
   const availability = Array.isArray(req.body) ? req.body : req.body.availability;
-  const normalizedAvailability = normalizeAvailabilitySlots(availability);
 
   const profile = await prisma.tutorProfile.findUnique({
     where: { userId: req.user.id },
+    include: { user: { select: { timezone: true } } },
   });
   ensureTutorProfileEditable(profile);
+  const tutorTimezone = normalizeTimezone(profile.user?.timezone || req.user?.timezone || 'UTC');
+  const normalizedAvailability = normalizeAvailabilitySlots(availability, tutorTimezone);
 
   const weekStart = getCurrentWeekStart();
 
@@ -614,7 +625,7 @@ exports.updateCurrentWeekAvailability = async (req, res) => {
     create: {
       tutorId: profile.id,
       weekStart,
-      timezone: 'UTC',
+      timezone: tutorTimezone,
       ...(normalizedAvailability.length > 0
         ? {
             slots: {
@@ -628,7 +639,7 @@ exports.updateCurrentWeekAvailability = async (req, res) => {
         : {}),
     },
     update: {
-      timezone: 'UTC',
+      timezone: tutorTimezone,
       slots: {
         deleteMany: {},
         ...(normalizedAvailability.length > 0
@@ -682,6 +693,7 @@ exports.getTutorAvailability = async (req, res) => {
     where: { OR: [{ id: req.params.id }, { userId: req.params.id }] },
     select: {
       id: true,
+      userId: true,
       availability: {
         orderBy: availabilityOrderBy,
       },
@@ -689,15 +701,47 @@ exports.getTutorAvailability = async (req, res) => {
   });
   if (!profile) throw new AppError('Tutor not found', 404);
 
+  // Get tutor's timezone
+  const tutor = await prisma.user.findUnique({
+    where: { id: profile.userId },
+    select: { timezone: true },
+  });
+  const tutorTimezone = tutor?.timezone || 'UTC';
+
+  // Get requesting user's timezone (if student is logged in)
+  const requesterTimezone = normalizeTimezone(req.user?.timezone || 'UTC');
+
   const [currentWeekOverride, bookedSlots] = await Promise.all([
     getCurrentWeekAvailabilityOverride(profile.id),
     getBookedSlots(profile.id),
   ]);
 
+  // Build availability state
+  let availabilityState = buildAvailabilityState(profile.availability, currentWeekOverride);
+
+  // If requester is a different timezone, convert availability to their timezone
+  if (requesterTimezone && requesterTimezone !== tutorTimezone) {
+    availabilityState = {
+      ...availabilityState,
+      availability: convertAvailabilityForStudent(
+        availabilityState.availability,
+        tutorTimezone,
+        requesterTimezone
+      ),
+      currentWeekEffectiveAvailability: convertAvailabilityForStudent(
+        availabilityState.currentWeekEffectiveAvailability,
+        tutorTimezone,
+        requesterTimezone
+      ),
+    };
+  }
+
   res.json({
     success: true,
     data: {
-      ...buildAvailabilityState(profile.availability, currentWeekOverride),
+      ...availabilityState,
+      tutorTimezone,
+      requesterTimezone,
       bookedSlots,
     },
   });

@@ -29,6 +29,7 @@ async function authenticate(req, res, next) {
         select: {
             id: true,
             email: true,
+            timezone: true,
             role: true,
             status: true,
             tutorProfile: {
@@ -52,6 +53,7 @@ async function authenticate(req, res, next) {
     req.user = {
         id: user.id,
         email: user.email,
+        timezone: user.timezone || 'UTC',
         role: user.role,
         status: user.status,
         tutorProfile: user.tutorProfile
@@ -88,6 +90,7 @@ async function optionalAuth(req, res, next) {
         select: {
             id: true,
             email: true,
+            timezone: true,
             role: true,
             status: true,
             tutorProfile: {
@@ -105,6 +108,7 @@ async function optionalAuth(req, res, next) {
         req.user = {
             id: user.id,
             email: user.email,
+            timezone: user.timezone || 'UTC',
             role: user.role,
             status: user.status,
             tutorProfile: user.tutorProfile

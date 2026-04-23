@@ -1,4 +1,6 @@
 const { prisma } = require('../config/database');
+const { AppError } = require('../middleware/errorHandler');
+const { isValidTimezone } = require('../utils/timezone');
 
 async function updateMyProfile(req, res) {
     if (!req.user || !req.user.id) {
@@ -9,6 +11,11 @@ async function updateMyProfile(req, res) {
     }
 
     const { firstName, lastName, bio, phone, timezone } = req.body;
+    const nextTimezone = timezone === undefined ? undefined : String(timezone || '').trim();
+
+    if (nextTimezone !== undefined && !isValidTimezone(nextTimezone)) {
+        throw new AppError('Invalid timezone. Use a valid IANA timezone, such as Australia/Sydney.', 400);
+    }
 
     const user = await prisma.user.update({
         where: { id: req.user.id },
@@ -17,7 +24,7 @@ async function updateMyProfile(req, res) {
             ...(lastName !== undefined ? { lastName } : {}),
             ...(bio !== undefined ? { bio } : {}),
             ...(phone !== undefined ? { phone } : {}),
-            ...(timezone !== undefined ? { timezone } : {}),
+            ...(nextTimezone !== undefined ? { timezone: nextTimezone } : {}),
         },
     });
 

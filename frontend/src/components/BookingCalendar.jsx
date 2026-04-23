@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
-import { DAY_ORDER, DAY_LABELS, getWeekStart } from '../lib/availability-calendar';
+import { DAY_ORDER, DAY_LABELS, getSlotDate, getWeekStart } from '../lib/availability-calendar';
 import { formatBookingStatus } from '../lib/booking-status';
+import { getHourInTimezone, getDayOfWeekInTimezone } from '../lib/formatters';
 
 const DISPLAY_HOURS = Array.from({ length: 15 }, (_, i) => i + 7);
 
@@ -24,7 +25,7 @@ function CalendarRow({ hour, weekDates, bookingsBySlot, isTutor, returnTo, today
         {String(hour).padStart(2, '0')}:00
       </div>
       {weekDates.map(({ dayOfWeek, date }) => {
-        const key = `${date.getDay()}-${hour}`;
+        const key = `${dayOfWeek}-${hour}`;
         const cellBookings = bookingsBySlot[key] || [];
         const isToday = date.toDateString() === today.toDateString();
         return (
@@ -63,19 +64,20 @@ function CalendarRow({ hour, weekDates, bookingsBySlot, isTutor, returnTo, today
   );
 }
 
-export default function BookingCalendar({ bookings = [], isTutor = false, returnTo = '/dashboard' }) {
+export default function BookingCalendar({
+  bookings = [],
+  isTutor = false,
+  returnTo = '/dashboard',
+  timezone = 'Australia/Sydney',
+}) {
   const [weekOffset, setWeekOffset] = useState(0);
 
-  const weekStart = getWeekStart(new Date(), weekOffset);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 7);
+  const weekStart = getWeekStart(new Date(), weekOffset, timezone);
+  const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // build date for each day column
   const weekDates = DAY_ORDER.map((dayOfWeek) => {
-    const d = new Date(weekStart);
-    const shift = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    d.setDate(weekStart.getDate() + shift);
-    return { dayOfWeek, date: d };
+    return { dayOfWeek, date: getSlotDate(dayOfWeek, 0, weekOffset, timezone) };
   });
 
   // keep only bookings that fall in this week
@@ -83,25 +85,30 @@ export default function BookingCalendar({ bookings = [], isTutor = false, return
     if (!b.scheduledAt) return false;
     if (['CANCELLED', 'DECLINED'].includes(String(b.status || '').toUpperCase())) return false;
     const d = new Date(b.scheduledAt);
-    return d >= weekStart && d < weekEnd;
+    const bookingDay = getDayOfWeekInTimezone(d, timezone);
+    const bookingWeekStart = getWeekStart(d, 0, timezone);
+    return bookingWeekStart.getTime() === weekStart.getTime() && DAY_ORDER.includes(bookingDay);
   });
 
-  // group bookings by "day-hour"
+  // group bookings by "day-hour" using user's timezone
   const bookingsBySlot = {};
   thisWeekBookings.forEach((booking) => {
-    const d = new Date(booking.scheduledAt);
-    const key = `${d.getDay()}-${d.getHours()}`;
+    const dayOfWeek = getDayOfWeekInTimezone(booking.scheduledAt, timezone);
+    const hour = getHourInTimezone(booking.scheduledAt, timezone);
+    const key = `${dayOfWeek}-${hour}`;
     if (!bookingsBySlot[key]) bookingsBySlot[key] = [];
     bookingsBySlot[key].push(booking);
   });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getSlotDate(getDayOfWeekInTimezone(new Date(), timezone), 0, 0, timezone);
 
   const weekLabel = (() => {
-    const fmt = new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' });
-    const end = new Date(weekStart);
-    end.setDate(weekStart.getDate() + 6);
+    const fmt = new Intl.DateTimeFormat('en-AU', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: timezone,
+    });
+    const end = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
     return `${fmt.format(weekStart)} – ${fmt.format(end)}`;
   })();
 
@@ -157,7 +164,11 @@ export default function BookingCalendar({ bookings = [], isTutor = false, return
                   {DAY_LABELS[dayOfWeek]}
                 </div>
                 <div className={`text-[11px] ${isToday ? 'text-blue-400' : 'text-gray-400'}`}>
-                  {new Intl.DateTimeFormat('en-AU', { month: 'short', day: 'numeric' }).format(date)}
+                  {new Intl.DateTimeFormat('en-AU', {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: timezone,
+                  }).format(date)}
                 </div>
               </div>
             );

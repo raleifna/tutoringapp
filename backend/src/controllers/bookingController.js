@@ -2,6 +2,7 @@ const { prisma } = require('../config/database');
 const { getStripe, isStripeConfigured } = require('../config/stripe');
 const { AppError } = require('../middleware/errorHandler');
 const { notify, notifyOrRefresh, notifyAdmin } = require('../services/notificationService');
+const { validateBookingTime } = require('../utils/timezone');
 
 const bookingInclude = {
   learner: {
@@ -456,7 +457,24 @@ exports.createBooking = async (req, res) => {
         },
       })) === 0
     : true;
+
+  // Get learner timezone
+  const learner = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { timezone: true },
+  });
+  const learnerTimezone = learner?.timezone || 'UTC';
+
+  // Check overlapping bookings
   await ensureTutorSlotIsAvailable(tutorProfile.id, scheduledAt, parsedDuration);
+
+  // Validate timezone-aware availability
+  const tzValidation = await validateTutorAvailabilityWithTimezone(
+    tutorProfile.id,
+    scheduledAt,
+    parsedDuration,
+    learnerTimezone
+  );
 
   const booking = await prisma.booking.create({
     data: {
@@ -474,6 +492,8 @@ exports.createBooking = async (req, res) => {
       recurringType: recurringType || 'ONE_OFF',
       recurringGroupId: recurringGroupId || null,
       meetingTool: meetingTool || tutorProfile.preferredMeetingTool || null,
+      learnerTimezone,
+      tutorTimezone: tzValidation.tutorTimezone,
       payment: {
         create: {
           userId: req.user.id,
@@ -506,7 +526,6 @@ exports.createBooking = async (req, res) => {
     data: booking,
   });
 };
-
 exports.getMyBookings = async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
   const parsedPage = parseInt(page, 10) || 1;
