@@ -184,6 +184,119 @@ const getPayableSeriesBookingsForLearner = async (booking, learnerId) => {
   });
 };
 
+const getSelectedPaymentDetails = (payableBookings, learner) => ({
+  stripePaymentMethodId:
+    payableBookings.find((item) => item.payment?.stripePaymentMethodId)?.payment?.stripePaymentMethodId ||
+    learner?.stripeDefaultPaymentMethodId,
+  stripeCustomerId:
+    payableBookings.find((item) => item.payment?.stripeCustomerId)?.payment?.stripeCustomerId ||
+    learner?.stripeCustomerId,
+});
+
+const chargePayableBookings = async ({ booking, payableBookings, stripeCustomerId, stripePaymentMethodId }) => {
+  if (!payableBookings.length) {
+    return {
+      paymentStatus: isPaidPaymentStatus(booking.payment?.status) ? 'PAID' : booking.payment?.status || 'PENDING',
+      updated: booking,
+      updatedBookings: [booking],
+    };
+  }
+
+  if (!stripeCustomerId || !stripePaymentMethodId) {
+    throw new AppError('Learner must save a payment method before this booking can be accepted', 400);
+  }
+
+  const stripe = isStripeConfigured() ? getStripe() : null;
+  const totalAmount = payableBookings.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+  let paymentStatus = 'PROCESSING';
+  let paymentIntent = null;
+  let failureReason = null;
+
+  try {
+    if (!stripe) {
+      paymentIntent = { id: `local_pi_${Date.now()}` };
+      paymentStatus = 'PAID';
+    } else {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: String(
+          booking.currency || booking.payment?.currency || payableBookings[0]?.currency || 'AUD'
+        ).toLowerCase(),
+        customer: stripeCustomerId,
+        payment_method: stripePaymentMethodId,
+        confirm: true,
+        off_session: true,
+        metadata: {
+          bookingId: booking.id,
+          learnerId: booking.learnerId,
+          recurringGroupId: booking.recurringGroupId || '',
+          bookingCount: String(payableBookings.length),
+        },
+      });
+
+      if (paymentIntent.status === 'succeeded') {
+        paymentStatus = 'PAID';
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        paymentStatus = 'FAILED';
+        failureReason = 'Payment method was declined';
+      }
+    }
+  } catch (error) {
+    paymentIntent = error?.raw?.payment_intent || null;
+    paymentStatus = 'FAILED';
+    failureReason =
+      error?.raw?.message || error?.message || 'Stripe payment could not be processed';
+  }
+
+  const processedAt = new Date();
+  const updatedBookings = await prisma.$transaction(
+    payableBookings.map((targetBooking) =>
+      prisma.booking.update({
+        where: { id: targetBooking.id },
+        data: {
+          payment: targetBooking.payment
+            ? {
+                update: {
+                  status: paymentStatus,
+                  stripeCustomerId,
+                  stripePaymentMethodId,
+                  stripePaymentIntentId: paymentIntent?.id || targetBooking.payment.stripePaymentIntentId,
+                  processedAt,
+                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
+                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
+                  failureReason,
+                },
+              }
+            : {
+                create: {
+                  userId: targetBooking.learnerId,
+                  amount: targetBooking.totalAmount,
+                  currency: targetBooking.currency || 'AUD',
+                  status: paymentStatus,
+                  stripeCustomerId,
+                  stripePaymentMethodId,
+                  stripePaymentIntentId: paymentIntent?.id || null,
+                  processedAt,
+                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
+                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
+                  failureReason,
+                  description: `${targetBooking.subject} session payment`,
+                },
+              },
+        },
+        include: bookingInclude,
+      })
+    )
+  );
+
+  return {
+    paymentStatus,
+    failureReason,
+    updated: updatedBookings.find((item) => item.id === booking.id) || updatedBookings[0],
+    updatedBookings,
+  };
+};
+
 const syncRecurringLearnerNotification = async (booking) => {
   if (!booking?.recurringGroupId) return;
 
@@ -586,8 +699,15 @@ exports.acceptBooking = async (req, res) => {
   });
   if (!booking || booking.tutorId !== tutorProfile.id) throw new AppError('Booking not found', 404);
   if (booking.status !== 'PENDING') throw new AppError('Booking is not pending', 400);
-  if (!isPaidPaymentStatus(booking.payment?.status)) {
-    throw new AppError('This session must be paid before it can be accepted', 400);
+
+  const payableBookings = await getPayableSeriesBookingsForLearner(booking, booking.learnerId);
+  const selectedPaymentDetails = getSelectedPaymentDetails(payableBookings, booking.learner);
+
+  if (
+    payableBookings.length &&
+    (!selectedPaymentDetails.stripeCustomerId || !selectedPaymentDetails.stripePaymentMethodId)
+  ) {
+    throw new AppError('Learner must save a payment method before this booking can be accepted', 400);
   }
 
   const updated = await prisma.booking.update({
@@ -600,6 +720,14 @@ exports.acceptBooking = async (req, res) => {
     include: bookingInclude,
   });
 
+  const paymentResult = await chargePayableBookings({
+    booking: updated,
+    payableBookings,
+    stripeCustomerId: selectedPaymentDetails.stripeCustomerId,
+    stripePaymentMethodId: selectedPaymentDetails.stripePaymentMethodId,
+  });
+  const responseBooking = paymentResult.updated || updated;
+
   if (booking.recurringGroupId) {
     await syncRecurringLearnerNotification(booking);
   } else {
@@ -607,17 +735,26 @@ exports.acceptBooking = async (req, res) => {
       booking.learnerId,
       'booking',
       'Booking Accepted',
-      'This session was accepted and payment has already been confirmed.',
-      `/bookings/${updated.id}`
+      paymentResult.paymentStatus === 'PAID'
+        ? 'This session was accepted and payment has been confirmed.'
+        : paymentResult.paymentStatus === 'FAILED'
+          ? 'This session was accepted, but payment failed. Please update your payment method.'
+          : 'This session was accepted and payment is processing.',
+      `/bookings/${responseBooking.id}`
     );
   }
 
   res.json({
     success: true,
-    message: 'Session accepted',
-    data: updated,
+    message:
+      paymentResult.paymentStatus === 'PAID'
+        ? 'Session accepted and payment confirmed'
+        : paymentResult.paymentStatus === 'FAILED'
+          ? 'Session accepted but payment failed'
+          : 'Session accepted and payment is processing',
+    data: responseBooking,
     affectedCount: 1,
-    seriesBookings: [updated],
+    seriesBookings: paymentResult.updatedBookings || [responseBooking],
   });
 };
 
@@ -708,8 +845,6 @@ exports.completeBooking = async (req, res) => {
 };
 
 exports.payForBooking = async (req, res) => {
-  const stripe = isStripeConfigured() ? getStripe() : null;
-
   const booking = await prisma.booking.findUnique({
     where: { id: req.params.id },
     include: {
@@ -727,100 +862,21 @@ exports.payForBooking = async (req, res) => {
     throw new AppError('This booking has already been paid', 400);
   }
 
-  const selectedPaymentMethodId =
-    payableBookings.find((item) => item.payment?.stripePaymentMethodId)?.payment?.stripePaymentMethodId ||
-    booking.learner?.stripeDefaultPaymentMethodId;
-  const stripeCustomerId =
-    payableBookings.find((item) => item.payment?.stripeCustomerId)?.payment?.stripeCustomerId ||
-    booking.learner?.stripeCustomerId;
+  const selectedPaymentDetails = getSelectedPaymentDetails(payableBookings, booking.learner);
 
-  if (!stripeCustomerId || !selectedPaymentMethodId) {
+  if (!selectedPaymentDetails.stripeCustomerId || !selectedPaymentDetails.stripePaymentMethodId) {
     throw new AppError('Please save a payment method before paying for this booking', 400);
   }
 
-  const totalAmount = payableBookings.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
-  let paymentStatus = 'PROCESSING';
-  let paymentIntent = null;
-  let failureReason = null;
-
-  try {
-    if (!stripe) {
-      paymentIntent = { id: `local_pi_${Date.now()}` };
-      paymentStatus = 'PAID';
-    } else {
-      paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalAmount * 100),
-        currency: String(
-          booking.currency || booking.payment?.currency || payableBookings[0]?.currency || 'AUD'
-        ).toLowerCase(),
-        customer: stripeCustomerId,
-        payment_method: selectedPaymentMethodId,
-        confirm: true,
-        off_session: true,
-        metadata: {
-          bookingId: booking.id,
-          learnerId: booking.learnerId,
-          recurringGroupId: booking.recurringGroupId || '',
-          bookingCount: String(payableBookings.length),
-        },
-      });
-
-      if (paymentIntent.status === 'succeeded') {
-        paymentStatus = 'PAID';
-      } else if (paymentIntent.status === 'requires_payment_method') {
-        paymentStatus = 'FAILED';
-        failureReason = 'Payment method was declined';
-      }
-    }
-  } catch (error) {
-    paymentIntent = error?.raw?.payment_intent || null;
-    paymentStatus = 'FAILED';
-    failureReason =
-      error?.raw?.message || error?.message || 'Stripe payment could not be processed';
-  }
-
-  const processedAt = new Date();
-  const updatedBookings = await prisma.$transaction(
-    payableBookings.map((targetBooking) =>
-      prisma.booking.update({
-        where: { id: targetBooking.id },
-        data: {
-          payment: targetBooking.payment
-            ? {
-                update: {
-                  status: paymentStatus,
-                  stripeCustomerId,
-                  stripePaymentMethodId: selectedPaymentMethodId,
-                  stripePaymentIntentId: paymentIntent?.id || targetBooking.payment.stripePaymentIntentId,
-                  processedAt,
-                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
-                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
-                  failureReason,
-                },
-              }
-            : {
-                create: {
-                  userId: targetBooking.learnerId,
-                  amount: targetBooking.totalAmount,
-                  currency: targetBooking.currency || 'AUD',
-                  status: paymentStatus,
-                  stripeCustomerId,
-                  stripePaymentMethodId: selectedPaymentMethodId,
-                  stripePaymentIntentId: paymentIntent?.id || null,
-                  processedAt,
-                  paidAt: paymentStatus === 'PAID' ? processedAt : null,
-                  failedAt: paymentStatus === 'FAILED' ? processedAt : null,
-                  failureReason,
-                  description: `${targetBooking.subject} session payment`,
-                },
-              },
-        },
-        include: bookingInclude,
-      })
-    )
-  );
-
-  const updated = updatedBookings.find((item) => item.id === booking.id) || updatedBookings[0];
+  const paymentResult = await chargePayableBookings({
+    booking,
+    payableBookings,
+    stripeCustomerId: selectedPaymentDetails.stripeCustomerId,
+    stripePaymentMethodId: selectedPaymentDetails.stripePaymentMethodId,
+  });
+  const updated = paymentResult.updated;
+  const updatedBookings = paymentResult.updatedBookings;
+  const paymentStatus = paymentResult.paymentStatus;
   const isSeriesPayment = updatedBookings.length > 1;
 
   await notify(
@@ -848,5 +904,3 @@ exports.payForBooking = async (req, res) => {
     seriesBookings: updatedBookings,
   });
 };
-
-

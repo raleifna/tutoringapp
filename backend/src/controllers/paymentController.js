@@ -64,6 +64,19 @@ const getStripeCustomerMethods = async (stripe, stripeCustomerId, stripeDefaultP
   });
 };
 
+const bookingPendingUpdate = (booking, reason) =>
+  booking.status === 'UNPAID'
+    ? {
+        status: 'PENDING',
+        statusHistory: {
+          create: {
+            status: 'PENDING',
+            reason,
+          },
+        },
+      }
+    : {};
+
 exports.getSavedPaymentMethod = async (req, res) => {
   if (req.user.role !== 'LEARNER') {
     throw new AppError('Only learners can view payment methods', 403);
@@ -308,7 +321,7 @@ exports.completeSetupIntent = async (req, res) => {
     await prisma.$transaction(
       targetBookings
         .filter((targetBooking) => targetBooking.payment)
-        .map((targetBooking) =>
+        .flatMap((targetBooking) => [
           prisma.payment.update({
             where: { id: targetBooking.payment.id },
             data: {
@@ -319,8 +332,16 @@ exports.completeSetupIntent = async (req, res) => {
               failureReason: null,
               failedAt: null,
             },
-          })
-        )
+          }),
+          ...(targetBooking.status === 'UNPAID'
+            ? [
+                prisma.booking.update({
+                  where: { id: targetBooking.id },
+                  data: bookingPendingUpdate(targetBooking, 'Payment method saved'),
+                }),
+              ]
+            : []),
+        ])
     );
   }
 
@@ -374,10 +395,10 @@ exports.useSavedMethodForBooking = async (req, res) => {
 
   const targetBookings = await getTargetBookingsForPaymentSetup(booking, req.user.id);
 
-  const updatedPayments = await prisma.$transaction(
+  const transactionResult = await prisma.$transaction(
     targetBookings
       .filter((targetBooking) => targetBooking.payment)
-      .map((targetBooking) =>
+      .flatMap((targetBooking) => [
         prisma.payment.update({
           where: { id: targetBooking.payment.id },
           data: {
@@ -387,9 +408,18 @@ exports.useSavedMethodForBooking = async (req, res) => {
             failedAt: null,
             status: targetBooking.payment.status === 'FAILED' ? 'PENDING' : targetBooking.payment.status,
           },
-        })
-      )
+        }),
+        ...(targetBooking.status === 'UNPAID'
+          ? [
+              prisma.booking.update({
+                where: { id: targetBooking.id },
+                data: bookingPendingUpdate(targetBooking, 'Saved payment method selected'),
+              }),
+            ]
+          : []),
+      ])
   );
+  const updatedPayments = transactionResult.filter((item) => item && item.bookingId);
 
   res.json({
     success: true,

@@ -3,6 +3,7 @@ import {
   isRecurringBooking,
   getRecurringSeriesBookings,
   getRecurringSessionCount,
+  getBookingDisplayStatus,
   needsPaymentSetup,
   getSeriesTotalAmount,
 } from '../recurring-bookings';
@@ -52,5 +53,10 @@ describe('recurring booking helpers', () => {
 
   test('treats missing payment as pending for actionable bookings', () => {
     expect(needsPaymentSetup(booking({ status: 'PENDING', payment: null }))).toBe(true);
+  });
+
+  test('keeps pending booking status after a payment method is saved', () => {
+    expect(getBookingDisplayStatus(booking({ status: 'PENDING', payment: { status: 'PENDING' } }))).toBe('PENDING');
+    expect(getBookingDisplayStatus(booking({ status: 'UNPAID', payment: { status: 'PENDING' } }))).toBe('UNPAID');
   });
 });

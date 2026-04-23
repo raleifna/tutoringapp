@@ -287,7 +287,7 @@ export default function BookingDetailPage() {
     (
       recurring
         ? paymentSetupSeriesBookings.length > 0
-        : booking?.status === 'PENDING' && ['PENDING', 'FAILED'].includes(paymentStatus)
+        : ['PENDING', 'ACCEPTED'].includes(booking?.status) && ['PENDING', 'FAILED'].includes(paymentStatus)
     );
 
   useEffect(() => {
@@ -659,11 +659,11 @@ export default function BookingDetailPage() {
                       : 'Payment could not be completed. Please update your payment method to try again.'
                     : savedMethod
                       ? recurring
-                        ? `We can charge ${formatSavedMethod(savedMethod)} for the remaining sessions in this recurring booking right away.`
-                        : `We can charge your saved ${formatSavedMethod(savedMethod)} for this booking right away.`
+                        ? `Your saved ${formatSavedMethod(savedMethod)} will be charged after tutor approval.`
+                        : `Your saved ${formatSavedMethod(savedMethod)} will be charged after tutor approval.`
                       : recurring
-                        ? 'Save a payment method now to pay the remaining sessions in this recurring booking together.'
-                        : 'Save a payment method now to pay for this booking.'}
+                        ? 'Save a payment method so TutorConnect can charge the remaining sessions after tutor approval.'
+                        : 'Save a payment method so TutorConnect can charge this booking after tutor approval.'}
                 </p>
                 {recurring && paymentSetupSeriesBookings.length > 0 && (
                   <p className="text-sm font-semibold text-sky-800">
@@ -681,11 +681,11 @@ export default function BookingDetailPage() {
                     <CheckCircleIcon className="w-4 h-4" />
                     {isFailedPayment || savedMethod
                       ? recurring
-                        ? 'Pay Remaining Series'
-                        : 'Pay Booking'
+                        ? 'Update Payment Method'
+                        : 'Update Payment Method'
                       : recurring
-                        ? 'Pay Series'
-                        : 'Pay Booking'}
+                        ? 'Set Up Series Payment'
+                        : 'Set Up Payment Method'}
                   </Link>
                 </div>
               )}
