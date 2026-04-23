@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const { prisma } = require('../config/database');
 const logger = require('../config/logger');
+const { verifyAccessToken } = require('../utils/tokens');
 
 let io = null;
 
@@ -22,16 +23,45 @@ const getAllowedOrigins = () => {
   return Array.from(new Set(configuredOrigins));
 };
 
-const getUserFromSocketToken = async (token) => {
-  if (!token || typeof token !== 'string' || !token.startsWith('demo-token-')) {
+const normalizeSocketToken = (token) => {
+  if (!token || typeof token !== 'string') {
     return null;
   }
 
-  const userId = token.replace('demo-token-', '');
+  const trimmedToken = token.trim();
+  if (!trimmedToken) {
+    return null;
+  }
+
+  return trimmedToken.startsWith('Bearer ')
+    ? trimmedToken.slice('Bearer '.length).trim()
+    : trimmedToken;
+};
+
+const getUserFromSocketToken = async (token) => {
+  const normalizedToken = normalizeSocketToken(token);
+  if (!normalizedToken) {
+    return null;
+  }
+
+  let payload;
+
+  try {
+    payload = verifyAccessToken(normalizedToken);
+  } catch (_error) {
+    return null;
+  }
 
   return prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, firstName: true, lastName: true, role: true },
+    where: { id: payload.id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      status: true,
+    },
   });
 };
 
@@ -47,7 +77,10 @@ const initSocket = (server) => {
 
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+      const token =
+        socket.handshake.auth?.token ||
+        socket.handshake.headers?.authorization ||
+        socket.handshake.query?.token;
       const user = await getUserFromSocketToken(token);
 
       if (!user) {
@@ -58,6 +91,7 @@ const initSocket = (server) => {
       socket.user = user;
       return next();
     } catch (error) {
+      logger.error('Socket authentication failed:', error);
       return next(new Error('Socket authentication failed'));
     }
   });
@@ -113,4 +147,4 @@ const initSocket = (server) => {
 
 const getSocketIO = () => io;
 
-module.exports = { initSocket, getSocketIO };
+module.exports = { initSocket, getSocketIO, getUserFromSocketToken };
