@@ -178,6 +178,39 @@ const ensureTutorSlotIsAvailable = async (tutorId, scheduledAt, duration, option
   }
 };
 
+const validateTutorAvailabilityWithTimezone = async (tutorId, scheduledAt, duration) => {
+  const tutorProfile = await prisma.tutorProfile.findUnique({
+    where: { id: tutorId },
+    include: {
+      availability: { orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] },
+      user: { select: { timezone: true } },
+    },
+  });
+
+  if (!tutorProfile) {
+    throw new AppError('Tutor not found', 404);
+  }
+
+  const tutorTimezone = tutorProfile.user?.timezone || 'UTC';
+  const slots = tutorProfile.availability || [];
+
+  if (!slots.length) {
+    throw new AppError('Tutor has no availability set', 400);
+  }
+
+  const validation = validateBookingTime(new Date(scheduledAt), tutorTimezone, slots, duration);
+
+  if (!validation.isValid) {
+    throw new AppError(validation.message, 400);
+  }
+
+  return {
+    isValid: true,
+    tutorTimezone,
+    tutorLocalTime: validation.tutorLocalTime,
+  };
+};
+
 const findOverlappingTutorBookings = async ({
   tutorId,
   scheduledAt,
