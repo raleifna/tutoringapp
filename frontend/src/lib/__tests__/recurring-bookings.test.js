@@ -45,7 +45,7 @@ describe('recurring booking helpers', () => {
     expect(getSeriesTotalAmount(sorted)).toBe(50);
   });
 
-  test('requires payment only for actionable unpaid bookings', () => {
+  test('requires payment setup for actionable bookings waiting for payment', () => {
     expect(needsPaymentSetup(booking({ status: 'ACCEPTED', payment: { status: 'PENDING' } }))).toBe(true);
     expect(needsPaymentSetup(booking({ status: 'ACCEPTED', payment: { status: 'PAID' } }))).toBe(false);
     expect(needsPaymentSetup(booking({ status: 'COMPLETED' }))).toBe(false);
@@ -57,6 +57,6 @@ describe('recurring booking helpers', () => {
 
   test('keeps pending booking status after a payment method is saved', () => {
     expect(getBookingDisplayStatus(booking({ status: 'PENDING', payment: { status: 'PENDING' } }))).toBe('PENDING');
-    expect(getBookingDisplayStatus(booking({ status: 'UNPAID', payment: { status: 'PENDING' } }))).toBe('UNPAID');
+    expect(getBookingDisplayStatus(booking({ status: 'ACCEPTED', payment: { status: 'PENDING' } }))).toBe('ACCEPTED');
   });
 });
