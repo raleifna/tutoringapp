@@ -107,8 +107,7 @@ invoke_backend_command() {
 backend_has_script() {
   local script_name="$1"
 
-  node -e 'const fs = require("fs"); const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.exit(pkg.scripts && pkg.scripts[process.argv[2]] ? 0 : 1);' \
-    "$PROJECT_ROOT/backend/package.json" "$script_name"
+  grep -Eq "\"${script_name}\"[[:space:]]*:" "$PROJECT_ROOT/backend/package.json"
 }
 
 wait_for_url() {
@@ -137,6 +136,7 @@ sync_database_schema() {
 }
 
 ensure_command docker "Install Docker Desktop and make sure the daemon is running."
+ensure_command curl "Install curl so the startup script can wait for local health checks."
 ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
 BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
 GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8080")"
