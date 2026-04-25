@@ -26,7 +26,14 @@ import { useAuthStore } from '../../../../../lib/store';
 import BackButton from '../../../../../components/BackButton';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, {
+      locale: 'en',
+      developerTools: {
+        assistant: {
+          enabled: false,
+        },
+      },
+    })
   : null;
 const addressElementOptions = {
   mode: 'billing',

@@ -14,7 +14,14 @@ import { formatSavedMethod } from '../../../../lib/payment-display';
 import { useAuthStore } from '../../../../lib/store';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, {
+      locale: 'en',
+      developerTools: {
+        assistant: {
+          enabled: false,
+        },
+      },
+    })
   : null;
 const stripeEnabled = Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
