@@ -120,20 +120,13 @@ function Wait-ForUrl {
     throw "Timed out waiting for $Url"
 }
 
-function Get-UserCount {
-    $script = "const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); prisma.user.count().then((count) => { console.log(count); }).catch((error) => { console.error(error); process.exit(1); }).finally(async () => { await prisma.`$disconnect(); });"
-    $output = & docker compose --env-file $EnvFile -p $ProjectName exec -T backend node -e $script
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Failed to inspect database state.'
-    }
-
-    $lastLine = ($output | Select-Object -Last 1).ToString().Trim()
-    return [int]$lastLine
-}
-
 function Sync-DatabaseSchema {
     Write-Step 'Synchronizing Prisma schema with the database'
     Invoke-BackendCommand -CommandArgs @('pnpm', 'exec', 'prisma', 'db', 'push', '--accept-data-loss')
+}
+
+if ($ForceSeed) {
+    Write-Host '--force-seed is now the default; seeding runs unless -SkipSeed is provided.' -ForegroundColor Yellow
 }
 
 Ensure-Command -Name 'docker' -Hint 'Install Docker Desktop and make sure the daemon is running.'
@@ -152,24 +145,11 @@ Wait-ForUrl -Url "http://localhost:$gatewayHostPort/api/v1/health"
 Sync-DatabaseSchema
 
 if (-not $SkipSeed) {
-    $shouldSeed = $ForceSeed
-
-    if (-not $shouldSeed) {
-        $userCount = Get-UserCount
-        if ($userCount -eq 0) {
-            $shouldSeed = $true
-        } else {
-            Write-Host "Seed skipped: detected $userCount existing users." -ForegroundColor Yellow
-        }
-    }
-
-    if ($shouldSeed) {
-        if (Test-BackendScript -ScriptName 'db:seed') {
-            Write-Step 'Seeding demo accounts and subjects'
-            Invoke-BackendCommand -CommandArgs @('pnpm', 'run', 'db:seed')
-        } else {
-            Write-Host 'Seed skipped: backend/package.json does not define db:seed.' -ForegroundColor Yellow
-        }
+    if (Test-BackendScript -ScriptName 'db:seed') {
+        Write-Step 'Seeding demo accounts and subjects'
+        Invoke-BackendCommand -CommandArgs @('pnpm', 'run', 'db:seed')
+    } else {
+        Write-Host 'Seed skipped: backend/package.json does not define db:seed.' -ForegroundColor Yellow
     }
 }
 
