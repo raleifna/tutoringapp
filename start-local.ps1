@@ -140,6 +140,7 @@ Ensure-Command -Name 'docker' -Hint 'Install Docker Desktop and make sure the da
 $envFilePath = Ensure-RootEnv -EnvFileName $EnvFile
 $backendHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'BACKEND_HOST_PORT' -DefaultValue '5050'
 $gatewayHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'NGINX_HOST_PORT' -DefaultValue '8080'
+$mailboxHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'MAILPIT_UI_HOST_PORT' -DefaultValue '8025'
 
 Write-Step 'Building and starting the local full-stack Docker environment'
 Invoke-Compose -ComposeArgs @('up', '--build', '-d')
@@ -188,3 +189,5 @@ Write-Host 'Frontend:' -NoNewline
 Write-Host " http://localhost:$gatewayHostPort" -ForegroundColor White
 Write-Host 'Backend:' -NoNewline
 Write-Host "  http://localhost:$gatewayHostPort/api/v1/health" -ForegroundColor White
+Write-Host 'Mailbox:' -NoNewline
+Write-Host "  http://localhost:$mailboxHostPort" -ForegroundColor White
