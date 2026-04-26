@@ -7,6 +7,7 @@ const prisma = {
   },
   tutorProfile: {
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
   },
   booking: {
     count: vi.fn(),
@@ -98,6 +99,17 @@ describe('booking and payment API integration tests', () => {
         {
           subjectId: 'subject-1',
           subject: { name: 'Mathematics' },
+        },
+      ],
+    });
+    prisma.tutorProfile.findUnique.mockResolvedValueOnce({
+      id: 'tutor-profile-1',
+      user: { timezone: 'UTC' },
+      availability: [
+        {
+          dayOfWeek: 5,
+          startTime: '09:00',
+          endTime: '12:00',
         },
       ],
     });
@@ -205,7 +217,7 @@ describe('booking and payment API integration tests', () => {
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 
-  test('returns empty payment method data when the learner has no saved card', async () => {
+  test('returns payment method unavailable data when Stripe is not configured', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(learnerUser)
       .mockResolvedValueOnce({
@@ -223,10 +235,11 @@ describe('booking and payment API integration tests', () => {
       hasPaymentMethod: false,
       paymentMethod: null,
       paymentMethods: [],
+      unavailable: true,
     });
   });
 
-  test('creates a local setup intent when Stripe is not configured', async () => {
+  test('rejects setup intent creation when Stripe is not configured', async () => {
     prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
 
     const response = await request(app)
@@ -234,14 +247,12 @@ describe('booking and payment API integration tests', () => {
       .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
       .send({});
 
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.localMode).toBe(true);
-    expect(response.body.data.customerId).toBe(`local_customer_${learnerUser.id}`);
-    expect(response.body.data.setupIntentId).toBe(`local_setup_${learnerUser.id}`);
+    expect(response.status).toBe(503);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe('Payment setup is currently unavailable');
   });
 
-  test('updates the default payment method in local mode', async () => {
+  test('rejects default payment method updates when Stripe is not configured', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(learnerUser)
       .mockResolvedValueOnce({
@@ -257,18 +268,13 @@ describe('booking and payment API integration tests', () => {
       .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
       .send({ paymentMethodId: 'pm_local_1' });
 
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(response.body.message).toBe('Default payment method updated');
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: learnerUser.id },
-      data: {
-        stripeDefaultPaymentMethodId: 'pm_local_1',
-      },
-    });
+    expect(response.status).toBe(503);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toBe('Payment setup is currently unavailable');
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
-  test('rejects updating the default payment method when the learner has no customer record', async () => {
+  test('returns Stripe unavailable before checking for a customer record', async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(learnerUser)
       .mockResolvedValueOnce({
@@ -280,9 +286,9 @@ describe('booking and payment API integration tests', () => {
       .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
       .send({ paymentMethodId: 'pm_local_1' });
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(response.body.success).toBe(false);
-    expect(response.body.message).toBe('Stripe customer not found');
+    expect(response.body.message).toBe('Payment setup is currently unavailable');
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });
