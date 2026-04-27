@@ -3,6 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.15.0",
   "scripts": {
-    "build": "pnpm --filter tutorconnect-frontend build"
+    "build": "corepack pnpm --filter tutorconnect-frontend build",
+    "test": "corepack pnpm --filter tutorconnect-backend test && corepack pnpm --filter tutorconnect-frontend test",
+    "test:coverage": "corepack pnpm --filter tutorconnect-backend test:coverage && corepack pnpm --filter tutorconnect-frontend test:coverage"
   }
 }

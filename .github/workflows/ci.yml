@@ -36,7 +36,7 @@ jobs:
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''
 
   backend:
-    name: Backend Install & Generate
+    name: Backend Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,3 +55,6 @@ jobs:
 
       - name: Prisma generate
         run: pnpm --filter tutorconnect-backend exec prisma generate
+
+      - name: Run tests
+        run: pnpm --filter tutorconnect-backend test
