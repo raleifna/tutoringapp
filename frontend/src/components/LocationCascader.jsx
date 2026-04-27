@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SEARCH_LOCATION_OPTIONS } from '../lib/search-filters';
 
+const defaultSerializeValue = (path) => path[path.length - 1]?.label || '';
+
 function buildPathMatchers(path, serializeValue) {
   const labels = path.map((item) => item.label);
   const leaf = labels[labels.length - 1] || '';
@@ -37,7 +39,7 @@ export default function LocationCascader({
   onChange,
   options = SEARCH_LOCATION_OPTIONS,
   placeholder = 'e.g. Sydney',
-  serializeValue = (path) => path[path.length - 1]?.label || '',
+  serializeValue = defaultSerializeValue,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPath, setSelectedPath] = useState([]);

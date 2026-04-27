@@ -4,6 +4,9 @@ pnpm-debug.log*
 
 frontend/.next/
 frontend/out/
+coverage/
+backend/coverage/
+frontend/coverage/
 .runtime/
 
 .env

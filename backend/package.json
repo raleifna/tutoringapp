@@ -11,6 +11,7 @@
     "start": "pnpm run db:push && node server.js",
     "dev": "pnpm run db:push && node --watch server.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
     "prisma": "^6.6.0",
     "supertest": "^7.1.4",
     "vitest": "^3.2.4"
