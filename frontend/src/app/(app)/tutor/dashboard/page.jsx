@@ -18,7 +18,6 @@ import { bookingApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { appendTimezoneName, formatCurrency, formatDuration, formatShortDateTime as formatDate, getUserTimezone } from '../../../../lib/formatters';
 import {
-  getRecurringDisplayBookings,
   getRecurringLabel,
   isRecurringBooking,
 } from '../../../../lib/recurring-bookings';
@@ -60,13 +59,7 @@ export default function TutorDashboardPage() {
     enabled: mounted && !!currentUserId,
   });
 
-  const { data: upcomingData, isLoading: upcomingLoading } = useQuery({
-    queryKey: ['tutor-bookings', currentUserId, 'ACCEPTED'],
-    queryFn: () => bookingApi.getTutorBookings({ status: 'ACCEPTED', limit: 5 }),
-    enabled: mounted && !!currentUserId,
-  });
-
-  const { data: allBookingsData } = useQuery({
+  const { data: allBookingsData, isLoading: allBookingsLoading } = useQuery({
     queryKey: ['tutor-bookings-all', currentUserId],
     queryFn: () => bookingApi.getTutorBookings({ limit: 100 }),
     enabled: mounted && !!currentUserId,
@@ -80,10 +73,21 @@ export default function TutorDashboardPage() {
   });
 
   const pendingRequestBookings = requestsData?.data?.data?.bookings || [];
-  const requests = getRecurringDisplayBookings(pendingRequestBookings);
+  const requests = pendingRequestBookings.filter(
+    (booking, index, bookings) =>
+      !booking?.recurringGroupId ||
+      bookings.findIndex((entry) => entry?.recurringGroupId === booking.recurringGroupId) === index
+  );
   const pendingRequestPreview = requests.slice(0, 5);
-  const upcomingBookings = upcomingData?.data?.data?.bookings || [];
   const allBookings = allBookingsData?.data?.data?.bookings || [];
+  const now = new Date();
+  const upcomingSessions = [...allBookings]
+    .filter((booking) => {
+      const scheduledAt = new Date(booking?.scheduledAt || 0);
+      return booking?.status === 'ACCEPTED' && scheduledAt >= now;
+    })
+    .sort((left, right) => new Date(left.scheduledAt) - new Date(right.scheduledAt));
+  const upcomingPreview = upcomingSessions.slice(0, 5);
   const myProfile = myProfileData?.data?.data || null;
   const tutorProfileId = myProfile?.id || user?.tutorProfileId || user?.tutorProfile?.id || null;
   const tutorProfileStatus = myProfile?.status || user?.tutorProfile?.status || null;
@@ -110,7 +114,7 @@ export default function TutorDashboardPage() {
     },
     {
       label: 'Upcoming Sessions',
-      value: upcomingData?.data?.data?.pagination?.total || 0,
+      value: upcomingSessions.length,
       icon: CalendarDaysIcon,
       color: 'text-blue-600 bg-blue-50',
       href: '/tutor/requests?status=ACCEPTED',
@@ -279,17 +283,17 @@ export default function TutorDashboardPage() {
             View all <ArrowRightIcon className="w-3.5 h-3.5" />
           </Link>
         </div>
-        {upcomingLoading ? (
+        {allBookingsLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
             ))}
           </div>
-        ) : upcomingBookings.length === 0 ? (
+        ) : upcomingPreview.length === 0 ? (
           <p className="text-sm font-semibold text-gray-900">No upcoming sessions</p>
         ) : (
           <div className="space-y-2">
-            {upcomingBookings.map((booking) => {
+            {upcomingPreview.map((booking) => {
               const learner = booking.learner;
               return (
                 <Link

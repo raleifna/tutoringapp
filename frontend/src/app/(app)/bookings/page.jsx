@@ -15,11 +15,13 @@ import {
   getBookingDisplayStatus,
   getLatestRescheduleEntry,
   getLatestRescheduleReason,
+  getNextUpcomingSession,
   getRecurringDisplayBookings,
   getRecurringDisplayStatus,
   getRecurringLabel,
   getRecurringSeriesBookings,
   getRecurringStatusSummary,
+  getUpcomingSessionCount,
   getSeriesTotalAmount,
   isRecurringBooking,
   matchesBookingDisplayStatus,
@@ -97,7 +99,17 @@ function BookingsPageContent() {
   });
   const displayBookings = getRecurringDisplayBookings(sortedBookings).filter((booking) =>
     matchesBookingDisplayStatus(booking, activeStatus)
-  );
+  ).sort((left, right) => {
+    if (activeStatus === 'ACCEPTED') {
+      const leftNextSession = getNextUpcomingSession(left);
+      const rightNextSession = getNextUpcomingSession(right);
+      const leftTime = new Date(leftNextSession?.scheduledAt || left?.scheduledAt || 0).getTime();
+      const rightTime = new Date(rightNextSession?.scheduledAt || right?.scheduledAt || 0).getTime();
+      return leftTime - rightTime;
+    }
+
+    return 0;
+  });
   const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
   const currentPage = Math.min(page, totalPages);
   const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
@@ -269,6 +281,12 @@ function BookingCard({ booking, isTutor, returnTo, timezone }) {
   })();
   const latestRescheduleEntry = getLatestRescheduleEntry(booking);
   const latestRescheduleReason = getLatestRescheduleReason(booking);
+  const nextUpcomingSession = getNextUpcomingSession(booking);
+  const upcomingSessionCount = getUpcomingSessionCount(booking);
+  const primaryScheduledAt =
+    returnTo?.includes('status=ACCEPTED') && nextUpcomingSession
+      ? nextUpcomingSession.scheduledAt
+      : booking?.scheduledAt;
 
   return (
     <div
@@ -328,7 +346,7 @@ function BookingCard({ booking, isTutor, returnTo, timezone }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-3 py-2 text-xs text-gray-500 transition-colors hover:bg-gray-50">
         <div className="flex items-center gap-1">
           <CalendarDaysIcon className="w-3.5 h-3.5" />
-          {formatDate(booking?.scheduledAt, timezone)}
+          {formatDate(primaryScheduledAt, timezone)}
         </div>
         <div className="flex items-center gap-1">
           <ClockIcon className="w-3.5 h-3.5" />
@@ -349,6 +367,17 @@ function BookingCard({ booking, isTutor, returnTo, timezone }) {
             This booking was rescheduled to {formatDate(booking?.scheduledAt)}.
             {latestRescheduleReason ? ` Reason: ${latestRescheduleReason}` : ''}
           </p>
+        </div>
+      )}
+
+      {isRecurringBooking(booking) && upcomingSessionCount > 0 && (
+        <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <p className="font-medium">
+            {upcomingSessionCount} upcoming session{upcomingSessionCount > 1 ? 's' : ''}
+          </p>
+          {nextUpcomingSession && (
+            <p className="mt-0.5">Next session: {formatDate(nextUpcomingSession.scheduledAt)}</p>
+          )}
         </div>
       )}
     </div>

@@ -14,6 +14,7 @@ export const getRecurringSeriesBookings = (booking) =>
   );
 
 const normalizeStatus = (status) => String(status || 'PENDING').toUpperCase();
+const isFutureBooking = (booking) => new Date(booking?.scheduledAt || 0) > new Date();
 
 export const isAwaitingPayment = (booking) => {
   const bookingStatus = normalizeStatus(booking?.status);
@@ -133,6 +134,18 @@ export const getRecurringLabel = (booking) => {
   return count > 1 ? `${type} · ${count} sessions` : type;
 };
 
+export const getUpcomingAcceptedSessions = (booking) => {
+  const bookings = isRecurringBooking(booking) ? getRecurringSeriesBookings(booking) : booking ? [booking] : [];
+
+  return bookings
+    .filter((entry) => normalizeStatus(entry?.status) === 'ACCEPTED' && isFutureBooking(entry))
+    .sort((left, right) => new Date(left.scheduledAt) - new Date(right.scheduledAt));
+};
+
+export const getUpcomingSessionCount = (booking) => getUpcomingAcceptedSessions(booking).length;
+
+export const getNextUpcomingSession = (booking) => getUpcomingAcceptedSessions(booking)[0] || null;
+
 export const matchesBookingDisplayStatus = (booking, status) => {
   if (!status) return true;
   const targetStatus = normalizeStatus(status);
@@ -140,6 +153,10 @@ export const matchesBookingDisplayStatus = (booking, status) => {
 
   if (targetStatus === 'CANCELLED') {
     return displayStatus === 'CANCELLED' || displayStatus === 'DECLINED';
+  }
+
+  if (targetStatus === 'ACCEPTED') {
+    return getUpcomingSessionCount(booking) > 0;
   }
 
   return displayStatus === targetStatus;
