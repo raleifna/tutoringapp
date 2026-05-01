@@ -98,6 +98,7 @@ export default function BookingDetailPage() {
   const timeZone = getUserTimezone(user);
   const currentUserId = user?.id || '';
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleTargetBooking, setRescheduleTargetBooking] = useState(null);
   const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
   const [selectedRescheduleSlot, setSelectedRescheduleSlot] = useState(null);
 
@@ -183,6 +184,7 @@ export default function BookingDetailPage() {
           : false
     );
   const latestRescheduleReason = getLatestStatusReason(booking, 'RESCHEDULED');
+  const activeRescheduleBooking = rescheduleTargetBooking || booking;
   const rescheduleAvailabilityState = rescheduleAvailabilityQuery.data?.data?.data || {};
   const rescheduleAvailability = rescheduleAvailabilityState?.availability || [];
   const rescheduleCurrentWeekAvailability =
@@ -191,7 +193,7 @@ export default function BookingDetailPage() {
     rescheduleAvailabilityState?.hasCurrentWeekAvailabilityOverride
   );
   const rescheduleBookedSlots = (rescheduleAvailabilityState?.bookedSlots || []).filter(
-    (slot) => slot?.id !== booking?.id
+    (slot) => slot?.id !== activeRescheduleBooking?.id
   );
 
   const promptForReason = ({ title, required = false, defaultValue = '' }) => {
@@ -304,7 +306,7 @@ export default function BookingDetailPage() {
   });
 
   const completeMutation = useMutation({
-    mutationFn: () => bookingApi.complete(id),
+    mutationFn: (targetId) => bookingApi.complete(targetId),
     onSuccess: async () => {
       toast.success('Session marked as complete');
       await invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId });
@@ -365,6 +367,7 @@ export default function BookingDetailPage() {
 
   useEffect(() => {
     if (!showRescheduleModal) {
+      setRescheduleTargetBooking(null);
       setSelectedRescheduleSlot(null);
       resetRescheduleForm({ newDate: '', reason: '' });
     }
@@ -623,6 +626,8 @@ export default function BookingDetailPage() {
                   {recurringBookings.map((seriesBooking) => {
                     const isCurrent = seriesBooking.id === booking.id;
                     const isPendingSeriesBooking = seriesBooking.status === 'PENDING';
+                    const canRescheduleSeriesBooking = isTutor && seriesBooking.status === 'ACCEPTED';
+                    const canCompleteSeriesBooking = isTutor && seriesBooking.status === 'ACCEPTED';
                     const canCancelSeriesBooking = isLearner
                       ? getCancellationState(seriesBooking, { isLearner, isTutor }).canCancel
                       : isTutor
@@ -631,6 +636,9 @@ export default function BookingDetailPage() {
                     const isCancellingThis =
                       cancelMutation.isPending &&
                       cancelMutation.variables?.targetId === seriesBooking.id;
+                    const isCompletingThis =
+                      completeMutation.isPending &&
+                      completeMutation.variables === seriesBooking.id;
                     return (
                       <div
                         key={seriesBooking.id}
@@ -672,14 +680,11 @@ export default function BookingDetailPage() {
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                               <span>{formatDuration(seriesBooking.duration)}</span>
-                              <span>
-                                {paymentSetupSeriesBookings.some((item) => item.id === seriesBooking.id)
-                                  ? 'Included in series total'
-                                  : 'Already paid'}
-                              </span>
-                              <span>
-                                Payment: {seriesBooking.payment?.status || 'PENDING'}
-                              </span>
+                              {paymentSetupSeriesBookings.some((item) => item.id === seriesBooking.id) ? (
+                                <span>Included in series total</span>
+                              ) : (
+                                <span>Payment: {seriesBooking.payment?.status || 'PENDING'}</span>
+                              )}
                             </div>
                             {seriesBooking.declineReason && (
                               <p className="mt-2 text-xs text-red-600">
@@ -700,6 +705,31 @@ export default function BookingDetailPage() {
                           </div>
 
                           <div className="flex shrink-0 flex-wrap gap-2">
+                            {canCompleteSeriesBooking && (
+                              <button
+                                type="button"
+                                onClick={() => completeMutation.mutate(seriesBooking.id)}
+                                disabled={isCompletingThis || bulkSeriesDecisionMutation.isPending}
+                                className="btn-primary btn-sm gap-1.5"
+                              >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                {isCompletingThis ? 'Saving...' : 'Mark Complete'}
+                              </button>
+                            )}
+                            {canRescheduleSeriesBooking && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRescheduleTargetBooking(seriesBooking);
+                                  setShowRescheduleModal(true);
+                                }}
+                                disabled={bulkSeriesDecisionMutation.isPending}
+                                className="btn-secondary btn-sm gap-1.5"
+                              >
+                                <CalendarDaysIcon className="w-4 h-4" />
+                                Reschedule
+                              </button>
+                            )}
                             {(isLearner || isTutor) && canCancelSeriesBooking && (
                               <button
                                 type="button"
@@ -911,11 +941,14 @@ export default function BookingDetailPage() {
           </>
         )}
 
-        {isTutor && booking.status === 'ACCEPTED' && (
+        {isTutor && !recurring && booking.status === 'ACCEPTED' && (
           <>
             <button
               type="button"
-              onClick={() => setShowRescheduleModal(true)}
+              onClick={() => {
+                setRescheduleTargetBooking(booking);
+                setShowRescheduleModal(true);
+              }}
               className="btn-secondary gap-2"
             >
               <CalendarDaysIcon className="w-4 h-4" />
@@ -923,7 +956,7 @@ export default function BookingDetailPage() {
             </button>
             <button
               type="button"
-              onClick={() => completeMutation.mutate()}
+              onClick={() => completeMutation.mutate(id)}
               disabled={completeMutation.isPending}
               className="btn-primary gap-2"
             >
@@ -981,7 +1014,7 @@ export default function BookingDetailPage() {
               <form
                 onSubmit={handleRescheduleSubmit((formData) => {
                   bookingApi
-                    .reschedule(id, {
+                    .reschedule(activeRescheduleBooking.id, {
                       scheduledAt: new Date(formData.newDate).toISOString(),
                       reason: formData.reason,
                     })
@@ -998,6 +1031,11 @@ export default function BookingDetailPage() {
               >
                 <div className="overflow-y-auto p-6">
                   <h2 className="mb-5 text-lg font-bold text-gray-900">Propose Reschedule</h2>
+                  {activeRescheduleBooking?.scheduledAt && (
+                    <p className="mb-4 text-sm text-gray-500">
+                      Current session: {formatDate(activeRescheduleBooking.scheduledAt)}
+                    </p>
+                  )}
                   <div className="space-y-4">
                     <div>
                       <label className="label">New Date & Time</label>

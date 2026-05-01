@@ -20,10 +20,12 @@ import {
   getDisplayStatusLabel,
   getLatestRescheduleEntry,
   getLatestRescheduleReason,
+  getNextUpcomingSession,
   getRecurringDisplayBookings,
   getRecurringDisplayStatus,
   getRecurringLabel,
   getRecurringStatusSummary,
+  getUpcomingSessionCount,
   isRecurringBooking,
   matchesBookingDisplayStatus,
 } from '../../../../lib/recurring-bookings';
@@ -43,6 +45,14 @@ const STATUS_VALUES = new Set(STATUS_TABS.map((item) => item.value));
 const getInitialStatus = (value) => {
   const next = String(value || '').toUpperCase();
   return STATUS_VALUES.has(next) ? next : 'PENDING';
+};
+
+const getRequestDisplaySortTime = (booking) => {
+  const displayStatus = isRecurringBooking(booking) ? getRecurringDisplayStatus(booking) : booking?.status;
+  const nextUpcomingSession =
+    displayStatus === 'ACCEPTED' ? getNextUpcomingSession(booking) : null;
+
+  return new Date(nextUpcomingSession?.scheduledAt || booking?.scheduledAt || 0).getTime();
 };
 
 export default function TutorRequestsPage() {
@@ -87,7 +97,12 @@ function TutorRequestsContent() {
   const bookings = data?.data?.data?.bookings || [];
   const displayBookings = getRecurringDisplayBookings(bookings).filter((booking) =>
     matchesBookingDisplayStatus(booking, activeStatus)
-  );
+  ).sort((left, right) => {
+    const timeDiff = getRequestDisplaySortTime(left) - getRequestDisplaySortTime(right);
+    if (timeDiff !== 0) return timeDiff;
+
+    return new Date(left?.createdAt || 0).getTime() - new Date(right?.createdAt || 0).getTime();
+  });
   const totalPages = Math.max(1, Math.ceil(displayBookings.length / 10));
   const currentPage = Math.min(page, totalPages);
   const paginatedBookings = displayBookings.slice((currentPage - 1) * 10, currentPage * 10);
@@ -213,6 +228,12 @@ function TutorRequestsContent() {
             const recurringStatus = getRecurringStatusSummary(booking);
             const latestRescheduleEntry = getLatestRescheduleEntry(booking);
             const latestRescheduleReason = getLatestRescheduleReason(booking);
+            const nextUpcomingSession = getNextUpcomingSession(booking);
+            const upcomingSessionCount = getUpcomingSessionCount(booking);
+            const primaryScheduledAt =
+              displayStatus === 'ACCEPTED' && nextUpcomingSession
+                ? nextUpcomingSession.scheduledAt
+                : booking.scheduledAt;
             return (
               <div
                 key={booking.id}
@@ -260,7 +281,7 @@ function TutorRequestsContent() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
                       <div className="flex items-center gap-1">
                         <CalendarDaysIcon className="w-3.5 h-3.5" />
-                        {formatDate(booking.scheduledAt, timeZone)}
+                        {formatDate(primaryScheduledAt, timeZone)}
                       </div>
                       <div className="flex items-center gap-1">
                         <ClockIcon className="w-3.5 h-3.5" />
@@ -281,6 +302,12 @@ function TutorRequestsContent() {
                       <p className="mt-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-xs text-sky-700">
                         Rescheduled to {formatDate(booking.scheduledAt)}
                         {latestRescheduleReason ? ` · ${latestRescheduleReason}` : ''}
+                      </p>
+                    )}
+                    {recurring && upcomingSessionCount > 0 && (
+                      <p className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-xs text-emerald-700">
+                        {upcomingSessionCount} upcoming session{upcomingSessionCount > 1 ? 's' : ''}
+                        {nextUpcomingSession ? ` · Next: ${formatDate(nextUpcomingSession.scheduledAt)}` : ''}
                       </p>
                     )}
                     {booking.notes && (
