@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const adminController = require('../controllers/adminController');
+const reviewController = require('../controllers/reviewController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const { validate } = require('../middleware/validate');
@@ -38,6 +39,8 @@ router.patch(
 );
 
 router.get('/bookings', adminController.getBookings);
+router.get('/reviews', reviewController.getAdminReviews);
+router.delete('/reviews/:id', reviewController.deleteReview);
 router.get('/actions', adminController.getAdminActions);
 router.post(
   '/subjects',

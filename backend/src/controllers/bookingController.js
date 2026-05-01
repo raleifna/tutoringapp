@@ -13,6 +13,16 @@ const bookingInclude = {
       user: { select: { id: true, firstName: true, lastName: true, avatar: true, email: true } },
     },
   },
+  review: {
+    select: {
+      id: true,
+      learnerId: true,
+      rating: true,
+      comment: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   payment: true,
   statusHistory: { orderBy: { createdAt: 'desc' } },
 };

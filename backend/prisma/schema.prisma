@@ -125,6 +125,7 @@ model User {
   receivedMessages Message[]       @relation("ReceivedMessages")
   conversations   ConversationParticipant[]
   bookingsAsLearner Booking[]      @relation("LearnerBookings")
+  writtenReviews   Review[]        @relation("LearnerReviews")
   subscription    Subscription?
   payments        Payment[]
   refreshTokens   RefreshToken[]
@@ -196,6 +197,7 @@ model TutorProfile {
   availability TutorAvailability[]
   availabilityOverrides TutorAvailabilityOverrideWeek[]
   bookings     Booking[]         @relation("TutorBookings")
+  reviews      Review[]
 
   @@index([status])
   @@index([rating])
@@ -306,12 +308,33 @@ model Booking {
   payment       Payment?
   statusHistory BookingStatusHistory[]
   creditTransactions CreditTransaction[]
+  review        Review?
 
   @@index([learnerId])
   @@index([tutorId])
   @@index([status])
   @@index([scheduledAt])
   @@map("bookings")
+}
+
+model Review {
+  id             String      @id @default(uuid())
+  bookingId      String      @unique
+  learnerId      String
+  tutorProfileId String
+  rating         Int
+  comment        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  booking      Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  learner      User         @relation("LearnerReviews", fields: [learnerId], references: [id], onDelete: Cascade)
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([learnerId])
+  @@index([tutorProfileId])
+  @@index([createdAt])
+  @@map("reviews")
 }
 
 model BookingStatusHistory {
@@ -501,4 +524,3 @@ model Notification {
   @@index([userId])
   @@map("notifications")
 }
-

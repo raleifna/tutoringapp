@@ -192,6 +192,7 @@ const tutorProfileSelect = {
   sessionTypes: true,
   location: true,
   rating: true,
+  totalReviews: true,
   totalSessions: true,
   isVerified: true,
   responseTime: true,

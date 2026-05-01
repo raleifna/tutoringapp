@@ -14,10 +14,11 @@ import {
   ClockIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
+  StarIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi, paymentApi, tutorApi } from '../../../../lib/api-entry';
+import { bookingApi, paymentApi, reviewApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { formatBookingStatus, getBookingStatusClass as getStatusClass } from '../../../../lib/booking-status';
 import { formatCurrency, formatDateTimeWithYear as formatDate, formatDuration, getUserTimezone } from '../../../../lib/formatters';
@@ -35,6 +36,7 @@ import {
 import { useAuthStore } from '../../../../lib/store';
 import BackButton from '../../../../components/BackButton';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
+import { StarRatingDisplay, StarRatingInput } from '../../../../components/StarRating';
 
 const rescheduleSchema = z.object({
   newDate: z.string().min(1, 'Please select a new date'),
@@ -101,6 +103,8 @@ export default function BookingDetailPage() {
   const [rescheduleTargetBooking, setRescheduleTargetBooking] = useState(null);
   const [selectedSeriesBookingIds, setSelectedSeriesBookingIds] = useState([]);
   const [selectedRescheduleSlot, setSelectedRescheduleSlot] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
 
   const from = (searchParams.get('from') || '').toLowerCase();
   const returnTo = searchParams.get('returnTo') || '';
@@ -184,6 +188,9 @@ export default function BookingDetailPage() {
           : false
     );
   const latestRescheduleReason = getLatestStatusReason(booking, 'RESCHEDULED');
+  const review = booking?.review || null;
+  const canLeaveReview = isLearner && booking?.status === 'COMPLETED' && !review;
+  const canDeleteReview = isLearner && review?.learnerId === currentUserId;
   const activeRescheduleBooking = rescheduleTargetBooking || booking;
   const rescheduleAvailabilityState = rescheduleAvailabilityQuery.data?.data?.data || {};
   const rescheduleAvailability = rescheduleAvailabilityState?.availability || [];
@@ -313,6 +320,40 @@ export default function BookingDetailPage() {
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || 'Failed to complete');
+    },
+  });
+
+  const createReviewMutation = useMutation({
+    mutationFn: (payload) => reviewApi.create(payload),
+    onSuccess: async () => {
+      toast.success('Review submitted');
+      setReviewRating(5);
+      setReviewComment('');
+      await Promise.all([
+        invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId }),
+        queryClient.invalidateQueries({ queryKey: ['tutor', bookingTutorId] }),
+        queryClient.invalidateQueries({ queryKey: ['tutor-reviews', bookingTutorId] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-reviews'] }),
+      ]);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to submit review');
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId) => reviewApi.delete(reviewId),
+    onSuccess: async () => {
+      toast.success('Review deleted');
+      await Promise.all([
+        invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId }),
+        queryClient.invalidateQueries({ queryKey: ['tutor', bookingTutorId] }),
+        queryClient.invalidateQueries({ queryKey: ['tutor-reviews', bookingTutorId] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-reviews'] }),
+      ]);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to delete review');
     },
   });
 
@@ -1002,6 +1043,101 @@ export default function BookingDetailPage() {
             <div>
               <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Reschedule Note</p>
               <p className="text-sm text-gray-700">{latestRescheduleReason}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(review || canLeaveReview) && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Tutor Review</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {review ? 'Learner feedback' : 'Rate this tutor'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Reviews are only available after the lesson is completed.
+              </p>
+            </div>
+            <div className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+              Completed booking
+            </div>
+          </div>
+
+          {review ? (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <StarRatingDisplay rating={review.rating} size="h-5 w-5" />
+                  <span className="text-sm font-semibold text-gray-900">
+                    {review.rating} / 5
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {formatDate(review.createdAt, timeZone)}
+                </span>
+              </div>
+              {review.comment ? (
+                <p className="text-sm leading-6 text-gray-700">{review.comment}</p>
+              ) : (
+                <p className="text-sm text-gray-500">No written comment.</p>
+              )}
+              {canDeleteReview && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm('Delete your review?')) return;
+                      deleteReviewMutation.mutate(review.id);
+                    }}
+                    disabled={deleteReviewMutation.isPending}
+                    className="btn-secondary btn-sm"
+                  >
+                    {deleteReviewMutation.isPending ? 'Deleting...' : 'Delete review'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-4">
+              <div>
+                <label className="label">Rating</label>
+                <StarRatingInput
+                  value={reviewRating}
+                  onChange={setReviewRating}
+                  disabled={createReviewMutation.isPending}
+                />
+              </div>
+              <div>
+                <label className="label">Comment</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.target.value)}
+                  rows={4}
+                  className="input resize-none"
+                  placeholder="Share your learning experience with this tutor..."
+                  maxLength={1000}
+                />
+                <p className="mt-1 text-xs text-gray-400">{reviewComment.length}/1000</p>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    createReviewMutation.mutate({
+                      bookingId: booking.id,
+                      rating: reviewRating,
+                      comment: reviewComment,
+                    })
+                  }
+                  disabled={createReviewMutation.isPending}
+                  className="btn-primary gap-2"
+                >
+                  <StarIcon className="w-4 h-4" />
+                  {createReviewMutation.isPending ? 'Submitting...' : 'Submit review'}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -20,13 +20,14 @@ import {
   MapPinIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { bookingApi, messageApi, tutorApi } from '../../../../lib/api-entry';
+import { bookingApi, messageApi, reviewApi, tutorApi } from '../../../../lib/api-entry';
 import { getAvatarUrl } from '../../../../lib/avatar';
 import { BOOKING_DURATIONS } from '../../../../lib/tutor-options';
 import { useAuthStore } from '../../../../lib/store';
 import { getUserTimezone } from '../../../../lib/formatters';
 import AvailabilityCalendar from '../../../../components/AvailabilityCalendar';
 import BackButton from '../../../../components/BackButton';
+import { StarRatingDisplay } from '../../../../components/StarRating';
 
 const bookingSchema = z.object({
   subjectId: z.string().min(1, 'Please select a subject'),
@@ -208,9 +209,15 @@ export default function TutorDetailPage() {
   });
 
   const tutor = tutorData?.data?.data;
+  const tutorReviewsQuery = useQuery({
+    queryKey: ['tutor-reviews', id],
+    queryFn: () => reviewApi.getTutorReviews(id, { limit: 10 }),
+    enabled: !!id && activeTab === 'reviews',
+  });
   const experienceItems = getExperienceItems(tutor);
   const certificationItems = getCertificationItems(tutor);
   const verifiedQualificationItems = getVerifiedQualificationItems(tutor);
+  const tutorReviews = tutorReviewsQuery.data?.data?.data?.reviews || [];
   const availabilityState = availabilityData?.data?.data || {};
   const availability = availabilityState?.availability || [];
   const currentWeekAvailability = availabilityState?.currentWeekEffectiveAvailability || availability;
@@ -473,6 +480,7 @@ export default function TutorDetailPage() {
                     <StarIcon className="w-4 h-4 text-yellow-500" />
                     <span className="text-gray-800 font-medium">{formatRating(tutor.rating)}</span>
                   </span>
+                  <span>{tutor.totalReviews || 0} reviews</span>
                   <span>{tutor.totalSessions || 0} sessions</span>
                   {tutor.location && (
                     <span className="inline-flex items-center gap-1">
@@ -556,6 +564,17 @@ export default function TutorDetailPage() {
           }`}
         >
           Availability
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('reviews')}
+          className={`px-4 py-2.5 -mb-px text-sm font-medium border-b-2 ${
+            activeTab === 'reviews'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Reviews
         </button>
       </div>
 
@@ -718,6 +737,79 @@ export default function TutorDetailPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'reviews' && (
+        <div className="space-y-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Reviews</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Ratings from learners who completed a lesson with this tutor.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <StarRatingDisplay rating={Math.round(Number(tutor.rating || 0))} size="h-5 w-5" />
+                  <div>
+                    <p className="text-lg font-bold text-gray-900">{formatRating(tutor.rating)}</p>
+                    <p className="text-xs text-gray-500">{tutor.totalReviews || 0} reviews</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {tutorReviewsQuery.isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : tutorReviews.length === 0 ? (
+            <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center">
+              <p className="text-sm text-gray-500">No reviews yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tutorReviews.map((review) => (
+                <div key={review.id} className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={getAvatarUrl(review.learner?.avatar, review.learner?.firstName, review.learner?.lastName, {
+                          fallbackName: 'Learner',
+                        })}
+                        alt={review.learner?.firstName || 'Learner'}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {review.learner?.firstName} {review.learner?.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(review.createdAt).toLocaleDateString('en-AU', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StarRatingDisplay rating={review.rating} />
+                      <span className="text-sm font-semibold text-gray-900">{review.rating}/5</span>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-gray-700">
+                    {review.comment || 'Learner left a rating without a written comment.'}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
         </div>

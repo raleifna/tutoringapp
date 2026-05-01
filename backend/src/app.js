@@ -15,6 +15,7 @@ const paymentRoutes = require('./routes/payments');
 const messageRoutes = require('./routes/messages');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
+const reviewRoutes = require('./routes/reviews');
 const paymentController = require('./controllers/paymentController');
 
 const app = express();
@@ -63,6 +64,7 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

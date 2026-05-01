@@ -5,6 +5,7 @@ export { authApi } from './api-services/auth';
 export { bookingApi } from './api-services/booking';
 export { messageApi } from './api-services/message';
 export { notificationApi } from './api-services/notification';
+export { reviewApi } from './api-services/review';
 export { subjectApi } from './api-services/subject';
 export { tutorApi } from './api-services/tutor';
 export { userApi } from './api-services/user';

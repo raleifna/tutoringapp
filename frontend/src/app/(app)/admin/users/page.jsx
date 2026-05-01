@@ -215,19 +215,23 @@ function AdminUsersContent() {
                 users.map((user) => (
                   <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUserId(user.id)}
+                        className="group flex items-center gap-3 rounded-xl text-left transition-colors hover:bg-gray-50"
+                      >
                         <img
                           src={getAvatarUrl(user.avatar, user.firstName, user.lastName, { fallbackName: 'User' })}
-                          alt=""
-                          className="w-9 h-9 rounded-full object-cover"
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-9 h-9 rounded-full object-cover transition-transform group-hover:scale-[1.03]"
                         />
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-gray-900 group-hover:text-primary-700">
                             {user.firstName} {user.lastName}
                           </p>
                           <p className="text-xs text-gray-400">{user.email}</p>
                         </div>
-                      </div>
+                      </button>
                     </td>
 
                     <td className="px-4 py-3">

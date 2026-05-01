@@ -12,6 +12,7 @@ import {
   PencilSquareIcon,
   PlusIcon,
   RectangleStackIcon,
+  StarIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi, subjectApi } from '../../../../lib/api-entry';
@@ -20,9 +21,11 @@ import { getRecurringLabel, isRecurringBooking } from '../../../../lib/recurring
 import { useAuthStore } from '../../../../lib/store';
 import { cn } from '../../../../lib/utils';
 import BackButton from '../../../../components/BackButton';
+import { StarRatingDisplay } from '../../../../components/StarRating';
 
 const OPERATION_TABS = [
   { key: 'bookings', label: 'Bookings', icon: ClipboardDocumentListIcon },
+  { key: 'reviews', label: 'Reviews', icon: StarIcon },
   { key: 'subjects', label: 'Subjects', icon: BookOpenIcon },
   { key: 'actions', label: 'Audit Log', icon: RectangleStackIcon },
 ];
@@ -98,6 +101,9 @@ function AdminOperationsContent() {
   const [expandedBookingId, setExpandedBookingId] = useState(null);
   const [bookingStatus, setBookingStatus] = useState('');
   const [bookingsPage, setBookingsPage] = useState(1);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [reviewRating, setReviewRating] = useState('');
   const [actionsPage, setActionsPage] = useState(1);
   const [subjectForm, setSubjectForm] = useState(EMPTY_SUBJECT_FORM);
   const [editingSubjectId, setEditingSubjectId] = useState(null);
@@ -125,6 +131,17 @@ function AdminOperationsContent() {
     queryFn: () => subjectApi.getAll(),
   });
 
+  const { data: reviewsData, isLoading: reviewsLoading } = useQuery({
+    queryKey: ['admin-reviews', reviewPage, reviewSearch, reviewRating],
+    queryFn: () =>
+      adminApi.getReviews({
+        page: reviewPage,
+        limit: 10,
+        search: reviewSearch || undefined,
+        rating: reviewRating || undefined,
+      }),
+  });
+
   const { data: actionsData, isLoading: actionsLoading } = useQuery({
     queryKey: ['admin-actions', actionsPage],
     queryFn: () => adminApi.getActions({ page: actionsPage, limit: 12 }),
@@ -132,6 +149,8 @@ function AdminOperationsContent() {
 
   const bookings = bookingsData?.data?.data?.bookings || [];
   const bookingsPagination = bookingsData?.data?.data?.pagination;
+  const reviews = reviewsData?.data?.data?.reviews || [];
+  const reviewsPagination = reviewsData?.data?.data?.pagination;
   const subjects = subjectsData?.data?.data?.subjects || [];
   const actions = actionsData?.data?.data?.actions || [];
   const actionsPagination = actionsData?.data?.data?.pagination;
@@ -173,6 +192,20 @@ function AdminOperationsContent() {
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || 'Failed to delete subject');
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId) => adminApi.deleteReview(reviewId),
+    onSuccess: () => {
+      toast.success('Review deleted');
+      queryClient.invalidateQueries({ queryKey: ['admin-reviews'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor'] });
+      queryClient.invalidateQueries({ queryKey: ['tutor-reviews'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-actions'] });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete review');
     },
   });
 
@@ -544,6 +577,128 @@ function AdminOperationsContent() {
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'reviews' && (
+        <section className="card p-5 space-y-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Review moderation</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Learners can delete their own reviews. Admins can delete any review.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:w-[520px]">
+              <input
+                value={reviewSearch}
+                onChange={(event) => {
+                  setReviewSearch(event.target.value);
+                  setReviewPage(1);
+                }}
+                className="input"
+                placeholder="Search tutor, learner, subject or comment"
+              />
+              <select
+                value={reviewRating}
+                onChange={(event) => {
+                  setReviewRating(event.target.value);
+                  setReviewPage(1);
+                }}
+                className="input"
+              >
+                <option value="">All ratings</option>
+                {[5, 4, 3, 2, 1].map((value) => (
+                  <option key={value} value={value}>
+                    {value} star{value === 1 ? '' : 's'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {reviewsLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="rounded-2xl bg-gray-100 h-36 animate-pulse" />
+              ))}
+            </div>
+          ) : reviews.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-400">
+              No reviews found.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div key={review.id} className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <StarRatingDisplay rating={review.rating} />
+                          <span className="text-sm font-semibold text-gray-900">{review.rating}/5</span>
+                        </div>
+                        <span className="text-xs text-gray-500">{formatDate(review.createdAt)}</span>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-gray-400">Learner</p>
+                          <p className="text-gray-800 mt-1">
+                            {review.learner?.firstName} {review.learner?.lastName}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-gray-400">Tutor</p>
+                          <p className="text-gray-800 mt-1">
+                            {review.tutorProfile?.user?.firstName} {review.tutorProfile?.user?.lastName}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-gray-400">Booking</p>
+                          <p className="text-gray-800 mt-1">
+                            {review.booking?.subject || 'Lesson'} · {formatDate(review.booking?.scheduledAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm leading-6 text-gray-700">
+                        {review.comment || 'No written comment.'}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                      {review.booking?.id && (
+                        <Link
+                          href={`/bookings/${review.booking.id}?returnTo=${encodeURIComponent('/admin/operations?tab=reviews')}&from=admin-reviews`}
+                          className="btn-secondary btn-sm"
+                        >
+                          View Booking
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm('Delete this review?')) return;
+                          deleteReviewMutation.mutate(review.id);
+                        }}
+                        disabled={deleteReviewMutation.isPending}
+                        className="btn-danger btn-sm gap-1.5"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        Delete review
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Pagination
+            currentPage={reviewPage}
+            totalPages={reviewsPagination?.totalPages || 1}
+            onPrevious={() => setReviewPage((current) => current - 1)}
+            onNext={() => setReviewPage((current) => current + 1)}
+          />
         </section>
       )}
 

@@ -40,14 +40,14 @@ export default function AdminDashboardPage() {
 
   const statCards = [
     {
-      label: 'Total Users',
+      label: 'User Management',
       value: overview.totalUsers ?? 0,
       icon: UsersIcon,
       iconColor: 'bg-blue-100 text-blue-600',
       href: '/admin/users',
     },
     {
-      label: 'Total Bookings',
+      label: 'Information Management',
       value: overview.totalBookings ?? 0,
       icon: CalendarDaysIcon,
       iconColor: 'bg-purple-100 text-purple-600',

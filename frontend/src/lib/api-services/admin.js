@@ -13,6 +13,8 @@ export const adminApi = {
   returnTutor: (id, feedback) =>
     api.patch(`/admin/tutors/${id}/return`, typeof feedback === 'object' ? feedback : { feedback }),
   getBookings: (params) => api.get('/admin/bookings', { params }),
+  getReviews: (params) => api.get('/admin/reviews', { params }),
+  deleteReview: (id) => api.delete(`/admin/reviews/${id}`),
   getActions: (params) => api.get('/admin/actions', { params }),
   createSubject: (data) => api.post('/admin/subjects', data),
   updateSubject: (id, data) => api.put(`/admin/subjects/${id}`, data),
