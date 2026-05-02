@@ -8,7 +8,7 @@ export const metadata = {
     default: 'TutorConnect - Find Your Perfect Tutor',
     template: '%s | TutorConnect',
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:8443'),
   description:
     'Connect with qualified tutors for personalized learning. Find expert tutors in any subject, book sessions online or in-person, and track your progress.',
   keywords: ['tutoring', 'online tutoring', 'find tutor', 'learning', 'education'],

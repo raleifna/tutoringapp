@@ -8,6 +8,7 @@ coverage/
 backend/coverage/
 frontend/coverage/
 .runtime/
+nginx/certs/
 
 .env
 .env.*

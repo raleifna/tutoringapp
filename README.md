@@ -1,5 +1,15 @@
 # TutorConnect
 
+## Local HTTPS
+
+The Docker gateway serves the app over HTTPS by default:
+
+```bash
+./start-local.sh
+```
+
+The startup script creates a local self-signed certificate in `nginx/certs/` when one is not already present. The default browser entrypoint is `https://localhost:8443`; if your existing `.env` keeps `NGINX_HOST_PORT=8080`, use `https://localhost:8080`.
+
 ## Testing Strategy
 
 TutorConnect uses automated Vitest suites for frontend and backend code developed in this project. The suite is split into unit, component, and API integration tests so business rules can be tested in isolation while the main API flows are still exercised through Express routes.

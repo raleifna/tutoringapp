@@ -117,7 +117,7 @@ wait_for_url() {
 
   while [[ "$elapsed" -lt "$timeout_seconds" ]]; do
     local status_code
-    status_code="$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)"
+    status_code="$(curl -k -s -o /dev/null -w "%{http_code}" "$url" || true)"
     if [[ "$status_code" =~ ^[234][0-9][0-9]$ ]]; then
       return
     fi
@@ -135,19 +135,71 @@ sync_database_schema() {
   invoke_backend_command pnpm exec prisma db push --accept-data-loss
 }
 
+ensure_https_certificate() {
+  local cert_dir="$PROJECT_ROOT/nginx/certs"
+  local cert_file="$cert_dir/localhost.crt"
+  local key_file="$cert_dir/localhost.key"
+
+  if [[ -f "$cert_file" && -f "$key_file" ]]; then
+    return
+  fi
+
+  write_step "Generating a local self-signed HTTPS certificate"
+  mkdir -p "$cert_dir"
+
+  local openssl_config
+  openssl_config="$(mktemp)"
+  cat >"$openssl_config" <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = v3_req
+prompt = no
+
+[dn]
+CN = localhost
+
+[v3_req]
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+IP.1 = 127.0.0.1
+IP.2 = ::1
+EOF
+
+  openssl req \
+    -x509 \
+    -nodes \
+    -newkey rsa:2048 \
+    -sha256 \
+    -days 3650 \
+    -keyout "$key_file" \
+    -out "$cert_file" \
+    -subj "/CN=localhost" \
+    -config "$openssl_config" >/dev/null 2>&1
+
+  rm -f "$openssl_config"
+}
+
 ensure_command docker "Install Docker Desktop and make sure the daemon is running."
 ensure_command curl "Install curl so the startup script can wait for local health checks."
+ensure_command openssl "Install OpenSSL so the startup script can create a local HTTPS certificate."
 ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
 BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
-GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8080")"
+GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8443")"
 MAILBOX_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "MAILPIT_UI_HOST_PORT" "8025")"
+GATEWAY_URL="https://localhost:${GATEWAY_HOST_PORT}"
+
+ensure_https_certificate
 
 write_step "Building and starting the local full-stack Docker environment"
 invoke_compose up --build -d
 
 write_step "Waiting for backend and unified gateway health checks"
 wait_for_url "http://localhost:${BACKEND_HOST_PORT}/health"
-wait_for_url "http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
+wait_for_url "${GATEWAY_URL}/api/v1/health"
 
 sync_database_schema
 
@@ -171,6 +223,6 @@ fi
 
 echo
 echo "Local environment is ready."
-echo "Frontend: http://localhost:${GATEWAY_HOST_PORT}"
-echo "Backend:  http://localhost:${GATEWAY_HOST_PORT}/api/v1/health"
+echo "Frontend: ${GATEWAY_URL}"
+echo "Backend:  ${GATEWAY_URL}/api/v1/health"
 echo "Mailbox:  http://localhost:${MAILBOX_HOST_PORT}"

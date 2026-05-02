@@ -49,8 +49,8 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       DEV_MAILBOX_URL: ${DEV_MAILBOX_URL:-http://localhost:8025}
       ALLOW_TRYCLOUDFLARE_CORS: ${ALLOW_TRYCLOUDFLARE_CORS:-false}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:8080}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,https://localhost:8443}
+      FRONTEND_URL: ${FRONTEND_URL:-https://localhost:8443}
       PORT: 5000
     ports:
       - '${BACKEND_HOST_PORT:-5050}:5000'
@@ -75,12 +75,14 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
         NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://localhost:8443}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
     # container_name: ${FRONTEND_CONTAINER_NAME:-tutorconnect_frontend}
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
       NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://localhost:8443}
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
     ports:
       - '${FRONTEND_HOST_PORT:-3000}:3000'
@@ -93,9 +95,10 @@ services:
     # container_name: ${NGINX_CONTAINER_NAME:-tutorconnect_nginx}
     restart: unless-stopped
     ports:
-      - '${NGINX_HOST_PORT:-8080}:80'
+      - '${NGINX_HOST_PORT:-8443}:443'
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - frontend
       - backend

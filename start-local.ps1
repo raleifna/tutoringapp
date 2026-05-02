@@ -105,7 +105,21 @@ function Wait-ForUrl {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
         try {
-            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
+            $supportsSkipCertificateCheck = (Get-Command Invoke-WebRequest).Parameters.ContainsKey('SkipCertificateCheck')
+            if ($Url.StartsWith('https://') -and -not $supportsSkipCertificateCheck) {
+                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+            }
+
+            $requestParams = @{
+                Uri = $Url
+                UseBasicParsing = $true
+                TimeoutSec = 5
+            }
+            if ($supportsSkipCertificateCheck) {
+                $requestParams.SkipCertificateCheck = $true
+            }
+
+            $response = Invoke-WebRequest @requestParams
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
                 return
             }
@@ -125,22 +139,77 @@ function Sync-DatabaseSchema {
     Invoke-BackendCommand -CommandArgs @('pnpm', 'exec', 'prisma', 'db', 'push', '--accept-data-loss')
 }
 
+function Ensure-HttpsCertificate {
+    $certDir = Join-Path $ProjectRoot 'nginx/certs'
+    $certFile = Join-Path $certDir 'localhost.crt'
+    $keyFile = Join-Path $certDir 'localhost.key'
+
+    if ((Test-Path $certFile) -and (Test-Path $keyFile)) {
+        return
+    }
+
+    Write-Step 'Generating a local self-signed HTTPS certificate'
+    New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+
+    $opensslConfig = New-TemporaryFile
+    @'
+[req]
+distinguished_name = dn
+x509_extensions = v3_req
+prompt = no
+
+[dn]
+CN = localhost
+
+[v3_req]
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+IP.1 = 127.0.0.1
+IP.2 = ::1
+'@ | Set-Content -Path $opensslConfig -Encoding ascii
+
+    & openssl req `
+        -x509 `
+        -nodes `
+        -newkey rsa:2048 `
+        -sha256 `
+        -days 3650 `
+        -keyout $keyFile `
+        -out $certFile `
+        -subj '/CN=localhost' `
+        -config $opensslConfig *> $null
+
+    Remove-Item $opensslConfig -Force
+
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to generate local HTTPS certificate with OpenSSL.'
+    }
+}
+
 if ($ForceSeed) {
     Write-Host '--force-seed is now the default; seeding runs unless -SkipSeed is provided.' -ForegroundColor Yellow
 }
 
 Ensure-Command -Name 'docker' -Hint 'Install Docker Desktop and make sure the daemon is running.'
+Ensure-Command -Name 'openssl' -Hint 'Install OpenSSL so the startup script can create a local HTTPS certificate.'
 $envFilePath = Ensure-RootEnv -EnvFileName $EnvFile
 $backendHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'BACKEND_HOST_PORT' -DefaultValue '5050'
-$gatewayHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'NGINX_HOST_PORT' -DefaultValue '8080'
+$gatewayHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'NGINX_HOST_PORT' -DefaultValue '8443'
 $mailboxHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'MAILPIT_UI_HOST_PORT' -DefaultValue '8025'
+$gatewayUrl = "https://localhost:$gatewayHostPort"
+
+Ensure-HttpsCertificate
 
 Write-Step 'Building and starting the local full-stack Docker environment'
 Invoke-Compose -ComposeArgs @('up', '--build', '-d')
 
 Write-Step 'Waiting for backend and unified gateway health checks'
 Wait-ForUrl -Url "http://localhost:$backendHostPort/health"
-Wait-ForUrl -Url "http://localhost:$gatewayHostPort/api/v1/health"
+Wait-ForUrl -Url "$gatewayUrl/api/v1/health"
 
 Sync-DatabaseSchema
 
@@ -166,8 +235,8 @@ if ($RunSmokeTest) {
 Write-Host ''
 Write-Host 'Local environment is ready.' -ForegroundColor Green
 Write-Host 'Frontend:' -NoNewline
-Write-Host " http://localhost:$gatewayHostPort" -ForegroundColor White
+Write-Host " $gatewayUrl" -ForegroundColor White
 Write-Host 'Backend:' -NoNewline
-Write-Host "  http://localhost:$gatewayHostPort/api/v1/health" -ForegroundColor White
+Write-Host "  $gatewayUrl/api/v1/health" -ForegroundColor White
 Write-Host 'Mailbox:' -NoNewline
 Write-Host "  http://localhost:$mailboxHostPort" -ForegroundColor White
