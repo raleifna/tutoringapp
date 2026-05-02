@@ -136,6 +136,7 @@ sync_database_schema() {
 }
 
 ensure_https_certificate() {
+  local cert_host="${1:-localhost}"
   local cert_dir="$PROJECT_ROOT/nginx/certs"
   local cert_file="$cert_dir/localhost.crt"
   local key_file="$cert_dir/localhost.key"
@@ -149,7 +150,7 @@ ensure_https_certificate() {
 
   local openssl_config
   openssl_config="$(mktemp)"
-  cat >"$openssl_config" <<'EOF'
+  cat >"$openssl_config" <<EOF
 [req]
 distinguished_name = dn
 x509_extensions = v3_req
@@ -165,6 +166,7 @@ subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = localhost
+DNS.2 = ${cert_host}
 IP.1 = 127.0.0.1
 IP.2 = ::1
 EOF
@@ -190,9 +192,11 @@ ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
 BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
 GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8443")"
 MAILBOX_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "MAILPIT_UI_HOST_PORT" "8025")"
-GATEWAY_URL="https://localhost:${GATEWAY_HOST_PORT}"
+HTTPS_CERT_HOST="$(get_env_value "$ENV_FILE_PATH" "HTTPS_CERT_HOST" "localhost")"
+GATEWAY_URL="$(get_env_value "$ENV_FILE_PATH" "FRONTEND_URL" "https://localhost:${GATEWAY_HOST_PORT}")"
+GATEWAY_URL="${GATEWAY_URL%/}"
 
-ensure_https_certificate
+ensure_https_certificate "$HTTPS_CERT_HOST"
 
 write_step "Building and starting the local full-stack Docker environment"
 invoke_compose up --build -d

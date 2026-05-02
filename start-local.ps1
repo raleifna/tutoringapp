@@ -140,6 +140,8 @@ function Sync-DatabaseSchema {
 }
 
 function Ensure-HttpsCertificate {
+    param([string]$CertHost = 'localhost')
+
     $certDir = Join-Path $ProjectRoot 'nginx/certs'
     $certFile = Join-Path $certDir 'localhost.crt'
     $keyFile = Join-Path $certDir 'localhost.key'
@@ -152,7 +154,7 @@ function Ensure-HttpsCertificate {
     New-Item -ItemType Directory -Path $certDir -Force | Out-Null
 
     $opensslConfig = New-TemporaryFile
-    @'
+    @"
 [req]
 distinguished_name = dn
 x509_extensions = v3_req
@@ -168,9 +170,10 @@ subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = localhost
+DNS.2 = $CertHost
 IP.1 = 127.0.0.1
 IP.2 = ::1
-'@ | Set-Content -Path $opensslConfig -Encoding ascii
+"@ | Set-Content -Path $opensslConfig -Encoding ascii
 
     & openssl req `
         -x509 `
@@ -200,9 +203,10 @@ $envFilePath = Ensure-RootEnv -EnvFileName $EnvFile
 $backendHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'BACKEND_HOST_PORT' -DefaultValue '5050'
 $gatewayHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'NGINX_HOST_PORT' -DefaultValue '8443'
 $mailboxHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'MAILPIT_UI_HOST_PORT' -DefaultValue '8025'
-$gatewayUrl = "https://localhost:$gatewayHostPort"
+$httpsCertHost = Get-EnvValue -EnvFilePath $envFilePath -Name 'HTTPS_CERT_HOST' -DefaultValue 'localhost'
+$gatewayUrl = (Get-EnvValue -EnvFilePath $envFilePath -Name 'FRONTEND_URL' -DefaultValue "https://localhost:$gatewayHostPort").TrimEnd('/')
 
-Ensure-HttpsCertificate
+Ensure-HttpsCertificate -CertHost $httpsCertHost
 
 Write-Step 'Building and starting the local full-stack Docker environment'
 Invoke-Compose -ComposeArgs @('up', '--build', '-d')
