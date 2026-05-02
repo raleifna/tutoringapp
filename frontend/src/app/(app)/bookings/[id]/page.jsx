@@ -188,8 +188,18 @@ export default function BookingDetailPage() {
           : false
     );
   const latestRescheduleReason = getLatestStatusReason(booking, 'RESCHEDULED');
+  const recurringReviewBookings = getRecurringSeriesBookings(booking);
   const review = booking?.review || null;
-  const canLeaveReview = isLearner && booking?.status === 'COMPLETED' && !review;
+  const recurringCompletedSessions = recurringReviewBookings.filter((seriesBooking) => seriesBooking.status === 'COMPLETED').length;
+  const reviewEligible =
+    isLearner &&
+    (
+      recurring
+        ? recurringCompletedSessions > 0
+        : booking?.status === 'COMPLETED'
+    );
+  const canLeaveReview = reviewEligible && !review;
+  const canUpdateReview = reviewEligible && recurring && !!review;
   const canDeleteReview = isLearner && review?.learnerId === currentUserId;
   const activeRescheduleBooking = rescheduleTargetBooking || booking;
   const rescheduleAvailabilityState = rescheduleAvailabilityQuery.data?.data?.data || {};
@@ -325,10 +335,8 @@ export default function BookingDetailPage() {
 
   const createReviewMutation = useMutation({
     mutationFn: (payload) => reviewApi.create(payload),
-    onSuccess: async () => {
-      toast.success('Review submitted');
-      setReviewRating(5);
-      setReviewComment('');
+    onSuccess: async (response) => {
+      toast.success(response?.data?.message || 'Review submitted');
       await Promise.all([
         invalidateBookingViews({ queryClient, currentUserId, id, bookingTutorId }),
         queryClient.invalidateQueries({ queryKey: ['tutor', bookingTutorId] }),
@@ -413,6 +421,17 @@ export default function BookingDetailPage() {
       resetRescheduleForm({ newDate: '', reason: '' });
     }
   }, [showRescheduleModal, resetRescheduleForm]);
+
+  useEffect(() => {
+    if (!review) {
+      setReviewRating(5);
+      setReviewComment('');
+      return;
+    }
+
+    setReviewRating(Number(review.rating || 5));
+    setReviewComment(review.comment || '');
+  }, [review?.id, review?.rating, review?.comment]);
 
   if (!currentUserId) {
     return (
@@ -1048,7 +1067,7 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      {(review || canLeaveReview) && (
+      {(review || reviewEligible) && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1057,45 +1076,99 @@ export default function BookingDetailPage() {
                 {review ? 'Learner feedback' : 'Rate this tutor'}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                Reviews are only available after the lesson is completed.
+                {recurring
+                  ? 'You can start reviewing this recurring booking after the first completed session and update it later.'
+                  : 'Reviews are only available after the lesson is completed.'}
               </p>
             </div>
             <div className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-              Completed booking
+              {recurring
+                ? `${recurringCompletedSessions} completed session${recurringCompletedSessions === 1 ? '' : 's'}`
+                : 'Completed booking'}
             </div>
           </div>
 
           {review ? (
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <StarRatingDisplay rating={review.rating} size="h-5 w-5" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    {review.rating} / 5
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <StarRatingDisplay rating={review.rating} size="h-5 w-5" />
+                    <span className="text-sm font-semibold text-gray-900">
+                      {review.rating} / 5
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDate(review.updatedAt || review.createdAt, timeZone)}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">
-                  {formatDate(review.createdAt, timeZone)}
-                </span>
+                {review.comment ? (
+                  <p className="text-sm leading-6 text-gray-700">{review.comment}</p>
+                ) : (
+                  <p className="text-sm text-gray-500">No written comment.</p>
+                )}
+                {canDeleteReview && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!window.confirm('Delete your review?')) return;
+                        deleteReviewMutation.mutate(review.id);
+                      }}
+                      disabled={deleteReviewMutation.isPending}
+                      className="btn-secondary btn-sm"
+                    >
+                      {deleteReviewMutation.isPending ? 'Deleting...' : 'Delete review'}
+                    </button>
+                  </div>
+                )}
               </div>
-              {review.comment ? (
-                <p className="text-sm leading-6 text-gray-700">{review.comment}</p>
-              ) : (
-                <p className="text-sm text-gray-500">No written comment.</p>
-              )}
-              {canDeleteReview && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm('Delete your review?')) return;
-                      deleteReviewMutation.mutate(review.id);
-                    }}
-                    disabled={deleteReviewMutation.isPending}
-                    className="btn-secondary btn-sm"
-                  >
-                    {deleteReviewMutation.isPending ? 'Deleting...' : 'Delete review'}
-                  </button>
+
+              {canUpdateReview && (
+                <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Add more feedback</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Update your rating or keep adding new thoughts as more sessions in this series are completed.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="label">Rating</label>
+                    <StarRatingInput
+                      value={reviewRating}
+                      onChange={setReviewRating}
+                      disabled={createReviewMutation.isPending}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Comment</label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(event) => setReviewComment(event.target.value)}
+                      rows={4}
+                      className="input resize-none"
+                      placeholder="Add new thoughts about how the sessions are going..."
+                      maxLength={1000}
+                    />
+                    <p className="mt-1 text-xs text-gray-400">{reviewComment.length}/1000</p>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        createReviewMutation.mutate({
+                          bookingId: booking.id,
+                          rating: reviewRating,
+                          comment: reviewComment,
+                        })
+                      }
+                      disabled={createReviewMutation.isPending}
+                      className="btn-primary gap-2"
+                    >
+                      <StarIcon className="w-4 h-4" />
+                      {createReviewMutation.isPending ? 'Saving...' : 'Update review'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1135,7 +1208,11 @@ export default function BookingDetailPage() {
                   className="btn-primary gap-2"
                 >
                   <StarIcon className="w-4 h-4" />
-                  {createReviewMutation.isPending ? 'Submitting...' : 'Submit review'}
+                  {createReviewMutation.isPending
+                    ? 'Submitting...'
+                    : recurring
+                      ? 'Submit review for this series'
+                      : 'Submit review'}
                 </button>
               </div>
             </div>

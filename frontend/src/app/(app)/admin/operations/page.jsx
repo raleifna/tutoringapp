@@ -638,7 +638,7 @@ function AdminOperationsContent() {
                           <StarRatingDisplay rating={review.rating} />
                           <span className="text-sm font-semibold text-gray-900">{review.rating}/5</span>
                         </div>
-                        <span className="text-xs text-gray-500">{formatDate(review.createdAt)}</span>
+                          <span className="text-xs text-gray-500">{formatDate(review.updatedAt || review.createdAt)}</span>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 text-sm">
                         <div>

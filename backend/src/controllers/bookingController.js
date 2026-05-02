@@ -120,6 +120,16 @@ const attachRecurringSeries = async (bookings, baseWhere = {}) => {
       recurringGroupId: { in: recurringGroupIds },
     },
     include: {
+      review: {
+        select: {
+          id: true,
+          learnerId: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
       payment: true,
       statusHistory: { orderBy: { createdAt: 'desc' } },
     },
@@ -135,9 +145,13 @@ const attachRecurringSeries = async (bookings, baseWhere = {}) => {
   return bookings.map((booking) => {
     if (!booking.recurringGroupId) return booking;
 
+    const groupedBookings = seriesByGroup[booking.recurringGroupId] || [];
+    const seriesReview = groupedBookings.find((seriesBooking) => seriesBooking.review)?.review || null;
+
     return {
       ...booking,
-      recurringSeries: buildRecurringSeries(seriesByGroup[booking.recurringGroupId] || []),
+      review: seriesReview || booking.review || null,
+      recurringSeries: buildRecurringSeries(groupedBookings),
     };
   });
 };

@@ -49,6 +49,15 @@ const reviewInclude = {
   },
 };
 
+const reviewSelect = {
+  id: true,
+  learnerId: true,
+  rating: true,
+  comment: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 const canViewTutorProfileReviews = (tutorProfile, user) => {
   if (!tutorProfile) return false;
   if (tutorProfile.status === 'ACTIVE') return true;
@@ -73,6 +82,81 @@ const recalculateTutorReviewSummary = async (tutorProfileId) => {
   });
 };
 
+const sortByScheduledAt = (left, right) =>
+  new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime();
+
+const resolveReviewContext = async ({ bookingId, learnerId }) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      learnerId: true,
+      tutorId: true,
+      status: true,
+      subject: true,
+      scheduledAt: true,
+      recurringGroupId: true,
+      review: {
+        select: reviewSelect,
+      },
+    },
+  });
+
+  if (!booking) throw new AppError('Booking not found', 404);
+  if (booking.learnerId !== learnerId) throw new AppError('You can only review your own bookings', 403);
+
+  if (!booking.recurringGroupId) {
+    if (booking.status !== 'COMPLETED') {
+      throw new AppError('You can only review a tutor after the booking is completed', 400);
+    }
+
+    return {
+      booking,
+      reviewBookingId: booking.id,
+      existingReview: booking.review || null,
+      canUpdateExistingReview: false,
+      completedSessionsCount: 1,
+      isRecurringReview: false,
+    };
+  }
+
+  const seriesBookings = await prisma.booking.findMany({
+    where: {
+      learnerId,
+      tutorId: booking.tutorId,
+      recurringGroupId: booking.recurringGroupId,
+    },
+    select: {
+      id: true,
+      status: true,
+      scheduledAt: true,
+      review: {
+        select: reviewSelect,
+      },
+    },
+    orderBy: { scheduledAt: 'asc' },
+  });
+
+  const completedBookings = seriesBookings.filter((seriesBooking) => seriesBooking.status === 'COMPLETED');
+  if (!completedBookings.length) {
+    throw new AppError('You can start reviewing this recurring booking after the first completed session', 400);
+  }
+
+  const existingReviewBooking = seriesBookings.find((seriesBooking) => seriesBooking.review);
+  const reviewAnchorBooking =
+    existingReviewBooking ||
+    [...completedBookings].sort(sortByScheduledAt)[0];
+
+  return {
+    booking,
+    reviewBookingId: reviewAnchorBooking.id,
+    existingReview: reviewAnchorBooking.review || null,
+    canUpdateExistingReview: Boolean(reviewAnchorBooking.review),
+    completedSessionsCount: completedBookings.length,
+    isRecurringReview: true,
+  };
+};
+
 exports.getTutorReviews = async (req, res) => {
   const tutorProfile = await prisma.tutorProfile.findUnique({
     where: { id: req.params.id },
@@ -95,7 +179,7 @@ exports.getTutorReviews = async (req, res) => {
     prisma.review.findMany({
       where: { tutorProfileId: tutorProfile.id },
       include: reviewInclude,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       skip: pagination.skip,
       take: pagination.limit,
     }),
@@ -123,46 +207,52 @@ exports.getTutorReviews = async (req, res) => {
 exports.createReview = async (req, res) => {
   const { bookingId, rating, comment } = req.body;
   const learnerId = req.user.id;
+  const reviewContext = await resolveReviewContext({ bookingId, learnerId });
+  const normalizedComment = comment?.trim() || null;
 
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    select: {
-      id: true,
-      learnerId: true,
-      tutorId: true,
-      status: true,
-      subject: true,
-      review: {
-        select: { id: true },
-      },
-    },
-  });
-
-  if (!booking) throw new AppError('Booking not found', 404);
-  if (booking.learnerId !== learnerId) throw new AppError('You can only review your own bookings', 403);
-  if (booking.status !== 'COMPLETED') {
-    throw new AppError('You can only review a tutor after the booking is completed', 400);
-  }
-  if (booking.review) {
+  if (reviewContext.existingReview && !reviewContext.canUpdateExistingReview) {
     throw new AppError('This booking has already been reviewed', 409);
+  }
+
+  if (reviewContext.existingReview) {
+    const review = await prisma.review.update({
+      where: { id: reviewContext.existingReview.id },
+      data: {
+        rating,
+        comment: normalizedComment,
+      },
+      include: reviewInclude,
+    });
+
+    await recalculateTutorReviewSummary(reviewContext.booking.tutorId);
+
+    return res.json({
+      success: true,
+      message: reviewContext.isRecurringReview
+        ? 'Review updated for this recurring booking'
+        : 'Review updated',
+      data: review,
+    });
   }
 
   const review = await prisma.review.create({
     data: {
-      bookingId: booking.id,
+      bookingId: reviewContext.reviewBookingId,
       learnerId,
-      tutorProfileId: booking.tutorId,
+      tutorProfileId: reviewContext.booking.tutorId,
       rating,
-      comment: comment?.trim() || null,
+      comment: normalizedComment,
     },
     include: reviewInclude,
   });
 
-  await recalculateTutorReviewSummary(booking.tutorId);
+  await recalculateTutorReviewSummary(reviewContext.booking.tutorId);
 
-  res.status(201).json({
+  return res.status(201).json({
     success: true,
-    message: 'Review submitted',
+    message: reviewContext.isRecurringReview
+      ? 'Review submitted for this recurring booking'
+      : 'Review submitted',
     data: review,
   });
 };
@@ -224,7 +314,7 @@ exports.getAdminReviews = async (req, res) => {
     prisma.review.findMany({
       where,
       include: reviewInclude,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       skip: pagination.skip,
       take: pagination.limit,
     }),

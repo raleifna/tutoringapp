@@ -6,9 +6,11 @@ const prisma = {
   },
   booking: {
     findUnique: vi.fn(),
+    findMany: vi.fn(),
   },
   review: {
     create: vi.fn(),
+    update: vi.fn(),
     findUnique: vi.fn(),
     delete: vi.fn(),
     aggregate: vi.fn(),
@@ -149,6 +151,100 @@ describe('review API integration tests', () => {
     });
   });
 
+  test('allows a recurring booking series to be reviewed after the first completed session', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
+    prisma.booking.findUnique.mockResolvedValueOnce({
+      id: 'booking-series-2',
+      learnerId: learnerUser.id,
+      tutorId: 'tutor-profile-1',
+      status: 'ACCEPTED',
+      subject: 'Mathematics',
+      scheduledAt: '2026-05-10T10:00:00.000Z',
+      recurringGroupId: 'series-1',
+      review: null,
+    });
+    prisma.booking.findMany.mockResolvedValueOnce([
+      {
+        id: 'booking-series-1',
+        status: 'COMPLETED',
+        scheduledAt: '2026-05-03T10:00:00.000Z',
+        review: null,
+      },
+      {
+        id: 'booking-series-2',
+        status: 'ACCEPTED',
+        scheduledAt: '2026-05-10T10:00:00.000Z',
+        review: null,
+      },
+    ]);
+    prisma.review.create.mockResolvedValueOnce({
+      id: 'review-series-1',
+      bookingId: 'booking-series-1',
+      learnerId: learnerUser.id,
+      tutorProfileId: 'tutor-profile-1',
+      rating: 4,
+      comment: 'Great start so far',
+      learner: {
+        id: learnerUser.id,
+        firstName: 'Learner',
+        lastName: 'Example',
+        avatar: null,
+      },
+      tutorProfile: {
+        id: 'tutor-profile-1',
+        rating: 0,
+        totalReviews: 0,
+        user: {
+          id: 'tutor-user-1',
+          firstName: 'Tutor',
+          lastName: 'Example',
+          avatar: null,
+        },
+      },
+      booking: {
+        id: 'booking-series-1',
+        subject: 'Mathematics',
+        scheduledAt: '2026-05-03T10:00:00.000Z',
+        duration: 60,
+        status: 'COMPLETED',
+        learnerId: learnerUser.id,
+        tutorId: 'tutor-profile-1',
+      },
+    });
+    prisma.review.aggregate.mockResolvedValueOnce({
+      _avg: { rating: 4 },
+      _count: { id: 1 },
+    });
+    prisma.tutorProfile.update.mockResolvedValueOnce({
+      id: 'tutor-profile-1',
+      rating: 4,
+      totalReviews: 1,
+    });
+
+    const response = await request(app)
+      .post('/api/v1/reviews')
+      .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
+      .send({
+        bookingId: 'booking-series-2',
+        rating: 4,
+        comment: 'Great start so far',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+    expect(response.body.message).toBe('Review submitted for this recurring booking');
+    expect(prisma.review.create).toHaveBeenCalledWith({
+      data: {
+        bookingId: 'booking-series-1',
+        learnerId: learnerUser.id,
+        tutorProfileId: 'tutor-profile-1',
+        rating: 4,
+        comment: 'Great start so far',
+      },
+      include: expect.any(Object),
+    });
+  });
+
   test('rejects review creation when the booking is not completed', async () => {
     prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
     prisma.booking.findUnique.mockResolvedValueOnce({
@@ -226,6 +322,106 @@ describe('review API integration tests', () => {
     expect(response.status).toBe(409);
     expect(response.body.success).toBe(false);
     expect(response.body.message).toBe('This booking has already been reviewed');
+    expect(prisma.review.create).not.toHaveBeenCalled();
+  });
+
+  test('updates the existing recurring review instead of creating a second one', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
+    prisma.booking.findUnique.mockResolvedValueOnce({
+      id: 'booking-series-3',
+      learnerId: learnerUser.id,
+      tutorId: 'tutor-profile-1',
+      status: 'COMPLETED',
+      subject: 'Mathematics',
+      scheduledAt: '2026-05-17T10:00:00.000Z',
+      recurringGroupId: 'series-2',
+      review: null,
+    });
+    prisma.booking.findMany.mockResolvedValueOnce([
+      {
+        id: 'booking-series-1',
+        status: 'COMPLETED',
+        scheduledAt: '2026-05-03T10:00:00.000Z',
+        review: {
+          id: 'review-series-2',
+          learnerId: learnerUser.id,
+          rating: 4,
+          comment: 'Good progress',
+          createdAt: '2026-05-03T10:00:00.000Z',
+          updatedAt: '2026-05-03T10:00:00.000Z',
+        },
+      },
+      {
+        id: 'booking-series-3',
+        status: 'COMPLETED',
+        scheduledAt: '2026-05-17T10:00:00.000Z',
+        review: null,
+      },
+    ]);
+    prisma.review.update.mockResolvedValueOnce({
+      id: 'review-series-2',
+      bookingId: 'booking-series-1',
+      learnerId: learnerUser.id,
+      tutorProfileId: 'tutor-profile-1',
+      rating: 5,
+      comment: 'Even better after more sessions',
+      learner: {
+        id: learnerUser.id,
+        firstName: 'Learner',
+        lastName: 'Example',
+        avatar: null,
+      },
+      tutorProfile: {
+        id: 'tutor-profile-1',
+        rating: 4,
+        totalReviews: 1,
+        user: {
+          id: 'tutor-user-1',
+          firstName: 'Tutor',
+          lastName: 'Example',
+          avatar: null,
+        },
+      },
+      booking: {
+        id: 'booking-series-1',
+        subject: 'Mathematics',
+        scheduledAt: '2026-05-03T10:00:00.000Z',
+        duration: 60,
+        status: 'COMPLETED',
+        learnerId: learnerUser.id,
+        tutorId: 'tutor-profile-1',
+      },
+    });
+    prisma.review.aggregate.mockResolvedValueOnce({
+      _avg: { rating: 5 },
+      _count: { id: 1 },
+    });
+    prisma.tutorProfile.update.mockResolvedValueOnce({
+      id: 'tutor-profile-1',
+      rating: 5,
+      totalReviews: 1,
+    });
+
+    const response = await request(app)
+      .post('/api/v1/reviews')
+      .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`)
+      .send({
+        bookingId: 'booking-series-3',
+        rating: 5,
+        comment: 'Even better after more sessions',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.message).toBe('Review updated for this recurring booking');
+    expect(prisma.review.update).toHaveBeenCalledWith({
+      where: { id: 'review-series-2' },
+      data: {
+        rating: 5,
+        comment: 'Even better after more sessions',
+      },
+      include: expect.any(Object),
+    });
     expect(prisma.review.create).not.toHaveBeenCalled();
   });
 

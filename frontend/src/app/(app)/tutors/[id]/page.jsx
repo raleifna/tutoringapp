@@ -792,7 +792,7 @@ export default function TutorDetailPage() {
                           {review.learner?.firstName} {review.learner?.lastName}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(review.createdAt).toLocaleDateString('en-AU', {
+                          {new Date(review.updatedAt || review.createdAt).toLocaleDateString('en-AU', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
