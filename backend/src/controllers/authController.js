@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { sendVerificationEmail } = require('../services/emailService');
-const { hashPassword, comparePassword } = require('../utils/passwords');
+const { hashPassword, comparePassword, passwordNeedsRehash } = require('../utils/passwords');
 const { createAccessToken, createRefreshToken, verifyRefreshToken } = require('../utils/tokens');
 
 const toBoolean = (value) => {
@@ -262,6 +262,7 @@ async function login(req, res) {
         where: { id: user.id },
         data: {
             lastLoginAt: new Date(),
+            ...(passwordNeedsRehash(user.password) ? { password: hashPassword(password) } : {}),
         },
         select: authUserSelect,
     });
