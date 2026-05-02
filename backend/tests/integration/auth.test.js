@@ -1,4 +1,5 @@
 const request = require('supertest');
+const crypto = require('crypto');
 
 const prisma = {
   user: {
@@ -36,6 +37,9 @@ const app = require('../../src/app');
 const { createAccessToken, createRefreshToken } = require('../../src/utils/tokens');
 const { hashPassword } = require('../../src/utils/passwords');
 
+const createLegacySha256Hash = (password) =>
+  crypto.createHash('sha256').update(String(password || '')).digest('hex');
+
 const baseUser = {
   id: 'user-1',
   email: 'learner@example.com',
@@ -59,6 +63,13 @@ beforeEach(() => {
 });
 
 describe('auth API integration tests', () => {
+  test('hashes new passwords with bcrypt', () => {
+    const hashedPassword = hashPassword('Secure1!');
+
+    expect(hashedPassword).toMatch(/^\$2[aby]\$/);
+    expect(hashedPassword).not.toBe(createLegacySha256Hash('Secure1!'));
+  });
+
   test('registers a learner account and returns verification delivery details', async () => {
     prisma.user.findUnique.mockResolvedValueOnce(null);
     prisma.user.create.mockResolvedValueOnce({
@@ -139,6 +150,40 @@ describe('auth API integration tests', () => {
     expect(typeof response.body.refreshToken).toBe('string');
     expect(response.body.user.email).toBe('learner@example.com');
     expect(response.body.user.ipAddress).toBe('203.0.113.5');
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: baseUser.id },
+      data: {
+        lastLoginAt: expect.any(Date),
+      },
+      select: expect.any(Object),
+    });
+  });
+
+  test('upgrades a legacy SHA-256 password hash after successful login', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...baseUser,
+      password: createLegacySha256Hash('Secure1!'),
+      isEmailVerified: true,
+    });
+    prisma.user.update.mockResolvedValueOnce({
+      ...baseUser,
+      lastLoginAt: new Date('2026-04-23T09:00:00.000Z'),
+    });
+
+    const response = await request(app).post('/api/v1/auth/login').send({
+      email: 'learner@example.com',
+      password: 'Secure1!',
+    });
+
+    expect(response.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: baseUser.id },
+      data: {
+        lastLoginAt: expect.any(Date),
+        password: expect.stringMatching(/^\$2[aby]\$/),
+      },
+      select: expect.any(Object),
+    });
   });
 
   test('refreshes an access token for a valid refresh token', async () => {
