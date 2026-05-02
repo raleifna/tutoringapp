@@ -13,9 +13,7 @@ import {
   TUTOR_REVIEW_PATH,
 } from '../../../../lib/tutor-access';
 
-const MAX_VERIFICATION_FILES = 5;
 const MAX_VERIFICATION_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_VERIFICATION_TOTAL_SIZE = 25 * 1024 * 1024;
 
 const getApplicationFiles = (items) =>
   Array.isArray(items) ? items.filter((item) => item && typeof item === 'object' && item.url) : [];
@@ -52,7 +50,10 @@ export default function TutorVerificationPage() {
   const [qualificationItems, setQualificationItems] = useState('');
   const [applicationNotes, setApplicationNotes] = useState('');
   const [applicationExperienceYears, setApplicationExperienceYears] = useState('0');
-  const [applicationFiles, setApplicationFiles] = useState([]);
+  const [graduationFile, setGraduationFile] = useState(null);
+  const [degreeFile, setDegreeFile] = useState(null);
+  const [resumeFile, setResumeFile] = useState(null);
+  const [otherFile, setOtherFile] = useState(null);
   const [applicationFileError, setApplicationFileError] = useState('');
 
   const { data, isLoading, isError, error } = useQuery({
@@ -94,7 +95,10 @@ export default function TutorVerificationPage() {
     );
     setApplicationNotes(getApplicationNotes(profile.certifications));
     setApplicationExperienceYears(String(profile.yearsExperience || 0));
-    setApplicationFiles([]);
+    setGraduationFile(null);
+    setDegreeFile(null);
+    setResumeFile(null);
+    setOtherFile(null);
     setApplicationFileError('');
   }, [profile]);
 
@@ -121,44 +125,6 @@ export default function TutorVerificationPage() {
     },
   });
 
-  const handleApplicationFilesChange = (event) => {
-    const files = Array.from(event.target.files || []);
-
-    if (files.length > MAX_VERIFICATION_FILES) {
-      setApplicationFiles([]);
-      setApplicationFileError(`Upload up to ${MAX_VERIFICATION_FILES} verification files`);
-      return;
-    }
-
-    if (files.some((file) => file.size > MAX_VERIFICATION_FILE_SIZE)) {
-      setApplicationFiles([]);
-      setApplicationFileError('Each verification file must be 5MB or smaller');
-      return;
-    }
-
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_VERIFICATION_TOTAL_SIZE) {
-      setApplicationFiles([]);
-      setApplicationFileError('Total upload size must stay within 25MB');
-      return;
-    }
-
-    const previousDescriptions = new Map(
-      applicationFiles.map((item) => [item.key, item.description])
-    );
-
-    setApplicationFiles(
-      files.map((file) => {
-        const key = `${file.name}-${file.size}-${file.lastModified}`;
-        return {
-          key,
-          file,
-          description: previousDescriptions.get(key) || '',
-        };
-      })
-    );
-    setApplicationFileError('');
-  };
 
   const handleSubmit = () => {
     const summaryForSubmit = applicationSummary.trim();
@@ -173,13 +139,8 @@ export default function TutorVerificationPage() {
       return;
     }
 
-    if (applicationFiles.length === 0 && existingApplicationFiles.length === 0) {
-      setApplicationFileError('Upload at least one verification file');
-      return;
-    }
-
-    if (applicationFiles.some((item) => !item.description.trim())) {
-      setApplicationFileError('Add a short description for each uploaded verification file');
+    if (!graduationFile || !degreeFile || !resumeFile) {
+      setApplicationFileError('Graduation Certificate, Degree Certificate, and Resume / CV are required');
       return;
     }
 
@@ -199,11 +160,14 @@ export default function TutorVerificationPage() {
     if (applicationNotes.trim()) {
       formData.append('tutorSupportingNotes', applicationNotes.trim());
     }
-    formData.append(
-      'verificationFileDescriptions',
-      JSON.stringify(applicationFiles.map((item) => item.description.trim()))
-    );
-    applicationFiles.forEach((item) => formData.append('verificationFiles', item.file));
+    const descriptions = ['Graduation Certificate', 'Degree Certificate', 'Resume / CV'];
+    const files = [graduationFile, degreeFile, resumeFile];
+    if (otherFile) {
+      descriptions.push('Other');
+      files.push(otherFile);
+    }
+    formData.append('verificationFileDescriptions', JSON.stringify(descriptions));
+    files.forEach((f) => formData.append('verificationFiles', f));
     applicationMutation.mutate(formData);
   };
 
@@ -314,38 +278,37 @@ export default function TutorVerificationPage() {
 
         <div>
           <label className="label">Verification Files <span className="text-xs font-normal text-gray-400 ml-1">· for admin review only, not shown to students</span></label>
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.txt,image/*"
-            className="input py-3"
-            onChange={handleApplicationFilesChange}
-          />
-          <p className="mt-1 text-xs text-gray-500">Up to 5 files, 5MB each, 25MB total. Add a description for each file explaining what it verifies.</p>
-          {applicationFileError && <p className="error-text">{applicationFileError}</p>}
-          {applicationFiles.length > 0 && (
-            <div className="mt-3 space-y-3">
-              {applicationFiles.map((item) => (
-                <div key={item.key} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                  <p className="text-sm font-medium text-gray-800">{item.file.name}</p>
-                  <input
-                    type="text"
-                    value={item.description}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      setApplicationFiles((current) =>
-                        current.map((entry) =>
-                          entry.key === item.key ? { ...entry, description: nextValue } : entry
-                        )
-                      );
-                    }}
-                    className="input mt-2"
-                    placeholder="What does this file verify?"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="mt-2 space-y-3">
+            {[
+              { label: 'Graduation Certificate', required: true, setter: setGraduationFile },
+              { label: 'Degree Certificate', required: true, setter: setDegreeFile },
+              { label: 'Resume / CV', required: true, setter: setResumeFile },
+              { label: 'Other Files', required: false, setter: setOtherFile },
+            ].map(({ label, required, setter }) => (
+              <div key={label} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <p className="text-sm font-medium text-gray-800 mb-2">
+                  {label}{required && <span className="text-red-500 ml-1">*</span>}
+                </p>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,image/*"
+                  className="input py-2"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && file.size > MAX_VERIFICATION_FILE_SIZE) {
+                      setApplicationFileError(`${label} must be 5MB or smaller`);
+                      e.target.value = '';
+                      return;
+                    }
+                    setter(file);
+                    setApplicationFileError('');
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-500">Uploading a new file will overwrite the existing file.</p>
+          {applicationFileError && <p className="error-text mt-2">{applicationFileError}</p>}
         </div>
 
         {existingApplicationFiles.length > 0 && (

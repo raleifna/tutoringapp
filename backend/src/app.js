@@ -45,7 +45,11 @@ app.post(
 );
 app.use(express.json());
 app.use(morgan('dev'));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('Content-Disposition', 'inline');
+  },
+}));
 
 app.get('/health', (_req, res) => {
   res.json({ success: true, name: 'TutorConnect API', timestamp: new Date().toISOString() });
