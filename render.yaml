@@ -1,0 +1,61 @@
+databases:
+  - name: tutoringapp-db
+    databaseName: tutoringapp
+    user: tutoringapp
+    plan: free
+    region: singapore
+
+services:
+  - type: web
+    name: raleifna-tutoringapp-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --filter tutorconnect-backend...
+    startCommand: pnpm --filter tutorconnect-backend db:migrate:deploy && pnpm --filter tutorconnect-backend start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tutoringapp-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://raleifna-tutoringapp.onrender.com
+      - key: CORS_ORIGIN
+        value: https://raleifna-tutoringapp.onrender.com
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: EMAIL_VERIFICATION_REQUIRED
+        value: false
+      - key: AI_REPLY_PROVIDER
+        value: gemini
+      - key: AI_REPLY_MODE
+        value: mock
+      - key: GEMINI_REPLY_MODEL
+        value: gemini-2.5-flash
+
+  - type: web
+    name: raleifna-tutoringapp
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --filter tutorconnect-frontend... && pnpm --filter tutorconnect-frontend build
+    startCommand: pnpm --filter tutorconnect-frontend start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://raleifna-tutoringapp-api.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SOCKET_URL
+        value: https://raleifna-tutoringapp-api.onrender.com
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://raleifna-tutoringapp.onrender.com

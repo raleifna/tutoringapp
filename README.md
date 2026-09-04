@@ -1,5 +1,8 @@
 # TutorConnect
 
+Deployment instructions for the personal Render environment are available in
+[DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Local HTTPS
 
 The Docker gateway serves the app over HTTPS by default:

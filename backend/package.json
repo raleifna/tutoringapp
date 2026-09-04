@@ -6,9 +6,10 @@
   "main": "server.js",
   "scripts": {
     "db:push": "prisma db push --accept-data-loss",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
-    "start": "pnpm run db:push && node server.js",
+    "start": "node server.js",
     "dev": "pnpm run db:push && node --watch server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

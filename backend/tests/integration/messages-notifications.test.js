@@ -206,6 +206,11 @@ describe('messages and notifications integration tests', () => {
       messages: expect.any(Array),
       currentUserId: learnerUser.id,
       partnerName: 'Tutor Two',
+      context: expect.objectContaining({
+        bookings: expect.any(Array),
+        currentUser: expect.objectContaining({ id: learnerUser.id }),
+        partner: expect.objectContaining({ id: otherUser.id }),
+      }),
     });
     expect(prisma.message.create).not.toHaveBeenCalled();
   });
