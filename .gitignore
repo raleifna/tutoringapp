@@ -19,5 +19,6 @@ nginx/certs/
 student-*-keys.json
 student-guide.md
 *.pem
+.runner/
 
 docs/*

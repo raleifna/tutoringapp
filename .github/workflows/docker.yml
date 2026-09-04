@@ -10,8 +10,29 @@ env:
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
+  verify:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm --filter tutorconnect-frontend build
+        env:
+          NEXT_PUBLIC_API_URL: /api/v1
+          NEXT_PUBLIC_SOCKET_URL: ''
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''
+
   build-backend:
     name: Build Backend Image
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,6 +73,7 @@ jobs:
 
   build-frontend:
     name: Build Frontend Image
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,3 +114,30 @@ jobs:
             NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-interview:
+    name: Deploy to interview host
+    needs: [build-backend, build-frontend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, macOS, ARM64, tutoringapp-deploy]
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: tutoringapp-interview
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy and verify
+        env:
+          JWT_SECRET: ${{ secrets.INTERVIEW_JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.INTERVIEW_JWT_REFRESH_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.INTERVIEW_POSTGRES_PASSWORD }}
+          EMAIL_VERIFICATION_REQUIRED: 'false'
+          ALLOW_TRYCLOUDFLARE_CORS: 'true'
+        run: bash scripts/deploy-interview.sh

@@ -17,20 +17,18 @@ const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
 const reviewRoutes = require('./routes/reviews');
 const paymentController = require('./controllers/paymentController');
+const { getAllowedOrigins, isAllowedOrigin } = require('./utils/cors');
 
 const app = express();
 
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((s) => s.trim().replace(/\/+$/, ''))
-  .filter(Boolean);
+const allowedOrigins = getAllowedOrigins();
 
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin.trim().replace(/\/+$/, ''))) {
+      if (isAllowedOrigin(origin, allowedOrigins)) {
         callback(null, true);
         return;
       }

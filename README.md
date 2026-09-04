@@ -3,6 +3,10 @@
 Deployment instructions for the personal Render environment are available in
 [DEPLOYMENT.md](./DEPLOYMENT.md).
 
+For the zero-cost interview environment, `scripts/deploy-interview.sh` runs the
+published containers locally and exposes Nginx through a Cloudflare Quick
+Tunnel. `scripts/show-interview-url.sh` prints the current public HTTPS URL.
+
 ## Local HTTPS
 
 The Docker gateway serves the app over HTTPS by default:

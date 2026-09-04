@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: ghcr.io/raleifna/tutoringapp/backend:latest
+    pull_policy: always
+    environment:
+      ALLOW_TRYCLOUDFLARE_CORS: 'true'
+      EMAIL_VERIFICATION_REQUIRED: 'false'
+      AI_REPLY_MODE: mock
+
+  frontend:
+    image: ghcr.io/raleifna/tutoringapp/frontend:latest
+    pull_policy: always
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://nginx:80
+    depends_on:
+      nginx:
+        condition: service_started

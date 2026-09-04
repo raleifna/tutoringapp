@@ -2,15 +2,16 @@ const { Server } = require('socket.io');
 const { prisma } = require('../config/database');
 const logger = require('../config/logger');
 const { verifyAccessToken } = require('../utils/tokens');
+const {
+  getAllowedOrigins: getConfiguredOrigins,
+  isAllowedOrigin,
+  normalizeOrigin,
+} = require('../utils/cors');
 
 let io = null;
 
 const getAllowedOrigins = () => {
-  const normalizeOrigin = (value = '') => value.trim().replace(/\/+$/, '');
-  const configuredOrigins = (process.env.CORS_ORIGIN || '')
-    .split(',')
-    .map(normalizeOrigin)
-    .filter(Boolean);
+  const configuredOrigins = getConfiguredOrigins();
 
   if (process.env.FRONTEND_URL) {
     configuredOrigins.push(normalizeOrigin(process.env.FRONTEND_URL));
@@ -68,7 +69,7 @@ const getUserFromSocketToken = async (token) => {
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: getAllowedOrigins(),
+      origin: (origin, callback) => callback(null, isAllowedOrigin(origin, getAllowedOrigins())),
       methods: ['GET', 'POST'],
       credentials: true,
     },
