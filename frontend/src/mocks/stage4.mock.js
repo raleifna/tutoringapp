@@ -1878,6 +1878,28 @@ export const messageApi = {
     return ok(message, 'Message sent');
   },
 
+  generateAiReply: async (conversationId) => {
+    await wait(420);
+    const sessionUser = getSessionUser();
+    if (!sessionUser) return fail('Unauthorized', 401);
+
+    const conversation = ensureConversations().find((item) => isSameUser(item.id, conversationId));
+    if (!conversation) return fail('Conversation not found', 404);
+    if (!(conversation.participantIds || []).some((id) => isSameUser(id, sessionUser.id))) {
+      return fail('Forbidden', 403);
+    }
+
+    const lastIncoming = sortConversationMessages(conversation.messages || [])
+      .reverse()
+      .find((message) => !isSameUser(message.senderId, sessionUser.id));
+    const content = String(lastIncoming?.content || '');
+    const reply = content.includes('?')
+      ? 'Thanks for asking. That works for me, and I can share more detail if helpful.'
+      : 'Thanks for the update. That sounds good to me, and I will keep an eye out for the next step.';
+
+    return ok({ reply, mode: 'mock' }, 'AI reply generated');
+  },
+
   markAsRead: async (conversationId) => {
     await wait(120);
     const sessionUser = getSessionUser();

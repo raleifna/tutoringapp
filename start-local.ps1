@@ -198,15 +198,12 @@ if ($ForceSeed) {
 }
 
 Ensure-Command -Name 'docker' -Hint 'Install Docker Desktop and make sure the daemon is running.'
-Ensure-Command -Name 'openssl' -Hint 'Install OpenSSL so the startup script can create a local HTTPS certificate.'
 $envFilePath = Ensure-RootEnv -EnvFileName $EnvFile
 $backendHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'BACKEND_HOST_PORT' -DefaultValue '5050'
 $gatewayHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'NGINX_HOST_PORT' -DefaultValue '8443'
 $mailboxHostPort = Get-EnvValue -EnvFilePath $envFilePath -Name 'MAILPIT_UI_HOST_PORT' -DefaultValue '8025'
 $httpsCertHost = Get-EnvValue -EnvFilePath $envFilePath -Name 'HTTPS_CERT_HOST' -DefaultValue 'localhost'
-$gatewayUrl = (Get-EnvValue -EnvFilePath $envFilePath -Name 'FRONTEND_URL' -DefaultValue "https://localhost:$gatewayHostPort").TrimEnd('/')
-
-Ensure-HttpsCertificate -CertHost $httpsCertHost
+$gatewayUrl = (Get-EnvValue -EnvFilePath $envFilePath -Name 'FRONTEND_URL' -DefaultValue "http://localhost:$gatewayHostPort").TrimEnd('/')
 
 Write-Step 'Building and starting the local full-stack Docker environment'
 Invoke-Compose -ComposeArgs @('up', '--build', '-d')

@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { messageApi } from '../../../lib/api-entry';
 import { getAvatarUrl } from '../../../lib/avatar';
@@ -236,6 +238,22 @@ export default function MessagesPage() {
     },
   });
 
+  const aiReplyMutation = useMutation({
+    mutationFn: (conversationId) => messageApi.generateAiReply(conversationId),
+    onSuccess: (response) => {
+      const reply = response?.data?.data?.reply || '';
+      if (!reply) {
+        toast.error('AI did not return a reply.');
+        return;
+      }
+      setMessageInput(reply);
+      toast.success('AI draft added.');
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to generate AI reply');
+    },
+  });
+
   const handleSend = () => {
     const content = messageInput.trim();
     if (!content || !selectedConversationId) return;
@@ -243,6 +261,11 @@ export default function MessagesPage() {
       conversationId: selectedConversationId,
       content,
     });
+  };
+
+  const handleGenerateAiReply = () => {
+    if (!selectedConversationId || aiReplyMutation.isPending) return;
+    aiReplyMutation.mutate(selectedConversationId);
   };
 
   const handleTyping = () => {
@@ -474,6 +497,20 @@ export default function MessagesPage() {
             </div>
 
             <div className="border-t border-gray-100 bg-white p-3 md:p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateAiReply}
+                  disabled={aiReplyMutation.isPending || messagesLoading}
+                  className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  <span>{aiReplyMutation.isPending ? 'AI is writing...' : 'AI draft reply'}</span>
+                </button>
+                {aiReplyMutation.data?.data?.data?.mode === 'mock' && (
+                  <span className="hidden text-xs text-gray-400 sm:inline">Mock mode</span>
+                )}
+              </div>
               <div className="flex items-end gap-2">
                 <textarea
                   value={messageInput}

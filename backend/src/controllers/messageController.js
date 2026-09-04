@@ -1,6 +1,159 @@
 const { prisma } = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { generateReply } = require('../services/aiReplyService');
 const { getSocketIO } = require('../services/socketService');
+
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const getUserName = (user) => `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+
+const getStartOfCurrentUtcWeek = () => {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = start.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setUTCDate(start.getUTCDate() + diff);
+  return start;
+};
+
+const serializeAvailability = (slots = []) =>
+  slots.map((slot) => ({
+    day: dayNames[slot.dayOfWeek] || `Day ${slot.dayOfWeek}`,
+    dayOfWeek: slot.dayOfWeek,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    timezone: slot.timezone,
+  }));
+
+const buildAiReplyContext = async ({ conversation, currentUserId }) => {
+  const users = (conversation?.participants || []).map((item) => item.user).filter(Boolean);
+  const currentUser = users.find((item) => item.id === currentUserId);
+  const partner = users.find((item) => item.id !== currentUserId);
+  const tutorUser = users.find((item) => item.role === 'TUTOR');
+  const learnerUser = users.find((item) => item.role === 'LEARNER');
+
+  let tutorContext = null;
+  let learnerProfile = null;
+  let bookings = [];
+
+  if (learnerUser?.id) {
+    learnerProfile = await prisma.learnerProfile.findUnique({
+      where: { userId: learnerUser.id },
+      select: {
+        gradeLevel: true,
+        learningGoals: true,
+        subjects: true,
+      },
+    });
+  }
+
+  if (tutorUser?.id) {
+    const weekStart = getStartOfCurrentUtcWeek();
+    const nextWeekStart = new Date(weekStart);
+    nextWeekStart.setUTCDate(nextWeekStart.getUTCDate() + 7);
+    const tutorProfile = await prisma.tutorProfile.findUnique({
+      where: { userId: tutorUser.id },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, role: true, timezone: true } },
+        subjects: {
+          include: { subject: true },
+        },
+        availability: {
+          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        },
+        availabilityOverrides: {
+          where: { weekStart: { gte: weekStart, lt: nextWeekStart } },
+          include: {
+            slots: {
+              orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+            },
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (tutorProfile) {
+      tutorContext = {
+        id: tutorProfile.id,
+        userId: tutorProfile.userId,
+        name: getUserName(tutorProfile.user),
+        timezone: tutorProfile.user?.timezone,
+        headline: tutorProfile.headline,
+        hourlyRate: Number(tutorProfile.hourlyRate || 0),
+        currency: tutorProfile.currency,
+        sessionTypes: tutorProfile.sessionTypes,
+        subjects: (tutorProfile.subjects || []).map((item) => ({
+          name: item.subject?.name,
+          category: item.subject?.category,
+          level: item.level,
+          description: item.description,
+        })),
+        availability: serializeAvailability(tutorProfile.availability || []),
+        currentWeekAvailability: serializeAvailability(
+          tutorProfile.availabilityOverrides?.[0]?.slots || []
+        ),
+      };
+
+      if (learnerUser?.id) {
+        bookings = await prisma.booking.findMany({
+          where: {
+            learnerId: learnerUser.id,
+            tutorId: tutorProfile.id,
+          },
+          orderBy: { scheduledAt: 'desc' },
+          take: 8,
+          select: {
+            id: true,
+            subject: true,
+            status: true,
+            scheduledAt: true,
+            duration: true,
+            sessionType: true,
+            recurringType: true,
+            learnerTimezone: true,
+            tutorTimezone: true,
+          },
+        });
+      }
+    }
+  }
+
+  return {
+    currentUser: currentUser
+      ? {
+          id: currentUser.id,
+          name: getUserName(currentUser),
+          role: currentUser.role,
+          timezone: currentUser.timezone,
+        }
+      : null,
+    partner: partner
+      ? {
+          id: partner.id,
+          name: getUserName(partner),
+          role: partner.role,
+          timezone: partner.timezone,
+        }
+      : null,
+    tutor: tutorContext,
+    learner: learnerUser
+      ? {
+          id: learnerUser.id,
+          name: getUserName(learnerUser),
+          role: learnerUser.role,
+          timezone: learnerUser.timezone,
+          gradeLevel: learnerProfile?.gradeLevel,
+          learningGoals: learnerProfile?.learningGoals,
+          subjects: learnerProfile?.subjects || [],
+        }
+      : null,
+    bookings: bookings.map((booking) => ({
+      ...booking,
+      scheduledAt: booking.scheduledAt?.toISOString?.() || booking.scheduledAt,
+    })),
+  };
+};
 
 exports.getConversations = async (req, res) => {
   const conversations = await prisma.conversation.findMany({
@@ -186,6 +339,52 @@ exports.sendMessage = async (req, res) => {
   }
 
   res.status(201).json({ success: true, data: message });
+};
+
+exports.generateAiReply = async (req, res) => {
+  const { conversationId } = req.params;
+
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: { conversationId_userId: { conversationId, userId: req.user.id } },
+  });
+
+  if (!participant) throw new AppError('Conversation not found', 404);
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      participants: {
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, role: true, timezone: true } },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 24,
+        include: {
+          sender: { select: { id: true, firstName: true, lastName: true } },
+        },
+      },
+    },
+  });
+
+  const messages = (conversation?.messages || []).reverse();
+  const partner = conversation?.participants?.find((item) => item.userId !== req.user.id)?.user;
+  const partnerName = `${partner?.firstName || ''} ${partner?.lastName || ''}`.trim();
+  const context = await buildAiReplyContext({ conversation, currentUserId: req.user.id });
+
+  try {
+    const suggestion = await generateReply({
+      messages,
+      currentUserId: req.user.id,
+      partnerName,
+      context,
+    });
+
+    res.json({ success: true, data: suggestion });
+  } catch (error) {
+    throw new AppError(error.message || 'Failed to generate AI reply', error.statusCode || 502);
+  }
 };
 
 exports.markAsRead = async (req, res) => {

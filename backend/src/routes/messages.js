@@ -17,6 +17,7 @@ router.post(
   validate,
   messageController.sendMessage
 );
+router.post('/conversations/:conversationId/ai-reply', messageController.generateAiReply);
 router.patch('/conversations/:conversationId/read', messageController.markAsRead);
 router.get('/unread-count', messageController.getUnreadCount);
 

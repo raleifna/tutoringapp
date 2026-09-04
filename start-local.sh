@@ -187,16 +187,13 @@ EOF
 
 ensure_command docker "Install Docker Desktop and make sure the daemon is running."
 ensure_command curl "Install curl so the startup script can wait for local health checks."
-ensure_command openssl "Install OpenSSL so the startup script can create a local HTTPS certificate."
 ENV_FILE_PATH="$(ensure_root_env "$ENV_FILE")"
 BACKEND_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "BACKEND_HOST_PORT" "5050")"
 GATEWAY_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "NGINX_HOST_PORT" "8443")"
 MAILBOX_HOST_PORT="$(get_env_value "$ENV_FILE_PATH" "MAILPIT_UI_HOST_PORT" "8025")"
 HTTPS_CERT_HOST="$(get_env_value "$ENV_FILE_PATH" "HTTPS_CERT_HOST" "localhost")"
-GATEWAY_URL="$(get_env_value "$ENV_FILE_PATH" "FRONTEND_URL" "https://localhost:${GATEWAY_HOST_PORT}")"
+GATEWAY_URL="$(get_env_value "$ENV_FILE_PATH" "FRONTEND_URL" "http://localhost:${GATEWAY_HOST_PORT}")"
 GATEWAY_URL="${GATEWAY_URL%/}"
-
-ensure_https_certificate "$HTTPS_CERT_HOST"
 
 write_step "Building and starting the local full-stack Docker environment"
 invoke_compose up --build -d

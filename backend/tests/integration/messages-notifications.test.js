@@ -7,6 +7,7 @@ const prisma = {
   conversation: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -35,10 +36,12 @@ const ioMock = {
 
 const databaseModulePath = require.resolve('../../src/config/database');
 const socketServiceModulePath = require.resolve('../../src/services/socketService');
+const aiReplyServiceModulePath = require.resolve('../../src/services/aiReplyService');
 const appModulePath = require.resolve('../../src/app');
 
 delete require.cache[databaseModulePath];
 delete require.cache[socketServiceModulePath];
+delete require.cache[aiReplyServiceModulePath];
 delete require.cache[appModulePath];
 
 require.cache[databaseModulePath] = {
@@ -58,8 +61,18 @@ require.cache[socketServiceModulePath] = {
   },
 };
 
+require.cache[aiReplyServiceModulePath] = {
+  id: aiReplyServiceModulePath,
+  filename: aiReplyServiceModulePath,
+  loaded: true,
+  exports: {
+    generateReply: vi.fn().mockResolvedValue({ reply: 'Sure, that works for me.', mode: 'mock' }),
+  },
+};
+
 const app = require('../../src/app');
 const { createAccessToken } = require('../../src/utils/tokens');
+const { generateReply } = require('../../src/services/aiReplyService');
 
 const learnerUser = {
   id: 'learner-1',
@@ -156,6 +169,45 @@ describe('messages and notifications integration tests', () => {
       success: true,
       data: { count: 3 },
     });
+  });
+
+  test('generates an AI reply draft without sending a message', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce(learnerUser);
+    prisma.conversationParticipant.findUnique.mockResolvedValueOnce({
+      conversationId: 'conversation-1',
+      userId: learnerUser.id,
+    });
+    prisma.conversation.findUnique.mockResolvedValueOnce({
+      id: 'conversation-1',
+      participants: [
+        { userId: learnerUser.id, user: { id: learnerUser.id, firstName: 'Learner', lastName: 'One' } },
+        { userId: otherUser.id, user: { id: otherUser.id, firstName: 'Tutor', lastName: 'Two' } },
+      ],
+      messages: [
+        {
+          id: 'message-1',
+          senderId: otherUser.id,
+          content: 'Does tomorrow work?',
+          sender: { id: otherUser.id, firstName: 'Tutor', lastName: 'Two' },
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .post('/api/v1/messages/conversations/conversation-1/ai-reply')
+      .set('Authorization', `Bearer ${createAccessToken(learnerUser)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { reply: 'Sure, that works for me.', mode: 'mock' },
+    });
+    expect(generateReply).toHaveBeenCalledWith({
+      messages: expect.any(Array),
+      currentUserId: learnerUser.id,
+      partnerName: 'Tutor Two',
+    });
+    expect(prisma.message.create).not.toHaveBeenCalled();
   });
 
   test('returns paginated notifications for the authenticated user', async () => {

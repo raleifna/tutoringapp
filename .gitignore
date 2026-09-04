@@ -15,4 +15,9 @@ nginx/certs/
 !.env.example
 !.env.local.example
 
+# Local cloud credentials must never be committed.
+student-*-keys.json
+student-guide.md
+*.pem
+
 docs/*
