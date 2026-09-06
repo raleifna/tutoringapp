@@ -7,6 +7,15 @@ cd "$PROJECT_ROOT"
 
 PROJECT_NAME="${PROJECT_NAME:-tutoringapp-interview}"
 
+# Keep the interview stack separate from a developer stack that may already be
+# running from the same repository.
+export POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-25432}"
+export MAILPIT_SMTP_HOST_PORT="${MAILPIT_SMTP_HOST_PORT:-11025}"
+export MAILPIT_UI_HOST_PORT="${MAILPIT_UI_HOST_PORT:-18025}"
+export BACKEND_HOST_PORT="${BACKEND_HOST_PORT:-15050}"
+export FRONTEND_HOST_PORT="${FRONTEND_HOST_PORT:-13000}"
+export NGINX_HOST_PORT="${NGINX_HOST_PORT:-18443}"
+
 if [[ -n "${ENV_FILE:-}" ]]; then
   ENV_FILE="$ENV_FILE"
 elif [[ -f .env ]]; then
@@ -45,9 +54,6 @@ compose pull backend frontend cloudflared
 
 echo "Starting the interview environment..."
 compose up -d --no-build
-
-BACKEND_HOST_PORT="${BACKEND_HOST_PORT:-5050}"
-NGINX_HOST_PORT="${NGINX_HOST_PORT:-8443}"
 
 wait_for_url "http://localhost:${BACKEND_HOST_PORT}/health"
 
