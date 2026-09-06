@@ -5,12 +5,14 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-ENV_FILE="${ENV_FILE:-.env}"
 PROJECT_NAME="${PROJECT_NAME:-tutoringapp-interview}"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Missing $ENV_FILE. Copy .env.example to .env and configure it first." >&2
-  exit 1
+if [[ -n "${ENV_FILE:-}" ]]; then
+  ENV_FILE="$ENV_FILE"
+elif [[ -f .env ]]; then
+  ENV_FILE=.env
+else
+  ENV_FILE=.env.example
 fi
 
 compose() {
